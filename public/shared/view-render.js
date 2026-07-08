@@ -96,6 +96,17 @@ function formatConfidence(confidence) {
   return `${Math.round(confidence * 100)}%`;
 }
 
+function formatTempo(tempo) {
+  if (tempo == null || Number.isNaN(Number(tempo))) return '—';
+  const n = Number(tempo);
+  return Number.isInteger(n) ? `${n} BPM` : `${n.toFixed(1)} BPM`;
+}
+
+function formatBeat(beat) {
+  if (beat == null || Number.isNaN(Number(beat))) return '—';
+  return String(beat);
+}
+
 function addStat(parent, label, value, { warn = false } = {}) {
   const card = document.createElement('div');
   card.className = 'stat' + (warn ? ' warn' : '');
@@ -136,6 +147,8 @@ export function renderAdmin(root, { title, payload, status, connected, lastUpdat
   addStat(stats, 'Row ID', payload?.match?.rowId ?? '—');
   addStat(stats, 'Matched value', payload?.match?.matchedValue ?? '—');
   addStat(stats, 'Via alias', payload?.match?.viaAlias ? 'Yes' : 'No');
+  addStat(stats, 'Tempo', formatTempo(payload?.tempo));
+  addStat(stats, 'Beat', formatBeat(payload?.beat));
   addStat(stats, 'Last sync', formatTimestamp(payload?.syncedAt));
   addStat(stats, 'Cache', payload?.stale ? 'Stale (offline)' : 'Fresh', { warn: payload?.stale });
   addStat(stats, 'Connected views', String(status?.connectedViews ?? 0));

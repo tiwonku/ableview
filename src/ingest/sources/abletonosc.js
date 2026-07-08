@@ -72,8 +72,8 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     });
 
     // Registration replies and explicit state queries can both report the
-    // same state; only emit when the playing clips actually changed.
-    const key = JSON.stringify([event.authoritativeClip, tracks]);
+    // same state; only emit when clip, tempo, or beat actually changed.
+    const key = JSON.stringify([event.authoritativeClip, tracks, event.tempo, event.beat]);
     if (key === lastEmittedKey) return;
     lastEmittedKey = key;
 
@@ -134,10 +134,10 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       case '/live/clip/get/name': return onClipName(msg.args);
       case '/live/song/get/tempo':
         tempo = msg.args[0];
-        return;
+        return emitNowPlaying();
       case '/live/song/get/beat':
         beat = msg.args[0];
-        return;
+        return emitNowPlaying();
       default:
         log.debug({ address: msg.address }, 'unhandled OSC message');
     }

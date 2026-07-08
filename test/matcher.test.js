@@ -106,6 +106,65 @@ test('alias column match sets viaAlias', () => {
   assert.equal(payload.match.matchedValue, 'SA Intro');
 });
 
+test('clip with arrangement suffix matches sheet title via prefix pass', () => {
+  const rows = [
+    {
+      rowId: '144',
+      data: {
+        'Clip Name': 'Still Night',
+        Key: 'Gm',
+        BPM: '98',
+        Aliases: '',
+      },
+    },
+  ];
+  const payload = matchClip(
+    'Still Night edit part 2',
+    snapshot({ rows }),
+    testConfig({ match: { threshold: 0.4 } })
+  );
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '144');
+  assert.equal(payload.match.matchedValue, 'Still Night');
+  assert.equal(payload.match.confidence, 0.9);
+});
+
+test('prefix match prefers longest sheet title', () => {
+  const rows = [
+    {
+      rowId: '10',
+      data: { 'Clip Name': 'So Bright', Aliases: '' },
+    },
+    {
+      rowId: '11',
+      data: { 'Clip Name': 'Bright', Aliases: '' },
+    },
+  ];
+  const payload = matchClip(
+    'So Bright edit',
+    snapshot({ rows }),
+    testConfig({ match: { threshold: 0.4 } })
+  );
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '10');
+  assert.equal(payload.match.matchedValue, 'So Bright');
+});
+
+test('prefix match requires title at start of clip name', () => {
+  const rows = [
+    {
+      rowId: '20',
+      data: { 'Clip Name': 'Still Night', Aliases: '' },
+    },
+  ];
+  const payload = matchClip(
+    'Intro - Still Night',
+    snapshot({ rows }),
+    testConfig({ match: { threshold: 0.4 } })
+  );
+  assert.equal(payload.match.matched, false);
+});
+
 test('below-threshold clip returns matched false (NFR-7)', () => {
   const payload = matchClip('Totally Unknown Clip v3', snapshot(), testConfig());
   assert.equal(payload.match.matched, false);
@@ -229,4 +288,43 @@ test('createMatcher re-emits when tempo changes for same clip', () => {
   assert.equal(payloads.length, 2);
   assert.equal(payloads[1].tempo, 130);
   assert.equal(payloads[1].simulated, false);
+});
+
+test('createMatcher re-emits when beat changes for same clip without re-matching', () => {
+  const bus = createBus();
+  const payloads = [];
+  bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
+
+  createMatcher({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    getSnapshot: () => snapshot(),
+  });
+
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'Song A - Intro',
+      tempo: 128,
+      beat: 12,
+    })
+  );
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'Song A - Intro',
+      tempo: 128,
+      beat: 13,
+    })
+  );
+
+  assert.equal(payloads.length, 2);
+  assert.equal(payloads[0].beat, 12);
+  assert.equal(payloads[1].beat, 13);
+  assert.equal(payloads[0].match.rowId, '5');
+  assert.equal(payloads[1].match.rowId, '5');
+  assert.equal(payloads[1].match.matchedValue, payloads[0].match.matchedValue);
 });

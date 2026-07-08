@@ -41,6 +41,29 @@ function scoreToConfidence(score) {
   return Math.max(0, Math.min(1, 1 - score));
 }
 
+const MIN_PREFIX_TITLE_LENGTH = 4;
+const PREFIX_MATCH_CONFIDENCE = 0.9;
+
+function findPrefixMatch(query, items) {
+  if (!query) return null;
+
+  let best = null;
+  for (const item of items) {
+    const { norm } = item;
+    if (!norm || norm.length < MIN_PREFIX_TITLE_LENGTH) continue;
+
+    const exact = query === norm;
+    const prefix = !exact && query.startsWith(`${norm} `);
+    if (!exact && !prefix) continue;
+
+    if (!best || norm.length > best.item.norm.length) {
+      best = { item, exact };
+    }
+  }
+
+  return best;
+}
+
 export function matchClip(clipName, snapshot, config) {
   const { matchColumn, aliasColumn } = config.sheets;
   const { threshold, normalize: normalizeOptions } = config.match;
@@ -71,8 +94,29 @@ export function matchClip(clipName, snapshot, config) {
     });
   }
 
-  const fuse = createFuseIndex(items, threshold);
   const query = normalizeClipName(clipName, normalizeOptions);
+
+  const prefixMatch = findPrefixMatch(query, items);
+  if (prefixMatch) {
+    const { item, exact } = prefixMatch;
+    const { row, matchedValue, viaAlias } = item;
+    return makeCuePayload({
+      clipName,
+      match: makeMatchResult({
+        matched: true,
+        confidence: exact ? 1 : PREFIX_MATCH_CONFIDENCE,
+        rowId: row.rowId,
+        matchedValue,
+        viaAlias,
+      }),
+      row: row.data,
+      syncedAt,
+      stale,
+      simulated,
+    });
+  }
+
+  const fuse = createFuseIndex(items, threshold);
   const results = fuse.search(query);
 
   if (results.length === 0) {
@@ -114,10 +158,19 @@ function nowPlayingKey(event) {
   });
 }
 
+function clipKey(event) {
+  return JSON.stringify({
+    clip: event.authoritativeClip,
+    source: event.source,
+  });
+}
+
 export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
   const resolveConfig = getConfig ?? (() => config);
   let lastKey = null;
+  let lastClipKey = null;
   let lastEvent = null;
+  let lastPayload = null;
 
   function handleNowPlaying(event, { force = false } = {}) {
     const key = nowPlayingKey(event);
@@ -125,11 +178,21 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
     lastKey = key;
     lastEvent = event;
 
-    const snapshot = getSnapshot();
-    const payload = matchClip(event.authoritativeClip, snapshot, resolveConfig());
-    payload.tempo = event.tempo;
-    payload.beat = event.beat;
-    payload.simulated = event.source === SOURCES.SIMULATOR;
+    const ck = clipKey(event);
+    const transportOnly = !force && lastClipKey === ck && lastPayload != null;
+
+    let payload;
+    if (transportOnly) {
+      payload = { ...lastPayload, tempo: event.tempo, beat: event.beat };
+    } else {
+      const snapshot = getSnapshot();
+      payload = matchClip(event.authoritativeClip, snapshot, resolveConfig());
+      payload.tempo = event.tempo;
+      payload.beat = event.beat;
+      payload.simulated = event.source === SOURCES.SIMULATOR;
+    }
+    lastClipKey = ck;
+    lastPayload = payload;
 
     log.info(
       {
