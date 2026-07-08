@@ -42,6 +42,10 @@ body {
   color: var(--muted);
 }
 
+.status-bar .view-nav {
+  margin-left: auto;
+}
+
 .status-bar .dot {
   width: 0.55rem;
   height: 0.55rem;
@@ -86,6 +90,36 @@ main {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+.view-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.view-nav a {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--bg);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.view-nav a:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.view-nav a.is-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: rgba(91, 141, 239, 0.12);
 }
 
 .clip-name {

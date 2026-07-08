@@ -106,6 +106,7 @@ test('WebSocket init includes view config and cue broadcast on bus emit', async 
   assert.equal(init.title, 'Band');
   assert.deepEqual(init.fields.map((f) => f.column), ['Key', 'BPM', 'Band Notes']);
   assert.equal(init.payload, null);
+  assert.deepEqual(init.views, [{ id: 'band', title: 'Band' }]);
 
   const payload = makeCuePayload({
     clipName: 'Song A - Intro',

@@ -125,6 +125,10 @@ export async function createViewServer({ config, bus, log, getHealthContext, con
       title: viewConfig.title ?? viewId,
       fields: viewConfig.fields ?? [],
       payload: lastPayload,
+      views: Object.entries(config.views).map(([id, v]) => ({
+        id,
+        title: v.title ?? id,
+      })),
     };
     if (viewConfig.system) {
       init.system = true;
