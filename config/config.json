@@ -2,12 +2,17 @@
   "ingest": {
     "oscListenPort": 11001,
     "oscSendPort": 11000,
-    "abletonHost": "127.0.0.1",
-    "watchedTracks": ["Cue"],
-    "authoritative": { "strategy": "track", "track": "Cue" }
+    "abletonHost": "192.168.0.119",
+    "watchedTracks": [
+      "Cue"
+    ],
+    "authoritative": {
+      "strategy": "track",
+      "track": "Cue"
+    }
   },
   "sim": {
-    "enabled": false,
+    "enabled": true,
     "mode": "internal",
     "driver": "scenario",
     "scenario": "./config/scenarios/sheet-demo.json",
@@ -23,13 +28,60 @@
   },
   "match": {
     "threshold": 0.4,
-    "normalize": { "lowercase": true, "stripPunctuation": true, "stripVersionTags": true }
+    "normalize": {
+      "lowercase": true,
+      "stripPunctuation": true,
+      "stripVersionTags": true
+    }
   },
-  "server": { "wsHeartbeatSeconds": 5 },
+  "server": {
+    "wsHeartbeatSeconds": 5
+  },
   "views": {
-    "band":     { "title": "Band",     "fields": [ { "column": "Key" }, { "column": "BPM" }, { "column": "Band Notes", "label": "Notes" } ] },
-    "visuals":  { "title": "Visuals",  "fields": [ { "column": "Mood" }, { "column": "Visual Notes", "label": "Notes" }, { "column": "Color" } ] },
-    "lighting": { "title": "Lighting", "fields": [ { "column": "Lighting Cue" }, { "column": "BPM" } ] },
-    "admin":    { "title": "Admin",    "system": true }
+    "band": {
+      "title": "Band",
+      "fields": [
+        {
+          "column": "Key"
+        },
+        {
+          "column": "BPM"
+        },
+        {
+          "column": "Band Notes",
+          "label": "Notes"
+        }
+      ]
+    },
+    "visuals": {
+      "title": "Visuals",
+      "fields": [
+        {
+          "column": "Mood"
+        },
+        {
+          "column": "Visual Notes",
+          "label": "Notes"
+        },
+        {
+          "column": "Color"
+        }
+      ]
+    },
+    "lighting": {
+      "title": "Lighting",
+      "fields": [
+        {
+          "column": "Lighting Cue"
+        },
+        {
+          "column": "BPM"
+        }
+      ]
+    },
+    "admin": {
+      "title": "Admin",
+      "system": true
+    }
   }
 }
