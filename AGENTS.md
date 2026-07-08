@@ -25,7 +25,7 @@ It runs unattended on show nights on a dedicated box (Windows NUC or Raspberry P
 | **M3** | Fuzzy matcher | ✅ **Done** |
 | **M4** | View server + first view | ✅ **Done** |
 | **M5** | Remaining views + admin/status | ✅ **Done** |
-| **M6** | Hardening | Not started |
+| **M6** | Hardening | ✅ **Done** |
 
 **M1 delivered:** config loader, event bus, `NowPlaying` contract, read-only AbletonOSC ingest, simulator (internal + on-the-wire `osc` mode), NFR-1 tests, systemd unit stub.
 
@@ -207,7 +207,8 @@ Use spec §10 acceptance criteria verbatim. Summary:
 
 - Auto-restart, reconnect logic, config validation on boot, log rotation, `/health`
 - Windows NUC: NSSM or Task Scheduler equivalent (alongside `deploy/ableview.service` for Linux/Pi)
-- **Accept:** power-cycle → everything recovers with no human intervention
+- **Accept:** power-cycle → everything recovers with no human intervention (after OS service install on show box)
+- **Delivered:** `/health`, `validateProductionReady` (gated by `NODE_ENV=production`), optional `LOG_FILE`, `deploy/README.md` + logrotate example + NSSM steps
 
 ---
 
@@ -232,7 +233,7 @@ Avoid native modules (e.g. `better-sqlite3`) unless explicitly needed. JSON file
 | Environment | Service manager | Unit file |
 |---|---|---|
 | Linux / Raspberry Pi | systemd | `deploy/ableview.service` |
-| Windows NUC (headless) | NSSM or Task Scheduler | TBD in M6 |
+| Windows NUC (headless) | NSSM or Task Scheduler | [`deploy/README.md`](./deploy/README.md) |
 
 Node.js ≥ 20 (LTS). Runs on x64 Windows and ARM Pi without code changes.
 

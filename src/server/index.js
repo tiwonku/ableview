@@ -2,13 +2,14 @@ import Fastify from 'fastify';
 import { WebSocketServer } from 'ws';
 import { EVENTS } from '../core/bus.js';
 import { readPublicFile } from './static.js';
+import { buildHealthReport } from './health.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
   return url.searchParams.get('view') || 'band';
 }
 
-export async function createViewServer({ config, bus, log }) {
+export async function createViewServer({ config, bus, log, getHealthContext }) {
   let lastPayload = null;
   const clients = new Map();
 
@@ -48,6 +49,18 @@ export async function createViewServer({ config, bus, log }) {
   const app = Fastify({ logger: false });
 
   app.get('/', async (_req, reply) => reply.redirect('/views/band'));
+
+  app.get('/health', async (_req, reply) => {
+    const ctx = getHealthContext?.() ?? {};
+    const report = buildHealthReport({
+      simulated: ctx.simulated ?? false,
+      getSheetSnapshot: ctx.getSheetSnapshot ?? (() => ({ syncedAt: null, stale: true, rows: [] })),
+      getConnectedViewCount,
+      lastCuePayload: lastPayload,
+    });
+    const code = report.status === 'ok' ? 200 : 503;
+    return reply.code(code).send(report);
+  });
 
   app.get('/views/:name', async (req, reply) => {
     try {

@@ -1,0 +1,14 @@
+/opt/ableview/logs/ableview.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+
+# Install (Linux):
+#   sudo cp deploy/logrotate.example /etc/logrotate.d/ableview
+#
+# Requires LOG_FILE=./logs/ableview.log in .env (see deploy/README.md).

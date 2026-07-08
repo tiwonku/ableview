@@ -1,4 +1,4 @@
-import { loadConfig } from './config/index.js';
+import { loadConfig, shouldValidateProduction, validateProductionReady } from './config/index.js';
 import { createLogger } from './core/logger.js';
 import { createBus } from './core/bus.js';
 import { createIngest } from './ingest/index.js';
@@ -14,7 +14,12 @@ async function main() {
   // `npm run sim` convenience: force simulation mode without editing config.
   if (process.argv.includes('--sim')) config.sim.enabled = true;
 
+  if (shouldValidateProduction()) {
+    validateProductionReady(config);
+  }
+
   const bus = createBus();
+  const simulated = config.sim.enabled;
 
   const sheets = createSheetsStore({ config, log: log.child({ module: 'sheets' }) });
   await sheets.start();
@@ -30,9 +35,13 @@ async function main() {
     config,
     bus,
     log: log.child({ module: 'server' }),
+    getHealthContext: () => ({
+      simulated,
+      getSheetSnapshot: sheets.getSnapshot,
+    }),
   });
 
-  const { source, simulated } = createIngest({
+  const { source } = createIngest({
     config,
     bus,
     log,

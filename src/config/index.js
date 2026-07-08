@@ -79,11 +79,59 @@ export function validateConfig(config) {
   if (!Number.isInteger(config.sheets.headerRow) || config.sheets.headerRow < 1) {
     errors.push('sheets.headerRow must be a positive integer (1-based sheet row number)');
   }
+  if (config.server.httpPort != null) {
+    if (!port(config.server.httpPort)) errors.push('HTTP_PORT must be a valid port');
+  }
+  if (!(config.server.wsHeartbeatSeconds >= 0)) {
+    errors.push('server.wsHeartbeatSeconds must be >= 0');
+  }
+
+  const views = config.views ?? {};
+  for (const [viewId, view] of Object.entries(views)) {
+    if (view.system) continue;
+    if (!view.title) errors.push(`views.${viewId}.title is required`);
+    if (!Array.isArray(view.fields) || view.fields.length === 0) {
+      errors.push(`views.${viewId}.fields must be a non-empty array`);
+    }
+    for (const [i, field] of (view.fields ?? []).entries()) {
+      if (!field?.column) errors.push(`views.${viewId}.fields[${i}].column is required`);
+    }
+  }
 
   if (errors.length > 0) {
     throw new Error(`Invalid config:\n  - ${errors.join('\n  - ')}`);
   }
   return config;
+}
+
+export function validateProductionReady(config) {
+  const errors = [];
+
+  if (config.sim.enabled) return config;
+
+  const views = config.views ?? {};
+  if (Object.keys(views).length === 0) {
+    errors.push('views must define at least one view');
+  }
+  if (!views.admin?.system) {
+    errors.push('views.admin with system: true is required for production');
+  }
+
+  if (!config.secrets?.googleServiceAccountKeyPath) {
+    errors.push('GOOGLE_SERVICE_ACCOUNT_KEY_PATH is required when not in simulation mode');
+  }
+  if (!config.secrets?.sheetId) {
+    errors.push('SHEET_ID is required when not in simulation mode');
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Production config incomplete:\n  - ${errors.join('\n  - ')}`);
+  }
+  return config;
+}
+
+export function shouldValidateProduction() {
+  return process.env.NODE_ENV === 'production' || process.env.ABLEVIEW_PRODUCTION === '1';
 }
 
 export function loadConfig({ configPath = './config/config.json', envPath = '.env', cwd = process.cwd() } = {}) {
@@ -96,7 +144,7 @@ export function loadConfig({ configPath = './config/config.json', envPath = '.en
     if (err.code !== 'ENOENT') throw new Error(`Failed to read ${configPath}: ${err.message}`);
   }
 
-  const config = validateConfig(deepMerge(DEFAULTS, fileConfig));
+  const config = deepMerge(DEFAULTS, fileConfig);
 
   // Secrets and machine-specific settings come from the environment (§8).
   config.secrets = {
@@ -105,5 +153,6 @@ export function loadConfig({ configPath = './config/config.json', envPath = '.en
   };
   config.server.httpPort = Number(process.env.HTTP_PORT ?? 8080);
 
+  validateConfig(config);
   return config;
 }

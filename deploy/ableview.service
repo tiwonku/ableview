@@ -1,15 +1,24 @@
 [Unit]
-Description=AbleView
+Description=AbleView — live show now-playing board
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/ableview
+Environment=NODE_ENV=production
+EnvironmentFile=-/opt/ableview/.env
 ExecStart=/usr/bin/node src/index.js
 Restart=always
 RestartSec=3
-Environment=NODE_ENV=production
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ableview
 
 [Install]
 WantedBy=multi-user.target
+
+# Install (see deploy/README.md):
+#   sudo cp deploy/ableview.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ableview
