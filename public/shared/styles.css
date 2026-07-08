@@ -333,3 +333,44 @@ main {
   background: rgba(245, 101, 101, 0.1);
   border: 1px solid var(--warn);
 }
+
+.settings-group-sim {
+  border-color: var(--warn);
+}
+
+.settings-field-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  grid-template-columns: unset;
+}
+
+.settings-checkbox {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: var(--warn);
+}
+
+.settings-checkbox-label {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.settings-sim-warn {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--warn);
+  background: rgba(230, 162, 60, 0.12);
+  border-radius: 0.35rem;
+}
+
+.settings-sim-hint {
+  margin: 0.5rem 0 0 1.7rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

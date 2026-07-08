@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { validateConfig } from './index.js';
 
 /** Sections editable from the admin settings panel (M7). */
-export const EDITABLE_SECTIONS = ['ingest', 'sheets', 'match'];
+export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match'];
 
 function deepMerge(base, override) {
   if (override === undefined) return base;
@@ -36,6 +36,7 @@ export function serializeFileConfig(config) {
 export function pickEditableSettings(config) {
   return {
     ingest: { ...config.ingest },
+    sim: { ...config.sim },
     sheets: { ...config.sheets },
     match: { ...config.match },
   };

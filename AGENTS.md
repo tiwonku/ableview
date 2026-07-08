@@ -213,10 +213,11 @@ Use spec §10 acceptance criteria verbatim. Summary:
 
 ### M7 — Admin settings GUI
 
-- `GET/PATCH /api/config/settings` for editable `ingest`, `sheets`, and `match` sections
+- `GET/PATCH /api/config/settings` for editable `ingest`, `sim`, `sheets`, and `match` sections
 - Admin page settings form; changes persist to `config.json` and reload ingest / sheets / matcher as needed
 - **Accept:** change Ableton IP or cue track in admin → ingest reconnects without SSH; invalid values rejected with clear error
-- **Not in scope:** `.env` secrets, `sim.enabled`, view field maps (still edit `config.json` or SSH)
+- **Sim toggle:** `sim.enabled` editable from admin with prominent warning; toggling reloads ingest (simulator ↔ live OSC)
+- **Not in scope:** `.env` secrets, view field maps (still edit `config.json` or SSH)
 
 ---
 

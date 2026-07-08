@@ -46,6 +46,9 @@ function settingsFromForm(form, current) {
   if (track !== '' && /^\d+$/.test(track)) track = Number(track);
 
   return {
+    sim: {
+      enabled: fd.get('simEnabled') === 'on',
+    },
     ingest: {
       abletonHost: fd.get('abletonHost')?.trim() ?? current.ingest.abletonHost,
       oscListenPort: Number(fd.get('oscListenPort')),
@@ -87,6 +90,33 @@ function renderForm(root, settings, { onSave, status }) {
 
   const form = el('form', 'settings-form');
   form.noValidate = true;
+
+  const simGroup = el('fieldset', 'settings-group settings-group-sim');
+  simGroup.appendChild(el('legend', null, 'Simulation'));
+  const simEnabled = settings.sim?.enabled === true;
+  const simCheck = el('input');
+  simCheck.type = 'checkbox';
+  simCheck.name = 'simEnabled';
+  simCheck.id = 'simEnabled';
+  simCheck.checked = simEnabled;
+  simCheck.className = 'settings-checkbox';
+  const simRow = el('div', 'settings-field settings-field-checkbox');
+  simRow.appendChild(simCheck);
+  const simLabel = el('label', 'settings-checkbox-label');
+  simLabel.htmlFor = 'simEnabled';
+  simLabel.textContent = 'Simulation mode (fake clip changes — not live Ableton)';
+  simRow.appendChild(simLabel);
+  simGroup.appendChild(simRow);
+  if (simEnabled) {
+    const simWarn = el('p', 'settings-sim-warn');
+    simWarn.textContent = 'Simulation is ON. Operator views show fake data. Turn off before show night.';
+    simGroup.appendChild(simWarn);
+  } else {
+    const simHint = el('p', 'settings-sim-hint');
+    simHint.textContent = 'When off, AbleView listens to the real Ableton session via OSC.';
+    simGroup.appendChild(simHint);
+  }
+  form.appendChild(simGroup);
 
   const ingestGroup = el('fieldset', 'settings-group');
   ingestGroup.appendChild(el('legend', null, 'Ableton / OSC'));

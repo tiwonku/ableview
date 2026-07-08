@@ -53,12 +53,19 @@ async function main() {
   });
 
   configRuntime.onReload(async (sections) => {
-    if (sections.includes('ingest')) await ingest.reloadIngest();
+    if (sections.includes('sim') || sections.includes('ingest')) {
+      await ingest.reloadIngest();
+      if (getConfig().sim.enabled) {
+        log.warn('================ SIMULATION MODE ================');
+      } else {
+        log.info('simulation mode disabled — listening for live Ableton');
+      }
+    }
     if (sections.includes('sheets')) {
       sheets.applySettings();
       matcher.rematch();
     }
-    if (sections.includes('match')) matcher.rematch();
+    if (sections.includes('match') || sections.includes('sim')) matcher.rematch();
   });
 
   if (ingest.simulated) {

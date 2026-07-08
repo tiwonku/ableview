@@ -30,11 +30,12 @@ function baseConfig(overrides = {}) {
   return { ...config, ...overrides };
 }
 
-test('pickEditableSettings returns ingest, sheets, and match only', () => {
+test('pickEditableSettings returns ingest, sim, sheets, and match', () => {
   const config = baseConfig();
   const settings = pickEditableSettings(config);
-  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'sheets']);
+  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'sheets', 'sim']);
   assert.equal(settings.ingest.abletonHost, '127.0.0.1');
+  assert.equal(settings.sim.enabled, false);
 });
 
 test('serializeFileConfig excludes secrets and env-only httpPort', () => {
@@ -132,10 +133,20 @@ test('GET and PATCH /api/config/settings', async () => {
   assert.equal(patchBody.settings.ingest.abletonHost, '192.168.0.99');
   assert.deepEqual(patchBody.reloaded, ['ingest']);
 
-  const badRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
+  const simRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sim: { enabled: true } }),
+  });
+  assert.equal(simRes.status, 200);
+  const simBody = await simRes.json();
+  assert.equal(simBody.settings.sim.enabled, true);
+  assert.deepEqual(simBody.reloaded, ['sim']);
+
+  const badRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ views: { band: { title: 'X' } } }),
   });
   assert.equal(badRes.status, 400);
 
