@@ -16,9 +16,11 @@
   "private": true,
   "dependencies": {
     "dotenv": "^17.4.2",
+    "fastify": "^5.10.0",
     "fuse.js": "^7.4.2",
     "googleapis": "^173.0.0",
     "osc": "^2.4.5",
-    "pino": "^10.3.1"
+    "pino": "^10.3.1",
+    "ws": "^8.21.0"
   }
 }

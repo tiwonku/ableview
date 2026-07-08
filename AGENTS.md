@@ -23,7 +23,7 @@ It runs unattended on show nights on a dedicated box (Windows NUC or Raspberry P
 | **M1** | Skeleton + ingest + simulator | ✅ **Done** |
 | **M2** | Sheets sync + offline cache | ✅ **Done** |
 | **M3** | Fuzzy matcher | ✅ **Done** |
-| **M4** | View server + first view | Not started |
+| **M4** | View server + first view | ✅ **Done** |
 | **M5** | Remaining views + admin/status | Not started |
 | **M6** | Hardening | Not started |
 

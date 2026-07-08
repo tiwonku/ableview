@@ -1,0 +1,98 @@
+// Shared WebSocket client (NFR-6). Auto-reconnect + connection/last-update display.
+
+import { renderView, setConnectionState } from './view-render.js';
+
+const RECONNECT_MS = 1500;
+
+export function connectView({ viewId, rootSelector = '#app' }) {
+  const root = document.querySelector(rootSelector);
+  if (!root) throw new Error(`Missing root element: ${rootSelector}`);
+
+  let ws = null;
+  let reconnectTimer = null;
+  let viewConfig = null;
+  let lastPayload = null;
+  let lastUpdate = null;
+  let connected = false;
+  let stopped = false;
+
+  function scheduleReconnect() {
+    if (stopped || reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, RECONNECT_MS);
+  }
+
+  function onMessage(event) {
+    let msg;
+    try {
+      msg = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+
+    if (msg.type === 'init') {
+      viewConfig = {
+        title: msg.title,
+        fields: msg.fields ?? [],
+      };
+      if (msg.payload) {
+        lastPayload = msg.payload;
+        lastUpdate = new Date();
+      }
+      render();
+      return;
+    }
+
+    if (msg.type === 'cue' && msg.payload) {
+      lastPayload = msg.payload;
+      lastUpdate = new Date();
+      render();
+    }
+  }
+
+  function render() {
+    if (!viewConfig) return;
+    renderView(root, {
+      ...viewConfig,
+      payload: lastPayload,
+      connected,
+      lastUpdate,
+    });
+  }
+
+  function setConnected(next) {
+    connected = next;
+    setConnectionState(connected, lastUpdate, lastPayload);
+  }
+
+  function connect() {
+    if (stopped) return;
+
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${protocol}//${location.host}/ws?view=${encodeURIComponent(viewId)}`;
+    ws = new WebSocket(url);
+
+    ws.addEventListener('open', () => setConnected(true));
+    ws.addEventListener('message', onMessage);
+    ws.addEventListener('close', () => {
+      setConnected(false);
+      ws = null;
+      scheduleReconnect();
+    });
+    ws.addEventListener('error', () => {
+      ws?.close();
+    });
+  }
+
+  connect();
+
+  return {
+    stop() {
+      stopped = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
+    },
+  };
+}

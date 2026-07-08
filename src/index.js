@@ -1,9 +1,10 @@
 import { loadConfig } from './config/index.js';
 import { createLogger } from './core/logger.js';
-import { createBus, EVENTS } from './core/bus.js';
+import { createBus } from './core/bus.js';
 import { createIngest } from './ingest/index.js';
 import { createSheetsStore } from './sheets/index.js';
 import { createMatcher } from './match/index.js';
+import { createViewServer } from './server/index.js';
 
 const log = createLogger({ app: 'ableview' });
 
@@ -25,9 +26,10 @@ async function main() {
     getSnapshot: sheets.getSnapshot,
   });
 
-  // Tap point for the view server (M4) and future outputs (§11).
-  bus.on(EVENTS.CUE_PAYLOAD, (payload) => {
-    log.debug({ payload }, 'CuePayload event on bus');
+  const viewServer = await createViewServer({
+    config,
+    bus,
+    log: log.child({ module: 'server' }),
   });
 
   const { source, simulated } = createIngest({
@@ -41,12 +43,13 @@ async function main() {
   }
 
   await source.start();
-  log.info({ source: source.name, simulated }, 'AbleView started');
+  log.info({ source: source.name, simulated, httpPort: viewServer.port }, 'AbleView started');
 
-  const shutdown = (signal) => {
+  const shutdown = async (signal) => {
     log.info({ signal }, 'shutting down');
     source.stop();
     sheets.stop();
+    await viewServer.stop();
     process.exit(0);
   };
   process.on('SIGINT', shutdown);

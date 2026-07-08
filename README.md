@@ -14,7 +14,7 @@ Full build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_
 | M1 | Skeleton + ingest + simulator | ✅ done |
 | M2 | Sheets sync + offline cache | ✅ done |
 | M3 | Fuzzy matcher | ✅ done |
-| M4 | View server + first view | — |
+| M4 | View server + first view | ✅ done |
 | M5 | Remaining views + admin/status | — |
 | M6 | Hardening | — |
 
@@ -28,6 +28,7 @@ cp .env.example .env      # fill in when Sheets integration lands (M2)
 
 # Run in simulation mode (no Ableton needed) — walks config/scenarios/demo-set.json
 npm run sim
+# Then open http://localhost:8080/views/band in a browser
 
 # Run against a real Ableton session with AbletonOSC installed
 npm start

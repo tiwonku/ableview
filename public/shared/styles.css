@@ -1,0 +1,149 @@
+/* AbleView operator views — zero-build static frontend (M4) */
+
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --text: #f0f2f8;
+  --muted: #8b92a8;
+  --accent: #5b8def;
+  --warn: #e6a23c;
+  --danger: #e05252;
+  --ok: #3ecf8e;
+  --border: #2a2f3d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+.status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+  padding: 0.6rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.status-bar .dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
+}
+
+.status-bar.connected .dot {
+  background: var(--ok);
+}
+
+.banner {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.banner.sim {
+  background: #3d2e00;
+  color: #ffd666;
+}
+
+.banner.stale {
+  background: #3d2200;
+  color: #ffb366;
+}
+
+main {
+  flex: 1;
+  padding: 1.5rem 1.25rem 2rem;
+  max-width: 48rem;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.view-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.clip-name {
+  margin: 0 0 1.5rem;
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.no-match {
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--warn);
+  border-radius: 0.5rem;
+  background: rgba(230, 162, 60, 0.08);
+  color: #ffd591;
+  font-size: 1.05rem;
+}
+
+.fields {
+  display: grid;
+  gap: 1rem;
+}
+
+.field {
+  padding: 1rem 1.15rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.field-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field-value {
+  margin: 0;
+  font-size: clamp(1.25rem, 3.5vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.field-value.empty {
+  color: var(--muted);
+  font-weight: 400;
+  font-style: italic;
+}
+
+.empty-clip {
+  color: var(--muted);
+  font-size: 1.25rem;
+  font-style: italic;
+}
