@@ -1,0 +1,106 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createBus } from '../src/core/bus.js';
+import { createLogger } from '../src/core/logger.js';
+import { DEFAULTS } from '../src/config/index.js';
+import { createViewServer } from '../src/server/index.js';
+
+const silentLog = createLogger();
+silentLog.level = 'silent';
+
+function testConfig() {
+  return {
+    ...DEFAULTS,
+    server: { httpPort: 0, wsHeartbeatSeconds: 30 },
+    views: {
+      band: { title: 'Band', fields: [{ column: 'Key' }] },
+      admin: { title: 'Admin', system: true },
+    },
+  };
+}
+
+test('GET /api/sheets/status returns snapshot metadata', async () => {
+  const bus = createBus();
+  const server = await createViewServer({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    sheetsActions: {
+      sync: async () => {},
+      getSnapshot: () => ({
+        syncedAt: '2026-07-08T12:00:00.000Z',
+        stale: false,
+        rows: [{ rowId: '1', data: {} }, { rowId: '2', data: {} }],
+        worksheet: 'Cues',
+      }),
+    },
+  });
+
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/sheets/status`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.rowCount, 2);
+  assert.equal(body.stale, false);
+  assert.equal(body.worksheet, 'Cues');
+
+  await server.stop();
+});
+
+test('POST /api/sheets/sync returns ok and calls onSynced', async () => {
+  const bus = createBus();
+  let synced = false;
+  let rematched = false;
+
+  const server = await createViewServer({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    sheetsActions: {
+      sync: async () => { synced = true; },
+      getSnapshot: () => ({
+        syncedAt: '2026-07-08T12:05:00.000Z',
+        stale: false,
+        rows: [{ rowId: '1', data: {} }],
+        worksheet: 'Cues',
+      }),
+      onSynced: () => { rematched = true; },
+    },
+  });
+
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/sheets/sync`, { method: 'POST' });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.rowCount, 1);
+  assert.equal(synced, true);
+  assert.equal(rematched, true);
+
+  await server.stop();
+});
+
+test('POST /api/sheets/sync returns 502 on failure', async () => {
+  const bus = createBus();
+  const server = await createViewServer({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    sheetsActions: {
+      sync: async () => { throw new Error('network down'); },
+      getSnapshot: () => ({
+        syncedAt: '2026-07-07T10:00:00.000Z',
+        stale: true,
+        rows: [],
+        worksheet: 'Cues',
+      }),
+    },
+  });
+
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/sheets/sync`, { method: 'POST' });
+  assert.equal(res.status, 502);
+  const body = await res.json();
+  assert.equal(body.ok, false);
+  assert.match(body.error, /network down/);
+  assert.equal(body.stale, true);
+
+  await server.stop();
+});

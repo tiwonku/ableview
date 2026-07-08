@@ -46,6 +46,11 @@ async function main() {
     bus,
     log: log.child({ module: 'server' }),
     configRuntime,
+    sheetsActions: {
+      sync: () => sheets.sync(),
+      getSnapshot: sheets.getSnapshot,
+      onSynced: () => matcher.rematch(),
+    },
     getHealthContext: () => ({
       simulated: ingest.simulated,
       getSheetSnapshot: sheets.getSnapshot,

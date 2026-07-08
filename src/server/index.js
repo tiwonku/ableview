@@ -4,13 +4,14 @@ import { EVENTS } from '../core/bus.js';
 import { readPublicFile } from './static.js';
 import { buildHealthReport } from './health.js';
 import { registerConfigRoutes } from './config-api.js';
+import { registerSheetsRoutes } from './sheets-api.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
   return url.searchParams.get('view') || 'band';
 }
 
-export async function createViewServer({ config, bus, log, getHealthContext, configRuntime }) {
+export async function createViewServer({ config, bus, log, getHealthContext, configRuntime, sheetsActions }) {
   let lastPayload = null;
   const clients = new Map();
 
@@ -65,6 +66,10 @@ export async function createViewServer({ config, bus, log, getHealthContext, con
 
   if (configRuntime) {
     registerConfigRoutes(app, { configRuntime, log });
+  }
+
+  if (sheetsActions) {
+    registerSheetsRoutes(app, { sheetsActions, log });
   }
 
   app.get('/views/:name', async (req, reply) => {

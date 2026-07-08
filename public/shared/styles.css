@@ -374,3 +374,35 @@ main {
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+.settings-sheet-status {
+  margin: 0.75rem 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.settings-sync-row {
+  margin-top: 0.25rem;
+}
+
+.settings-sync {
+  padding: 0.45rem 1rem;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.settings-sync:hover:not(:disabled) {
+  border-color: var(--accent, #5b9bd5);
+  color: var(--accent, #5b9bd5);
+}
+
+.settings-sync:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

@@ -217,6 +217,7 @@ Use spec §10 acceptance criteria verbatim. Summary:
 - Admin page settings form; changes persist to `config.json` and reload ingest / sheets / matcher as needed
 - **Accept:** change Ableton IP or cue track in admin → ingest reconnects without SSH; invalid values rejected with clear error
 - **Sim toggle:** `sim.enabled` editable from admin with prominent warning; toggling reloads ingest (simulator ↔ live OSC)
+- **Manual sheet sync:** `POST /api/sheets/sync` + status line in admin; re-matches current clip on success
 - **Not in scope:** `.env` secrets, view field maps (still edit `config.json` or SSH)
 
 ---

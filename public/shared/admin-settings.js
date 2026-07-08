@@ -35,6 +35,21 @@ function numberInput(name, value, { min, max, step } = {}) {
   return input;
 }
 
+function formatSyncTime(iso) {
+  if (!iso) return 'never';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString();
+}
+
+function sheetStatusLine(sheetStatus) {
+  if (!sheetStatus) return 'Loading sync status…';
+  const when = formatSyncTime(sheetStatus.syncedAt);
+  const rows = sheetStatus.rowCount ?? 0;
+  const fresh = sheetStatus.stale ? 'stale (offline cache)' : 'fresh';
+  return `Last sync: ${when} · ${rows} rows · ${fresh}`;
+}
+
 function settingsFromForm(form, current) {
   const fd = new FormData(form);
   const watchedRaw = fd.get('watchedTracks')?.trim() ?? '';
@@ -72,7 +87,7 @@ function settingsFromForm(form, current) {
   };
 }
 
-function renderForm(root, settings, { onSave, status }) {
+function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus }) {
   root.innerHTML = '';
 
   const heading = el('h2', 'section-title', 'Settings');
@@ -140,6 +155,27 @@ function renderForm(root, settings, { onSave, status }) {
   sheetsGroup.appendChild(fieldRow('Match column', textInput('matchColumn', settings.sheets.matchColumn)));
   sheetsGroup.appendChild(fieldRow('Alias column', textInput('aliasColumn', settings.sheets.aliasColumn)));
   sheetsGroup.appendChild(fieldRow('Refresh (seconds)', numberInput('refreshSeconds', settings.sheets.refreshSeconds, { min: 1 })));
+
+  const sheetMeta = el('p', 'settings-sheet-status');
+  sheetMeta.textContent = sheetStatusLine(sheetStatus);
+  sheetsGroup.appendChild(sheetMeta);
+
+  const syncRow = el('div', 'settings-sync-row');
+  const syncBtn = el('button', 'settings-sync', 'Sync sheet now');
+  syncBtn.type = 'button';
+  syncBtn.disabled = syncStatus?.pending === true;
+  syncBtn.textContent = syncStatus?.pending ? 'Syncing…' : 'Sync sheet now';
+  syncRow.appendChild(syncBtn);
+  sheetsGroup.appendChild(syncRow);
+
+  if (syncStatus?.message && !syncStatus.pending) {
+    const syncBanner = el('div', `settings-status ${syncStatus.ok ? 'ok' : 'err'}`);
+    syncBanner.textContent = syncStatus.message;
+    sheetsGroup.appendChild(syncBanner);
+  }
+
+  syncBtn.addEventListener('click', () => onSync?.());
+
   form.appendChild(sheetsGroup);
 
   const matchGroup = el('fieldset', 'settings-group');
@@ -178,13 +214,25 @@ export function mountSettingsPanel(rootSelector) {
 
   let settings = null;
   let status = null;
+  let sheetStatus = null;
+  let syncStatus = null;
+
+  function render() {
+    renderForm(root, settings, { onSave: save, onSync: syncSheet, status, sheetStatus, syncStatus });
+  }
+
+  async function loadSheetStatus() {
+    const res = await fetch('/api/sheets/status');
+    if (res.ok) sheetStatus = await res.json();
+  }
 
   async function load() {
     const res = await fetch('/api/config/settings');
     if (!res.ok) throw new Error(`Failed to load settings (${res.status})`);
     const data = await res.json();
     settings = data.settings;
-    renderForm(root, settings, { onSave: save, status });
+    await loadSheetStatus();
+    render();
   }
 
   async function save(patch) {
@@ -197,13 +245,36 @@ export function mountSettingsPanel(rootSelector) {
     const data = await res.json();
     if (!res.ok) {
       status = { ok: false, message: data.error ?? 'Save failed' };
-      renderForm(root, settings, { onSave: save, status });
+      render();
       return;
     }
     settings = data.settings;
     const reloaded = data.reloaded?.length ? ` Reloaded: ${data.reloaded.join(', ')}.` : '';
     status = { ok: true, message: `Settings saved.${reloaded}` };
-    renderForm(root, settings, { onSave: save, status });
+    await loadSheetStatus();
+    render();
+  }
+
+  async function syncSheet() {
+    syncStatus = { pending: true, message: 'Syncing…' };
+    render();
+    const res = await fetch('/api/sheets/sync', { method: 'POST' });
+    const data = await res.json();
+    sheetStatus = {
+      syncedAt: data.syncedAt,
+      stale: data.stale,
+      rowCount: data.rowCount,
+      worksheet: sheetStatus?.worksheet ?? settings?.sheets?.worksheet,
+    };
+    if (res.ok) {
+      syncStatus = {
+        ok: true,
+        message: `Synced ${data.rowCount} rows (${data.stale ? 'stale' : 'fresh'}).`,
+      };
+    } else {
+      syncStatus = { ok: false, message: data.error ?? 'Sync failed' };
+    }
+    render();
   }
 
   load().catch((err) => {
