@@ -1,0 +1,16 @@
+{
+  "loop": true,
+  "steps": [
+    { "clipName": "After Midnight - Intro", "holdSeconds": 8, "tempo": 95 },
+    { "clipName": "Almost Familiar v2", "holdSeconds": 10, "tempo": 97 },
+    { "clipName": "Bombay Bump", "holdSeconds": 8, "tempo": 82 },
+    { "clipName": "Butterfly 82bpm", "holdSeconds": 10, "tempo": 82 },
+    { "clipName": "Chain Around My Heart - Drop", "holdSeconds": 10, "tempo": 90 },
+    { "clipName": "Cold Feeling", "holdSeconds": 8, "tempo": 88 },
+    { "clipName": "Color Of My Soul", "holdSeconds": 10, "tempo": 92 },
+    { "clipName": "Came From Nothing", "holdSeconds": 8, "tempo": 94 },
+    { "clipName": "Back Dat Azz Up", "holdSeconds": 8, "tempo": 95 },
+    { "clipName": "B-Rock", "holdSeconds": 10, "tempo": 110 },
+    { "clipName": "Totally Unknown Clip v3", "holdSeconds": 6 }
+  ]
+}

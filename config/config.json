@@ -10,7 +10,7 @@
     "enabled": false,
     "mode": "internal",
     "driver": "scenario",
-    "scenario": "./config/scenarios/demo-set.json",
+    "scenario": "./config/scenarios/sheet-demo.json",
     "intervalSeconds": 8
   },
   "sheets": {
