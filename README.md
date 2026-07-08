@@ -6,18 +6,7 @@ Google Sheet of cue notes, and pushes each operator — band, visuals, lighting 
 web view of exactly the info they need.
 
 Full build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claude.md).
-
-## Status
-
-| Milestone | Description | Status |
-|---|---|---|
-| M1 | Skeleton + ingest + simulator | ✅ done |
-| M2 | Sheets sync + offline cache | ✅ done |
-| M3 | Fuzzy matcher | ✅ done |
-| M4 | View server + first view | ✅ done |
-| M5 | Remaining views + admin/status | ✅ done |
-| M6 | Hardening | ✅ done |
-| M7 | Admin settings GUI | ✅ done |
+Milestone status and future work: [`ROADMAP.md`](./ROADMAP.md).
 
 ## Quick start
 
@@ -25,7 +14,7 @@ Requires Node.js ≥ 20.
 
 ```bash
 npm install
-cp .env.example .env      # fill in when Sheets integration lands (M2)
+cp .env.example .env      # sheet ID, service account key path, HTTP port
 
 # Run in simulation mode (no Ableton needed) — walks config/scenarios/demo-set.json
 npm run sim
@@ -40,6 +29,19 @@ npm test
 # Health check (while the process is running)
 curl http://localhost:8080/health
 ```
+
+## Getting Ableton ready
+
+AbleView reads clip names from a live Ableton session via [AbletonOSC](https://github.com/ideoforms/AbletonOSC). It never sends write commands — only listen/register and read addresses (see NFR-1 below).
+
+1. **Install AbletonOSC** on the Ableton machine — add it as a **Control Surface / MIDI Remote Script** in Live's preferences (follow the AbletonOSC README for your Live version).
+2. **Open the show set** and confirm a dedicated **cue track** exists (default name `"Cue"` in config) with **named session clips** that match your Google Sheet's match column.
+3. **Network** — the AbleView box must reach the Ableton machine on UDP. AbletonOSC listens on port **11000** and sends replies to the requesting host on **11001** (unicast, not multicast).
+4. **Point AbleView at Ableton** — set `ingest.abletonHost` in `config/config.json` (or from `/views/admin`) to the Ableton machine's LAN IP. Ports default to 11000/11001.
+5. **Disable simulation** — ensure `sim.enabled` is `false` for a live session (`npm start`, not `npm run sim`).
+6. **Smoke test** — launch a clip on the cue track; the admin view should show the clip name and a sheet match within a second or two.
+
+If you are iterating without Ableton, use `npm run sim` instead — no OSC setup required.
 
 ## Configuration
 

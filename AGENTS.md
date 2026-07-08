@@ -14,21 +14,7 @@ It runs unattended on show nights on a dedicated box (Windows NUC or Raspberry P
 
 **Authoritative spec:** [`ableview_spec_from_claude.md`](./ableview_spec_from_claude.md) — treat §4 (NFRs), §9 (data contracts), and §10 (milestones) as the build contract.
 
----
-
-## Current status
-
-| Milestone | Description | Status |
-|---|---|---|
-| **M1** | Skeleton + ingest + simulator | ✅ **Done** |
-| **M2** | Sheets sync + offline cache | ✅ **Done** |
-| **M3** | Fuzzy matcher | ✅ **Done** |
-| **M4** | View server + first view | ✅ **Done** |
-| **M5** | Remaining views + admin/status | ✅ **Done** |
-| **M6** | Hardening | ✅ **Done** |
-| **M7** | Admin settings GUI | ✅ **Done** |
-
-**M1 delivered:** config loader, event bus, `NowPlaying` contract, read-only AbletonOSC ingest, simulator (internal + on-the-wire `osc` mode), NFR-1 tests, systemd unit stub.
+**Milestone status and future work:** [`ROADMAP.md`](./ROADMAP.md).
 
 ---
 
@@ -51,7 +37,7 @@ It runs unattended on show nights on a dedicated box (Windows NUC or Raspberry P
 1. Run `npm test` — all tests must pass.
 2. If you touched `src/ingest/` or OSC code, confirm NFR-1 tests still pass (`test/nfr1-readonly.test.js`).
 3. Demo the milestone acceptance criteria (see §10 in the spec).
-4. Update the status table in `README.md` when a milestone ships.
+4. Update the status table in `ROADMAP.md` when a milestone ships.
 5. Do **not** commit unless the user asks.
 
 ### When to escalate to a stronger model
