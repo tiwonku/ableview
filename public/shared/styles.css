@@ -176,6 +176,99 @@ main {
   font-style: italic;
 }
 
+.colors-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.field-color {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.color-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  margin-bottom: 0.75rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.color-values {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.color-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.color-copy:hover {
+  border-color: var(--accent);
+}
+
+.color-copy:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.color-copy-kind {
+  flex-shrink: 0;
+  min-width: 2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.color-copy-value {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.color-copy.copied {
+  border-color: var(--ok);
+  background: rgba(62, 207, 142, 0.1);
+}
+
+.color-copy.copied .color-copy-value::after {
+  content: ' ✓';
+  color: var(--ok);
+}
+
+.color-copy.copy-failed {
+  border-color: var(--warn);
+}
+
+@media (max-width: 36rem) {
+  .colors-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .empty-clip {
   color: var(--muted);
   font-size: 1.25rem;

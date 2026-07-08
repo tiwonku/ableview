@@ -19,8 +19,8 @@ function testConfig(overrides = {}) {
         title: 'Band',
         fields: [
           { column: 'Key' },
+          { column: 'Relative Key' },
           { column: 'BPM' },
-          { column: 'Band Notes', label: 'Notes' },
         ],
       },
       ...overrides.views,
@@ -72,8 +72,8 @@ test('serves visuals, lighting, and admin view HTML', async () => {
   const config = testConfig({
     views: {
       band: { title: 'Band', fields: [{ column: 'Key' }] },
-      visuals: { title: 'Visuals', fields: [{ column: 'Mood' }] },
-      lighting: { title: 'Lighting', fields: [{ column: 'Lighting Cue' }] },
+      visuals: { title: 'Visuals', fields: [{ column: 'Video World' }] },
+      lighting: { title: 'Lighting', fields: [{ column: 'Lasers' }] },
       admin: { title: 'Admin', system: true },
     },
   });
@@ -104,14 +104,14 @@ test('WebSocket init includes view config and cue broadcast on bus emit', async 
   assert.equal(init.type, 'init');
   assert.equal(init.viewId, 'band');
   assert.equal(init.title, 'Band');
-  assert.deepEqual(init.fields.map((f) => f.column), ['Key', 'BPM', 'Band Notes']);
+  assert.deepEqual(init.fields.map((f) => f.column), ['Key', 'Relative Key', 'BPM']);
   assert.equal(init.payload, null);
   assert.deepEqual(init.views, [{ id: 'band', title: 'Band' }]);
 
   const payload = makeCuePayload({
     clipName: 'Song A - Intro',
     match: makeMatchResult({ matched: true, confidence: 0.92, rowId: '5' }),
-    row: { Key: 'A minor', BPM: '128', 'Band Notes': 'Count in 4' },
+    row: { Key: 'Ebm', 'Relative Key': 'Gb', BPM: '90.2' },
     syncedAt: '2026-07-07T20:12:00.000Z',
     stale: false,
     simulated: true,
@@ -225,7 +225,11 @@ test('role views receive configured field maps', async () => {
     views: {
       visuals: {
         title: 'Visuals',
-        fields: [{ column: 'Mood' }, { column: 'Color' }],
+        fields: [
+          { column: 'Video World' },
+          { column: 'RGB_1', label: 'Color 1', type: 'color' },
+          { column: 'RGB_2', label: 'Color 2', type: 'color' },
+        ],
       },
     },
   });
@@ -234,7 +238,11 @@ test('role views receive configured field maps', async () => {
   const { ws, messages } = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=visuals`);
   const init = await waitForMessage(messages, ws);
   assert.equal(init.viewId, 'visuals');
-  assert.deepEqual(init.fields.map((f) => f.column), ['Mood', 'Color']);
+  assert.deepEqual(init.fields.map((f) => f.column), ['Video World', 'RGB_1', 'RGB_2']);
+  assert.deepEqual(
+    init.fields.filter((f) => f.type === 'color').map((f) => f.column),
+    ['RGB_1', 'RGB_2'],
+  );
 
   ws.close();
   await server.stop();

@@ -1,5 +1,7 @@
 // Shared view rendering (spec §9.4). Maps CuePayload + field config → DOM.
 
+import { parseRgbCell } from './color-parse.js';
+
 export function renderView(root, { title, fields, payload, connected, lastUpdate }) {
   root.innerHTML = '';
 
@@ -30,31 +32,126 @@ export function renderView(root, { title, fields, payload, connected, lastUpdate
   if (matched && fields?.length) {
     const grid = document.createElement('div');
     grid.className = 'fields';
-    for (const field of fields) {
-      const column = field.column;
-      const label = field.label ?? column;
-      const raw = payload.row?.[column];
-      const value = raw == null || String(raw).trim() === '' ? null : String(raw);
 
-      const card = document.createElement('div');
-      card.className = 'field';
-
-      const labelEl = document.createElement('p');
-      labelEl.className = 'field-label';
-      labelEl.textContent = label;
-      card.appendChild(labelEl);
-
-      const valueEl = document.createElement('p');
-      valueEl.className = 'field-value' + (value ? '' : ' empty');
-      valueEl.textContent = value ?? '—';
-      card.appendChild(valueEl);
-
-      grid.appendChild(card);
+    for (let i = 0; i < fields.length; i++) {
+      const field = fields[i];
+      if (field.type === 'color') {
+        const group = [];
+        while (i < fields.length && fields[i].type === 'color') {
+          group.push(fields[i]);
+          i++;
+        }
+        i--;
+        grid.appendChild(renderColorGroup(group, payload));
+      } else {
+        grid.appendChild(renderTextField(field, payload));
+      }
     }
+
     root.appendChild(grid);
   }
 
   updateStatusBar({ connected, lastUpdate, payload });
+}
+
+function renderTextField(field, payload) {
+  const column = field.column;
+  const label = field.label ?? column;
+  const raw = payload.row?.[column];
+  const value = raw == null || String(raw).trim() === '' ? null : String(raw);
+
+  const card = document.createElement('div');
+  card.className = 'field';
+
+  const labelEl = document.createElement('p');
+  labelEl.className = 'field-label';
+  labelEl.textContent = label;
+  card.appendChild(labelEl);
+
+  const valueEl = document.createElement('p');
+  valueEl.className = 'field-value' + (value ? '' : ' empty');
+  valueEl.textContent = value ?? '—';
+  card.appendChild(valueEl);
+
+  return card;
+}
+
+function renderColorGroup(fields, payload) {
+  const row = document.createElement('div');
+  row.className = 'colors-row';
+
+  for (const field of fields) {
+    row.appendChild(renderColorField(field, payload));
+  }
+
+  return row;
+}
+
+function renderColorField(field, payload) {
+  const column = field.column;
+  const label = field.label ?? column;
+  const raw = payload.row?.[column];
+  const color = parseRgbCell(raw);
+
+  const card = document.createElement('div');
+  card.className = 'field field-color';
+
+  const labelEl = document.createElement('p');
+  labelEl.className = 'field-label';
+  labelEl.textContent = label;
+  card.appendChild(labelEl);
+
+  if (!color) {
+    const empty = document.createElement('p');
+    empty.className = 'field-value empty';
+    empty.textContent = '—';
+    card.appendChild(empty);
+    return card;
+  }
+
+  const swatch = document.createElement('div');
+  swatch.className = 'color-swatch';
+  swatch.style.backgroundColor = color.css;
+  swatch.setAttribute('aria-label', `${label}: ${color.rgbText}`);
+  card.appendChild(swatch);
+
+  const values = document.createElement('div');
+  values.className = 'color-values';
+  values.appendChild(makeCopyButton('RGB', color.rgbText));
+  values.appendChild(makeCopyButton('Hex', color.hex));
+  card.appendChild(values);
+
+  return card;
+}
+
+function makeCopyButton(kind, text) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'color-copy';
+  btn.title = `Copy ${kind}`;
+
+  const kindEl = document.createElement('span');
+  kindEl.className = 'color-copy-kind';
+  kindEl.textContent = kind;
+  btn.appendChild(kindEl);
+
+  const valueEl = document.createElement('span');
+  valueEl.className = 'color-copy-value';
+  valueEl.textContent = text;
+  btn.appendChild(valueEl);
+
+  btn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.classList.add('copied');
+      window.setTimeout(() => btn.classList.remove('copied'), 1200);
+    } catch {
+      btn.classList.add('copy-failed');
+      window.setTimeout(() => btn.classList.remove('copy-failed'), 1200);
+    }
+  });
+
+  return btn;
 }
 
 function updateStatusBar({ connected, lastUpdate, payload }) {

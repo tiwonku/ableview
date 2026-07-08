@@ -45,11 +45,10 @@
           "column": "Key"
         },
         {
-          "column": "BPM"
+          "column": "Relative Key"
         },
         {
-          "column": "Band Notes",
-          "label": "Notes"
+          "column": "BPM"
         }
       ]
     },
@@ -57,14 +56,32 @@
       "title": "Visuals",
       "fields": [
         {
-          "column": "Mood"
+          "column": "Video World"
         },
         {
-          "column": "Visual Notes",
-          "label": "Notes"
+          "column": "Color_Desc_Derek",
+          "label": "Color Description"
         },
         {
-          "column": "Color"
+          "column": "RGB_1",
+          "label": "Color 1",
+          "type": "color"
+        },
+        {
+          "column": "RGB_2",
+          "label": "Color 2",
+          "type": "color"
+        },
+        {
+          "column": "RGB_3",
+          "label": "Color 3",
+          "type": "color"
+        },
+        {
+          "column": "Notch"
+        },
+        {
+          "column": "Ghost Cloud"
         }
       ]
     },
@@ -72,10 +89,31 @@
       "title": "Lighting",
       "fields": [
         {
-          "column": "Lighting Cue"
+          "column": "BPM"
         },
         {
-          "column": "BPM"
+          "column": "Lasers"
+        },
+        {
+          "column": "Notch"
+        },
+        {
+          "column": "RGB_1",
+          "label": "Color 1",
+          "type": "color"
+        },
+        {
+          "column": "RGB_2",
+          "label": "Color 2",
+          "type": "color"
+        },
+        {
+          "column": "RGB_3",
+          "label": "Color 3",
+          "type": "color"
+        },
+        {
+          "column": "Automation"
         }
       ]
     },
