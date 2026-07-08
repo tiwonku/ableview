@@ -2,16 +2,21 @@ import { createAbletonOscSource } from './sources/abletonosc.js';
 import { createSimulatorSource } from './sources/simulator.js';
 import { createOscEmitter } from '../sim/osc-emitter.js';
 
-// Ingest interface (spec §3, §7): selects the active NowPlaying source.
-//
-//   sim disabled          → real AbletonOSC listener
-//   sim internal (default)→ simulator feeds the event bus directly
-//   sim osc               → mock AbletonOSC on the wire + the REAL adapter,
-//                           exercising the actual OSC listener path
-export function createIngest({ config, bus, log, getClipNames = null }) {
+function resolveGetConfig({ config, getConfig }) {
+  return getConfig ?? (() => config);
+}
+
+function buildSource({ getConfig, bus, log, getClipNames }) {
+  const config = getConfig();
+
   if (!config.sim.enabled) {
     return {
-      source: createAbletonOscSource({ config, bus, log: log.child({ module: 'ingest.abletonosc' }) }),
+      source: createAbletonOscSource({
+        config,
+        getIngestConfig: () => getConfig().ingest,
+        bus,
+        log: log.child({ module: 'ingest.abletonosc' }),
+      }),
       simulated: false,
     };
   }
@@ -20,6 +25,7 @@ export function createIngest({ config, bus, log, getClipNames = null }) {
     const emitter = createOscEmitter({ config, log: log.child({ module: 'sim.osc-emitter' }) });
     const adapter = createAbletonOscSource({
       config: { ...config, ingest: { ...config.ingest, abletonHost: '127.0.0.1' } },
+      getIngestConfig: () => ({ ...getConfig().ingest, abletonHost: '127.0.0.1' }),
       bus,
       log: log.child({ module: 'ingest.abletonosc' }),
     });
@@ -34,7 +40,52 @@ export function createIngest({ config, bus, log, getClipNames = null }) {
   }
 
   return {
-    source: createSimulatorSource({ config, bus, log: log.child({ module: 'ingest.simulator' }), getClipNames }),
+    source: createSimulatorSource({
+      config,
+      bus,
+      log: log.child({ module: 'ingest.simulator' }),
+      getClipNames,
+    }),
     simulated: true,
+  };
+}
+
+// Ingest interface (spec §3, §7): selects the active NowPlaying source.
+export function createIngest({ config, getConfig, bus, log, getClipNames = null }) {
+  const resolveConfig = resolveGetConfig({ config, getConfig });
+  let active = null;
+  let running = false;
+
+  function recreate() {
+    active?.source.stop();
+    active = buildSource({ getConfig: resolveConfig, bus, log, getClipNames });
+    return active;
+  }
+
+  return {
+    get simulated() {
+      return active?.simulated ?? resolveConfig().sim.enabled;
+    },
+    get source() {
+      return active?.source ?? { name: 'pending', start: async () => {}, stop: () => {} };
+    },
+    async start() {
+      recreate();
+      await active.source.start();
+      running = true;
+    },
+    stop() {
+      active?.source.stop();
+      running = false;
+    },
+    async reloadIngest() {
+      if (!running) {
+        recreate();
+        return;
+      }
+      active.source.stop();
+      recreate();
+      await active.source.start();
+    },
   };
 }

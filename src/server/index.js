@@ -3,13 +3,14 @@ import { WebSocketServer } from 'ws';
 import { EVENTS } from '../core/bus.js';
 import { readPublicFile } from './static.js';
 import { buildHealthReport } from './health.js';
+import { registerConfigRoutes } from './config-api.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
   return url.searchParams.get('view') || 'band';
 }
 
-export async function createViewServer({ config, bus, log, getHealthContext }) {
+export async function createViewServer({ config, bus, log, getHealthContext, configRuntime }) {
   let lastPayload = null;
   const clients = new Map();
 
@@ -61,6 +62,10 @@ export async function createViewServer({ config, bus, log, getHealthContext }) {
     const code = report.status === 'ok' ? 200 : 503;
     return reply.code(code).send(report);
   });
+
+  if (configRuntime) {
+    registerConfigRoutes(app, { configRuntime, log });
+  }
 
   app.get('/views/:name', async (req, reply) => {
     try {

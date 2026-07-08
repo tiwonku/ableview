@@ -17,6 +17,7 @@ Full build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_
 | M4 | View server + first view | ✅ done |
 | M5 | Remaining views + admin/status | ✅ done |
 | M6 | Hardening | ✅ done |
+| M7 | Admin settings GUI | ✅ done |
 
 ## Quick start
 
@@ -46,6 +47,8 @@ Two layers (spec §8):
 
 - `.env` — secrets and machine-specific values (sheet ID, service-account key path, HTTP port). Never committed.
 - `config/config.json` — everything else: OSC ports, watched tracks, authoritative cue track, simulator settings, match threshold, per-view field maps.
+
+**Show-day settings** (Ableton IP, cue track, sheet tab/columns, match threshold) can also be changed from the **admin view** at `/views/admin` without SSH. Changes save to `config.json` and apply immediately. Secrets (`SHEET_ID`, service account key, `HTTP_PORT`) remain in `.env`.
 
 Simulation mode can also be forced without editing config: `npm run sim` (or `node src/index.js --sim`).
 

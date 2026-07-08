@@ -15,9 +15,12 @@
     <span data-role="last-update">Last update: —</span>
   </header>
   <main id="app" class="admin-main" aria-live="polite"></main>
+  <section id="settings-panel" class="admin-section settings-panel" aria-label="Settings"></section>
   <script type="module">
     import { connectView } from '/shared/ws-client.js';
+    import { mountSettingsPanel } from '/shared/admin-settings.js';
     connectView({ viewId: 'admin' });
+    mountSettingsPanel('#settings-panel');
   </script>
 </body>
 </html>

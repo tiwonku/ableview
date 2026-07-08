@@ -80,7 +80,11 @@ export function validateConfig(config) {
     errors.push('sheets.headerRow must be a positive integer (1-based sheet row number)');
   }
   if (config.server.httpPort != null) {
-    if (!port(config.server.httpPort)) errors.push('HTTP_PORT must be a valid port');
+    const hp = config.server.httpPort;
+    // Port 0 is valid for OS-assigned listen ports (tests and ephemeral binds).
+    if (!(Number.isInteger(hp) && hp >= 0 && hp < 65536)) {
+      errors.push('HTTP_PORT must be a valid port');
+    }
   }
   if (!(config.server.wsHeartbeatSeconds >= 0)) {
     errors.push('server.wsHeartbeatSeconds must be >= 0');

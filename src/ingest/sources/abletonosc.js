@@ -9,8 +9,9 @@ const NOTHING_PLAYING = -1; // AbletonOSC: -1 = stopped, -2 = no clip slots
 // playing slot on each watched track, resolves clip names on change, and
 // emits NowPlaying events. All outbound messages pass through send(), which
 // enforces the NFR-1 read-only allowlist.
-export function createAbletonOscSource({ config, bus, log }) {
-  const { oscListenPort, oscSendPort, abletonHost, watchedTracks, authoritative } = config.ingest;
+export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
+  const getIngest = getIngestConfig ?? (() => config.ingest);
+  const { oscListenPort } = getIngest();
 
   let udp = null;
   let lastInboundAt = 0;
@@ -24,15 +25,18 @@ export function createAbletonOscSource({ config, bus, log }) {
 
   function send(address, args = []) {
     assertReadOnlyAddress(address);
+    const { abletonHost, oscSendPort } = getIngest();
     udp.send({ address, args }, abletonHost, oscSendPort);
   }
 
   function isWatched(trackName, trackIndex) {
+    const { watchedTracks } = getIngest();
     if (watchedTracks.length === 0) return true;
     return watchedTracks.some((t) => t === trackName || t === trackIndex);
   }
 
   function authoritativeClipOf() {
+    const { authoritative } = getIngest();
     if (authoritative.strategy === 'track') {
       for (const [index, state] of trackState) {
         if (state.trackName === authoritative.track || index === authoritative.track) {
@@ -78,6 +82,7 @@ export function createAbletonOscSource({ config, bus, log }) {
   }
 
   function registerListeners() {
+    const { abletonHost, oscSendPort } = getIngest();
     log.info({ host: abletonHost, sendPort: oscSendPort, listenPort: oscListenPort }, 'registering AbletonOSC listeners');
     send('/live/song/get/track_names');
     send('/live/song/get/tempo');

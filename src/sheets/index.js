@@ -17,23 +17,31 @@ function writeCacheFile(cachePath, snapshot) {
   writeFileSync(cachePath, JSON.stringify(snapshot, null, 2), 'utf8');
 }
 
-export function createSheetsStore({ config, log }) {
-  const { worksheet, matchColumn, aliasColumn, refreshSeconds, cacheFile, headerRow } = config.sheets;
-  const cachePath = resolve(process.cwd(), cacheFile);
+export function createSheetsStore({ config, getConfig, log }) {
+  const resolveConfig = getConfig ?? (() => config);
 
   let snapshot = {
     syncedAt: null,
     stale: true,
-    worksheet,
-    headerRow,
-    matchColumn,
-    aliasColumn,
+    worksheet: resolveConfig().sheets.worksheet,
+    headerRow: resolveConfig().sheets.headerRow,
+    matchColumn: resolveConfig().sheets.matchColumn,
+    aliasColumn: resolveConfig().sheets.aliasColumn,
     headers: [],
     rows: [],
   };
   let refreshTimer = null;
 
+  function sheetSettings() {
+    return resolveConfig().sheets;
+  }
+
+  function cachePath() {
+    return resolve(process.cwd(), sheetSettings().cacheFile);
+  }
+
   function applyParsed({ headers, rows }, { syncedAt, stale }) {
+    const { worksheet, headerRow, matchColumn, aliasColumn } = sheetSettings();
     snapshot = {
       syncedAt,
       stale,
@@ -48,7 +56,7 @@ export function createSheetsStore({ config, log }) {
 
   function loadFromCache() {
     try {
-      const cached = readCacheFile(cachePath);
+      const cached = readCacheFile(cachePath());
       applyParsed(
         { headers: cached.headers ?? [], rows: cached.rows ?? [] },
         { syncedAt: cached.syncedAt ?? null, stale: true }
@@ -64,15 +72,17 @@ export function createSheetsStore({ config, log }) {
 
   function persistCache() {
     try {
-      writeCacheFile(cachePath, snapshot);
+      writeCacheFile(cachePath(), snapshot);
     } catch (err) {
       log.error({ err: err.message }, 'failed to write sheet cache');
     }
   }
 
   async function fetchFromGoogle() {
-    const keyPath = config.secrets.googleServiceAccountKeyPath;
-    const sheetId = config.secrets.sheetId;
+    const cfg = resolveConfig();
+    const { worksheet, headerRow } = sheetSettings();
+    const keyPath = cfg.secrets.googleServiceAccountKeyPath;
+    const sheetId = cfg.secrets.sheetId;
     if (!keyPath || !sheetId) {
       throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY_PATH and SHEET_ID are required for sheet sync');
     }
@@ -110,18 +120,26 @@ export function createSheetsStore({ config, log }) {
   }
 
   function getClipNames() {
-    return getMatchValues(snapshot.rows, matchColumn);
+    return getMatchValues(snapshot.rows, sheetSettings().matchColumn);
   }
 
   function getSnapshot() {
     return { ...snapshot };
   }
 
+  function startRefreshTimer() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    const { refreshSeconds } = sheetSettings();
+    refreshTimer = setInterval(() => {
+      sync().catch(() => {});
+    }, refreshSeconds * 1000);
+  }
+
   async function start() {
     loadFromCache();
 
-    const hasCredentials =
-      config.secrets.googleServiceAccountKeyPath && config.secrets.sheetId;
+    const cfg = resolveConfig();
+    const hasCredentials = cfg.secrets.googleServiceAccountKeyPath && cfg.secrets.sheetId;
 
     if (hasCredentials) {
       try {
@@ -129,9 +147,7 @@ export function createSheetsStore({ config, log }) {
       } catch {
         // Already logged; continue serving cache if available.
       }
-      refreshTimer = setInterval(() => {
-        sync().catch(() => {});
-      }, refreshSeconds * 1000);
+      startRefreshTimer();
     } else if (snapshot.rows.length === 0) {
       log.warn('sheet sync skipped: set GOOGLE_SERVICE_ACCOUNT_KEY_PATH and SHEET_ID in .env');
     } else {
@@ -144,5 +160,13 @@ export function createSheetsStore({ config, log }) {
     refreshTimer = null;
   }
 
-  return { start, stop, sync, getClipNames, getSnapshot };
+  function applySettings() {
+    const { worksheet, headerRow, matchColumn, aliasColumn } = sheetSettings();
+    snapshot = { ...snapshot, worksheet, headerRow, matchColumn, aliasColumn, stale: true };
+    stop();
+    startRefreshTimer();
+    sync().catch(() => {});
+  }
+
+  return { start, stop, sync, getClipNames, getSnapshot, applySettings };
 }

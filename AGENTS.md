@@ -26,6 +26,7 @@ It runs unattended on show nights on a dedicated box (Windows NUC or Raspberry P
 | **M4** | View server + first view | ✅ **Done** |
 | **M5** | Remaining views + admin/status | ✅ **Done** |
 | **M6** | Hardening | ✅ **Done** |
+| **M7** | Admin settings GUI | ✅ **Done** |
 
 **M1 delivered:** config loader, event bus, `NowPlaying` contract, read-only AbletonOSC ingest, simulator (internal + on-the-wire `osc` mode), NFR-1 tests, systemd unit stub.
 
@@ -209,6 +210,13 @@ Use spec §10 acceptance criteria verbatim. Summary:
 - Windows NUC: NSSM or Task Scheduler equivalent (alongside `deploy/ableview.service` for Linux/Pi)
 - **Accept:** power-cycle → everything recovers with no human intervention (after OS service install on show box)
 - **Delivered:** `/health`, `validateProductionReady` (gated by `NODE_ENV=production`), optional `LOG_FILE`, `deploy/README.md` + logrotate example + NSSM steps
+
+### M7 — Admin settings GUI
+
+- `GET/PATCH /api/config/settings` for editable `ingest`, `sheets`, and `match` sections
+- Admin page settings form; changes persist to `config.json` and reload ingest / sheets / matcher as needed
+- **Accept:** change Ableton IP or cue track in admin → ingest reconnects without SSH; invalid values rejected with clear error
+- **Not in scope:** `.env` secrets, `sim.enabled`, view field maps (still edit `config.json` or SSH)
 
 ---
 

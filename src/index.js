@@ -1,4 +1,5 @@
 import { loadConfig, shouldValidateProduction, validateProductionReady } from './config/index.js';
+import { createConfigRuntime } from './config/runtime.js';
 import { createLogger } from './core/logger.js';
 import { createBus } from './core/bus.js';
 import { createIngest } from './ingest/index.js';
@@ -18,45 +19,58 @@ async function main() {
     validateProductionReady(config);
   }
 
-  const bus = createBus();
-  const simulated = config.sim.enabled;
+  const configRuntime = createConfigRuntime({ config, log: log.child({ module: 'config' }) });
+  const getConfig = () => configRuntime.getConfig();
 
-  const sheets = createSheetsStore({ config, log: log.child({ module: 'sheets' }) });
+  const bus = createBus();
+
+  const sheets = createSheetsStore({ getConfig, log: log.child({ module: 'sheets' }) });
   await sheets.start();
 
-  createMatcher({
-    config,
+  const matcher = createMatcher({
+    getConfig,
     bus,
     log: log.child({ module: 'match' }),
     getSnapshot: sheets.getSnapshot,
+  });
+
+  const ingest = createIngest({
+    getConfig,
+    bus,
+    log,
+    getClipNames: sheets.getClipNames,
   });
 
   const viewServer = await createViewServer({
     config,
     bus,
     log: log.child({ module: 'server' }),
+    configRuntime,
     getHealthContext: () => ({
-      simulated,
+      simulated: ingest.simulated,
       getSheetSnapshot: sheets.getSnapshot,
     }),
   });
 
-  const { source } = createIngest({
-    config,
-    bus,
-    log,
-    getClipNames: sheets.getClipNames,
+  configRuntime.onReload(async (sections) => {
+    if (sections.includes('ingest')) await ingest.reloadIngest();
+    if (sections.includes('sheets')) {
+      sheets.applySettings();
+      matcher.rematch();
+    }
+    if (sections.includes('match')) matcher.rematch();
   });
-  if (simulated) {
+
+  if (ingest.simulated) {
     log.warn('================ SIMULATION MODE ================');
   }
 
-  await source.start();
-  log.info({ source: source.name, simulated, httpPort: viewServer.port }, 'AbleView started');
+  await ingest.start();
+  log.info({ source: ingest.source.name, simulated: ingest.simulated, httpPort: viewServer.port }, 'AbleView started');
 
   const shutdown = async (signal) => {
     log.info({ signal }, 'shutting down');
-    source.stop();
+    ingest.stop();
     sheets.stop();
     await viewServer.stop();
     process.exit(0);

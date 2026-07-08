@@ -114,16 +114,19 @@ function nowPlayingKey(event) {
   });
 }
 
-export function createMatcher({ config, bus, log, getSnapshot }) {
+export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
+  const resolveConfig = getConfig ?? (() => config);
   let lastKey = null;
+  let lastEvent = null;
 
-  function handleNowPlaying(event) {
+  function handleNowPlaying(event, { force = false } = {}) {
     const key = nowPlayingKey(event);
-    if (key === lastKey) return;
+    if (!force && key === lastKey) return;
     lastKey = key;
+    lastEvent = event;
 
     const snapshot = getSnapshot();
-    const payload = matchClip(event.authoritativeClip, snapshot, config);
+    const payload = matchClip(event.authoritativeClip, snapshot, resolveConfig());
     payload.tempo = event.tempo;
     payload.beat = event.beat;
     payload.simulated = event.source === SOURCES.SIMULATOR;
@@ -144,5 +147,10 @@ export function createMatcher({ config, bus, log, getSnapshot }) {
 
   bus.on(EVENTS.NOW_PLAYING, handleNowPlaying);
 
-  return { matchClip: (clipName) => matchClip(clipName, getSnapshot(), config) };
+  return {
+    matchClip: (clipName) => matchClip(clipName, getSnapshot(), resolveConfig()),
+    rematch: () => {
+      if (lastEvent) handleNowPlaying(lastEvent, { force: true });
+    },
+  };
 }
