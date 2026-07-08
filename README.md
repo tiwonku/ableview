@@ -13,7 +13,7 @@ Full build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_
 |---|---|---|
 | M1 | Skeleton + ingest + simulator | ✅ done |
 | M2 | Sheets sync + offline cache | ✅ done |
-| M3 | Fuzzy matcher | — |
+| M3 | Fuzzy matcher | ✅ done |
 | M4 | View server + first view | — |
 | M5 | Remaining views + admin/status | — |
 | M6 | Hardening | — |

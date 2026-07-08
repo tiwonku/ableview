@@ -3,6 +3,7 @@ import { createLogger } from './core/logger.js';
 import { createBus, EVENTS } from './core/bus.js';
 import { createIngest } from './ingest/index.js';
 import { createSheetsStore } from './sheets/index.js';
+import { createMatcher } from './match/index.js';
 
 const log = createLogger({ app: 'ableview' });
 
@@ -14,13 +15,20 @@ async function main() {
 
   const bus = createBus();
 
-  // Tap point for the view server (M4) and future outputs (§11).
-  bus.on(EVENTS.NOW_PLAYING, (event) => {
-    log.debug({ event }, 'NowPlaying event on bus');
-  });
-
   const sheets = createSheetsStore({ config, log: log.child({ module: 'sheets' }) });
   await sheets.start();
+
+  createMatcher({
+    config,
+    bus,
+    log: log.child({ module: 'match' }),
+    getSnapshot: sheets.getSnapshot,
+  });
+
+  // Tap point for the view server (M4) and future outputs (§11).
+  bus.on(EVENTS.CUE_PAYLOAD, (payload) => {
+    log.debug({ payload }, 'CuePayload event on bus');
+  });
 
   const { source, simulated } = createIngest({
     config,

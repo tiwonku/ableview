@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 // (e.g. OSC rebroadcast, §11) subscribe to the same stream.
 export const EVENTS = Object.freeze({
   NOW_PLAYING: 'nowPlaying',
+  CUE_PAYLOAD: 'cuePayload',
 });
 
 export function createBus() {
