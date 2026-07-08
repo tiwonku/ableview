@@ -18,7 +18,11 @@ The checklist below assumes M6 is complete: `/health`, production config validat
    - `SHEET_ID`
    - `HTTP_PORT` (default `8080`)
 5. **Place the service account key** at the path in `.env` (e.g. `secrets/service-account.json`).
-6. **Tune `config/config.json`** for this network: `ingest.abletonHost`, cue track, sheet columns, views.
+6. **Copy and tune local config:**
+   ```bash
+   cp config/config.example.json config/config.json
+   ```
+   Set `ingest.abletonHost`, cue track, sheet columns, and views for this network.
 7. **Set production mode** in the service environment (not in `.env` unless you prefer):
    - `NODE_ENV=production` **or** `ABLEVIEW_PRODUCTION=1`
    - Enables stricter boot validation (sheet credentials, admin view required when not simulating).
@@ -49,6 +53,7 @@ git clone <repo-url> /opt/ableview   # or rsync/scp your tree
 cd /opt/ableview
 npm install
 cp .env.example .env                 # edit with production values
+cp config/config.example.json config/config.json
 # edit config/config.json for this show
 ```
 
@@ -115,7 +120,7 @@ sudo systemctl daemon-reload
 - Clone or copy the repo to `C:\AbleView`.
 - Run `npm install` in that folder.
 - Copy `.env.example` to `.env` and configure.
-- Edit `config\config.json` for this network.
+- Copy `config\config.example.json` to `config\config.json` and tune for this network.
 
 ### 2. Install NSSM
 

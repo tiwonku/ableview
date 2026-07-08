@@ -309,7 +309,17 @@ SHEET_ID=1AbC...xyz
 HTTP_PORT=8080
 ```
 
-### `config.json` (settings, committed with safe defaults)
+### `config.json` (local settings, gitignored)
+
+Copy `config/config.example.json` to `config/config.json` on first setup. The example file
+is committed; your local `config.json` is gitignored so show-specific tweaks (admin saves,
+field maps, Ableton IP) do not churn in version control.
+
+```bash
+cp config/config.example.json config/config.json
+```
+
+See `config/config.example.json` in the repo for the current template. Shape:
 
 ```json
 {
@@ -522,7 +532,8 @@ ableview/
     views/            # band.html, visuals.html, lighting.html, admin.html
     shared/           # ws-client.js, styles.css
   config/
-    config.json
+    config.example.json   # committed template
+    config.json           # local copy (gitignored)
     scenarios/
       demo-set.json
   data/

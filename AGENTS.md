@@ -126,7 +126,8 @@ Two layers (spec §8):
 | File | Committed? | Contents |
 |---|---|---|
 | `.env` | **No** (gitignored) | `GOOGLE_SERVICE_ACCOUNT_KEY_PATH`, `SHEET_ID`, `HTTP_PORT` |
-| `config/config.json` | Yes | OSC ports, watched tracks, authoritative cue track, sim settings, match threshold, view field maps |
+| `config/config.json` | **No** (gitignored) | Local show settings; copy from `config.example.json` on setup |
+| `config/config.example.json` | Yes | Committed template: OSC, sim, sheets, match, view field maps |
 
 Rules:
 
@@ -242,7 +243,7 @@ Confirm with the maintainer before hardcoding assumptions:
 | ID | Topic | Default |
 |---|---|---|
 | OD-2 | Language | **Node.js** (confirmed in practice) |
-| OD-3 | View names + sheet columns | Placeholders in `config/config.json` |
+| OD-3 | View names + sheet columns | Example field maps in `config/config.example.json` |
 | OD-4 | Match column + aliases | `"Clip Name"` / `"Aliases"` |
 | OD-5 | Hardware/OS | Linux/Pi for deploy; Windows NUC also supported |
 
@@ -264,8 +265,9 @@ src/
   index.js          # bootstrap / wiring
 public/             # (M4) static views + shared ws-client
 config/
-  config.json       # committed settings
-  scenarios/        # sim scenario files
+  config.example.json  # committed template
+  config.json          # local copy (gitignored)
+  scenarios/           # sim scenario files
 data/               # runtime cache (gitignored except .gitkeep)
 secrets/            # service account key (gitignored)
 deploy/             # systemd unit
@@ -276,7 +278,7 @@ test/               # node:test suite
 
 ## Git / secrets
 
-- **Never commit:** `.env`, `secrets/*`, `data/sheet-cache.json`
+- **Never commit:** `.env`, `config/config.json`, `secrets/*`, `data/sheet-cache.json`
 - **Never commit** unless the user explicitly asks
 - `.env.example` documents required env vars without values
 

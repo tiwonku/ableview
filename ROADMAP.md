@@ -28,7 +28,7 @@ default `track` strategy and the other sim drivers.
 |---|---|---|
 | **`scene` / `mostRecent` cue strategies** | §6 | Config-valid, but only `track` is fully implemented. Other strategies fall back to “any playing watched clip.” |
 | **Manual sim driver from admin** | §7 | `sim.driver: "manual"` works programmatically (`.fire(clipName)` on the simulator). No admin UI or REST endpoint to fire clips on demand yet. |
-| **View field maps in admin** | M7 scope note | Still edited in `config/config.json` (or SSH). Admin covers ingest, sim, sheets, and match — not per-view layouts. |
+| **View field maps in admin** | M7 scope note | Still edited in local `config/config.json` (or SSH). Admin covers ingest, sim, sheets, and match — not per-view layouts. |
 | **`.env` secrets in admin** | M7 scope note | `SHEET_ID`, service account key path, and `HTTP_PORT` remain in `.env` only. |
 
 ---
@@ -63,6 +63,6 @@ From spec §12 — confirm with the maintainer before hardcoding show-specific a
 |---|---|---|
 | OD-1 | Authoritative cue source | **Resolved** — `track` strategy on a designated cue track (`ingest.authoritative.track`). |
 | OD-2 | Implementation language | Node.js in use; Python + FastAPI remains a valid alternative with the same architecture. |
-| OD-3 | View names + sheet columns | Placeholder field maps in `config/config.json`; confirm real operator views and columns per show. |
+| OD-3 | View names + sheet columns | Example field maps in `config/config.example.json`; confirm real operator views and columns per show. |
 | OD-4 | Match column + aliases | Confirm which sheet column clip names match against and whether aliases are maintained. |
 | OD-5 | Hardware / OS | Linux/Pi + systemd and Windows NUC + NSSM both supported; pick per deployment. |

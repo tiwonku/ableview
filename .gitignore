@@ -1,6 +1,9 @@
 # Secrets — never commit
 .env
 secrets/*
+
+# Local show config (copy from config/config.example.json)
+config/config.json
 !secrets/.gitkeep
 
 # Runtime data (offline sheet cache, logs)

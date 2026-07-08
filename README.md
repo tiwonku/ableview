@@ -29,7 +29,8 @@ Re-open your terminal after installing, then run `node -v` again.
 
 ```bash
 npm install
-cp .env.example .env      # sheet ID, service account key path, HTTP port
+cp .env.example .env                              # sheet ID, service account key path, HTTP port
+cp config/config.example.json config/config.json  # local settings (gitignored)
 
 # Run in simulation mode (no Ableton needed) — walks config/scenarios/demo-set.json
 npm run sim
@@ -63,7 +64,7 @@ If you are iterating without Ableton, use `npm run sim` instead — no OSC setup
 Two layers (spec §8):
 
 - `.env` — secrets and machine-specific values (sheet ID, service-account key path, HTTP port). Never committed.
-- `config/config.json` — everything else: OSC ports, watched tracks, authoritative cue track, simulator settings, match threshold, per-view field maps.
+- `config/config.json` — everything else: OSC ports, watched tracks, authoritative cue track, simulator settings, match threshold, per-view field maps. Copy from `config/config.example.json` on first setup; never committed.
 
 **Show-day settings** (Ableton IP, cue track, sheet tab/columns, match threshold, **simulation on/off**) can also be changed from the **admin view** at `/views/admin` without SSH. Changes save to `config.json` and apply immediately. Secrets (`SHEET_ID`, service account key, `HTTP_PORT`) remain in `.env`.
 
@@ -125,8 +126,9 @@ Use the same codebase; follow the path for your OS. Full step-by-step instructio
 [`deploy/README.md`](./deploy/README.md). Summary:
 
 1. **Copy the repo** to a fixed path (`/opt/ableview` or `C:\AbleView`).
-2. **Configure** `.env` (sheet ID, service-account key, port) and `config/config.json`
-   (Ableton host, cue track, views). Set `sim.enabled` to `false`.
+2. **Configure** `.env` (sheet ID, service-account key, port) and copy
+   `config/config.example.json` to `config/config.json` (Ableton host, cue track, views).
+   Set `sim.enabled` to `false`.
 3. **Smoke-test manually** before installing any service:
    ```bash
    NODE_ENV=production npm start

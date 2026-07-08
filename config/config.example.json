@@ -2,7 +2,7 @@
   "ingest": {
     "oscListenPort": 11001,
     "oscSendPort": 11000,
-    "abletonHost": "192.168.0.119",
+    "abletonHost": "127.0.0.1",
     "watchedTracks": [
       "Cue"
     ],
