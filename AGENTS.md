@@ -24,7 +24,7 @@ It runs unattended on show nights on a dedicated box (Windows NUC or Raspberry P
 | **M2** | Sheets sync + offline cache | ✅ **Done** |
 | **M3** | Fuzzy matcher | ✅ **Done** |
 | **M4** | View server + first view | ✅ **Done** |
-| **M5** | Remaining views + admin/status | Not started |
+| **M5** | Remaining views + admin/status | ✅ **Done** |
 | **M6** | Hardening | Not started |
 
 **M1 delivered:** config loader, event bus, `NowPlaying` contract, read-only AbletonOSC ingest, simulator (internal + on-the-wire `osc` mode), NFR-1 tests, systemd unit stub.

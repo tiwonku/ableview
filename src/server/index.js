@@ -12,10 +12,30 @@ export async function createViewServer({ config, bus, log }) {
   let lastPayload = null;
   const clients = new Map();
 
+  function getConnectedViewCount() {
+    let count = 0;
+    for (const { viewId } of clients.values()) {
+      if (viewId !== 'admin') count++;
+    }
+    return count;
+  }
+
+  function buildStatus() {
+    return { connectedViews: getConnectedViewCount() };
+  }
+
   function broadcast(msg) {
     const data = JSON.stringify(msg);
     for (const [ws] of clients) {
       if (ws.readyState === ws.OPEN) ws.send(data);
+    }
+  }
+
+  function broadcastStatus() {
+    const status = buildStatus();
+    const data = JSON.stringify({ type: 'status', status });
+    for (const [ws, { viewId }] of clients) {
+      if (viewId === 'admin' && ws.readyState === ws.OPEN) ws.send(data);
     }
   }
 
@@ -76,16 +96,28 @@ export async function createViewServer({ config, bus, log }) {
     }
 
     clients.set(ws, { viewId });
-    ws.send(JSON.stringify({
+    const init = {
       type: 'init',
       viewId,
       title: viewConfig.title ?? viewId,
       fields: viewConfig.fields ?? [],
       payload: lastPayload,
-    }));
+    };
+    if (viewConfig.system) {
+      init.system = true;
+      init.status = buildStatus();
+    }
+    ws.send(JSON.stringify(init));
+    if (viewId !== 'admin') broadcastStatus();
 
-    ws.on('close', () => clients.delete(ws));
-    ws.on('error', () => clients.delete(ws));
+    ws.on('close', () => {
+      clients.delete(ws);
+      broadcastStatus();
+    });
+    ws.on('error', () => {
+      clients.delete(ws);
+      broadcastStatus();
+    });
   });
 
   let heartbeatTimer = null;
@@ -102,6 +134,7 @@ export async function createViewServer({ config, bus, log }) {
   return {
     port,
     getClientCount: () => clients.size,
+    getConnectedViewCount,
     async stop() {
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       for (const ws of clients.keys()) ws.close();

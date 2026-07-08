@@ -44,10 +44,13 @@ function waitForMessage(messages, ws, timeoutMs = 3000) {
   if (messages.length > 0) return Promise.resolve(messages.shift());
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('timed out waiting for message')), timeoutMs);
-    ws.once('message', (data) => {
+    const onMessage = () => {
+      if (messages.length === 0) return;
       clearTimeout(timer);
-      resolve(JSON.parse(data.toString()));
-    });
+      ws.off('message', onMessage);
+      resolve(messages.shift());
+    };
+    ws.on('message', onMessage);
   });
 }
 
@@ -60,6 +63,33 @@ test('serves band view HTML', async () => {
   const html = await res.text();
   assert.match(html, /AbleView — Band/);
   assert.match(html, /connectView/);
+
+  await server.stop();
+});
+
+test('serves visuals, lighting, and admin view HTML', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    views: {
+      band: { title: 'Band', fields: [{ column: 'Key' }] },
+      visuals: { title: 'Visuals', fields: [{ column: 'Mood' }] },
+      lighting: { title: 'Lighting', fields: [{ column: 'Lighting Cue' }] },
+      admin: { title: 'Admin', system: true },
+    },
+  });
+  const server = await createViewServer({ config, bus, log: silentLog });
+
+  for (const [name, title] of [
+    ['visuals', 'Visuals'],
+    ['lighting', 'Lighting'],
+    ['admin', 'Admin'],
+  ]) {
+    const res = await fetch(`http://127.0.0.1:${server.port}/views/${name}`);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, new RegExp(`AbleView — ${title}`));
+    assert.match(html, /connectView/);
+  }
 
   await server.stop();
 });
@@ -132,6 +162,78 @@ test('CuePayload broadcast reaches client in under 200 ms', async () => {
   assert.equal(msg.type, 'cue');
   assert.equal(msg.payload.clipName, 'Fast Clip');
   assert.ok(elapsed < 200, `expected < 200 ms, got ${elapsed.toFixed(1)} ms`);
+
+  ws.close();
+  await server.stop();
+});
+
+test('admin WebSocket init includes system flag and status', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    views: {
+      band: { title: 'Band', fields: [{ column: 'Key' }] },
+      admin: { title: 'Admin', system: true },
+    },
+  });
+  const server = await createViewServer({ config, bus, log: silentLog });
+
+  const { ws, messages } = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=admin`);
+
+  const init = await waitForMessage(messages, ws);
+  assert.equal(init.type, 'init');
+  assert.equal(init.viewId, 'admin');
+  assert.equal(init.system, true);
+  assert.equal(typeof init.status?.connectedViews, 'number');
+
+  ws.close();
+  await server.stop();
+});
+
+test('admin receives status updates when operator views connect', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    views: {
+      band: { title: 'Band', fields: [{ column: 'Key' }] },
+      admin: { title: 'Admin', system: true },
+    },
+  });
+  const server = await createViewServer({ config, bus, log: silentLog });
+
+  const admin = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=admin`);
+  await waitForMessage(admin.messages, admin.ws);
+
+  const band = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=band`);
+  await waitForMessage(band.messages, band.ws);
+
+  const status = await waitForMessage(admin.messages, admin.ws);
+  assert.equal(status.type, 'status');
+  assert.equal(status.status.connectedViews, 1);
+
+  band.ws.close();
+  const afterClose = await waitForMessage(admin.messages, admin.ws);
+  assert.equal(afterClose.type, 'status');
+  assert.equal(afterClose.status.connectedViews, 0);
+
+  admin.ws.close();
+  await server.stop();
+});
+
+test('role views receive configured field maps', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    views: {
+      visuals: {
+        title: 'Visuals',
+        fields: [{ column: 'Mood' }, { column: 'Color' }],
+      },
+    },
+  });
+  const server = await createViewServer({ config, bus, log: silentLog });
+
+  const { ws, messages } = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=visuals`);
+  const init = await waitForMessage(messages, ws);
+  assert.equal(init.viewId, 'visuals');
+  assert.deepEqual(init.fields.map((f) => f.column), ['Mood', 'Color']);
 
   ws.close();
   await server.stop();

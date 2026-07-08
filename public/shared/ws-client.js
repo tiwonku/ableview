@@ -1,6 +1,6 @@
 // Shared WebSocket client (NFR-6). Auto-reconnect + connection/last-update display.
 
-import { renderView, setConnectionState } from './view-render.js';
+import { renderView, renderAdmin, setConnectionState } from './view-render.js';
 
 const RECONNECT_MS = 1500;
 
@@ -12,6 +12,7 @@ export function connectView({ viewId, rootSelector = '#app' }) {
   let reconnectTimer = null;
   let viewConfig = null;
   let lastPayload = null;
+  let lastStatus = null;
   let lastUpdate = null;
   let connected = false;
   let stopped = false;
@@ -36,11 +37,19 @@ export function connectView({ viewId, rootSelector = '#app' }) {
       viewConfig = {
         title: msg.title,
         fields: msg.fields ?? [],
+        system: msg.system === true,
       };
+      if (msg.status) lastStatus = msg.status;
       if (msg.payload) {
         lastPayload = msg.payload;
         lastUpdate = new Date();
       }
+      render();
+      return;
+    }
+
+    if (msg.type === 'status' && msg.status) {
+      lastStatus = msg.status;
       render();
       return;
     }
@@ -54,12 +63,15 @@ export function connectView({ viewId, rootSelector = '#app' }) {
 
   function render() {
     if (!viewConfig) return;
-    renderView(root, {
+    const ctx = {
       ...viewConfig,
       payload: lastPayload,
+      status: lastStatus,
       connected,
       lastUpdate,
-    });
+    };
+    if (viewConfig.system) renderAdmin(root, ctx);
+    else renderView(root, ctx);
   }
 
   function setConnected(next) {

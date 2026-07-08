@@ -83,3 +83,97 @@ function updateStatusBar({ connected, lastUpdate, payload }) {
 export function setConnectionState(connected, lastUpdate, payload) {
   updateStatusBar({ connected, lastUpdate, payload });
 }
+
+function formatTimestamp(iso) {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString();
+}
+
+function formatConfidence(confidence) {
+  if (confidence == null || Number.isNaN(confidence)) return '—';
+  return `${Math.round(confidence * 100)}%`;
+}
+
+function addStat(parent, label, value, { warn = false } = {}) {
+  const card = document.createElement('div');
+  card.className = 'stat' + (warn ? ' warn' : '');
+
+  const labelEl = document.createElement('p');
+  labelEl.className = 'stat-label';
+  labelEl.textContent = label;
+  card.appendChild(labelEl);
+
+  const valueEl = document.createElement('p');
+  valueEl.className = 'stat-value';
+  valueEl.textContent = value ?? '—';
+  card.appendChild(valueEl);
+
+  parent.appendChild(card);
+}
+
+export function renderAdmin(root, { title, payload, status, connected, lastUpdate }) {
+  root.innerHTML = '';
+
+  const titleEl = document.createElement('h1');
+  titleEl.className = 'view-title';
+  titleEl.textContent = title ?? 'Admin';
+  root.appendChild(titleEl);
+
+  const clipName = payload?.clipName?.trim() || null;
+  const clipEl = document.createElement('p');
+  clipEl.className = 'clip-name' + (clipName ? '' : ' empty-clip');
+  clipEl.textContent = clipName ?? 'Nothing playing';
+  root.appendChild(clipEl);
+
+  const stats = document.createElement('div');
+  stats.className = 'admin-stats';
+
+  const matched = payload?.match?.matched === true;
+  addStat(stats, 'Match', matched ? 'Yes' : 'No', { warn: payload && clipName && !matched });
+  addStat(stats, 'Confidence', formatConfidence(payload?.match?.confidence));
+  addStat(stats, 'Row ID', payload?.match?.rowId ?? '—');
+  addStat(stats, 'Matched value', payload?.match?.matchedValue ?? '—');
+  addStat(stats, 'Via alias', payload?.match?.viaAlias ? 'Yes' : 'No');
+  addStat(stats, 'Last sync', formatTimestamp(payload?.syncedAt));
+  addStat(stats, 'Cache', payload?.stale ? 'Stale (offline)' : 'Fresh', { warn: payload?.stale });
+  addStat(stats, 'Connected views', String(status?.connectedViews ?? 0));
+
+  root.appendChild(stats);
+
+  if (payload && clipName && !matched) {
+    const noMatch = document.createElement('div');
+    noMatch.className = 'no-match';
+    noMatch.textContent = 'No confident match — check the cue sheet or clip name.';
+    root.appendChild(noMatch);
+  }
+
+  if (matched && payload.row) {
+    const section = document.createElement('section');
+    section.className = 'admin-section';
+
+    const heading = document.createElement('h2');
+    heading.className = 'section-title';
+    heading.textContent = 'Matched row';
+    section.appendChild(heading);
+
+    const table = document.createElement('dl');
+    table.className = 'row-table';
+    for (const [column, raw] of Object.entries(payload.row)) {
+      const value = raw == null || String(raw).trim() === '' ? '—' : String(raw);
+
+      const dt = document.createElement('dt');
+      dt.textContent = column;
+      table.appendChild(dt);
+
+      const dd = document.createElement('dd');
+      dd.textContent = value;
+      table.appendChild(dd);
+    }
+    section.appendChild(table);
+    root.appendChild(section);
+  }
+
+  updateStatusBar({ connected, lastUpdate, payload });
+}
