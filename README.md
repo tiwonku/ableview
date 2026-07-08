@@ -10,7 +10,22 @@ Milestone status and future work: [`ROADMAP.md`](./ROADMAP.md).
 
 ## Quick start
 
-Requires Node.js ≥ 20.
+Requires **Node.js ≥ 20 (LTS)**. Verify before `npm install`:
+
+```bash
+node -v   # must print v20.x or higher (v22.x is fine)
+npm -v    # bundled with Node; should print a version
+```
+
+If Node is missing or too old:
+
+| OS | Install |
+|---|---|
+| **Windows** | [nodejs.org LTS](https://nodejs.org/) installer, or `winget install OpenJS.NodeJS.LTS` |
+| **macOS** | [nodejs.org LTS](https://nodejs.org/) pkg, or `brew install node@20` |
+| **Linux / Raspberry Pi** | [NodeSource setup](https://github.com/nodesource/distributions) for your distro, or `nvm install 20` |
+
+Re-open your terminal after installing, then run `node -v` again.
 
 ```bash
 npm install
