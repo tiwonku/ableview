@@ -7,20 +7,20 @@
   <link rel="stylesheet" href="/shared/styles.css">
 </head>
 <body>
-  <div id="sim-banner" class="banner sim" hidden>SIMULATION MODE</div>
-  <div id="stale-banner" class="banner stale" hidden>Sheet data may be stale (offline cache)</div>
   <header id="status-bar" class="status-bar">
-    <span class="dot" aria-hidden="true"></span>
-    <span data-role="connection">Connecting…</span>
-    <span data-role="last-update">Last update: —</span>
+    <span class="status-group">
+      <span class="dot" aria-hidden="true"></span>
+      <span data-role="connection">Connecting…</span>
+    </span>
+    <span id="sim-pill" class="status-pill sim" hidden role="status" title="Simulation mode — not live Ableton">SIM</span>
+    <span id="stale-pill" class="status-pill stale" hidden role="status" title="Sheet data from offline cache">STALE</span>
+    <span class="status-sep" aria-hidden="true">·</span>
+    <span data-role="last-update" title="Last cue update">—</span>
   </header>
   <main id="app" class="admin-main" aria-live="polite"></main>
-  <section id="settings-panel" class="admin-section settings-panel" aria-label="Settings"></section>
   <script type="module">
     import { connectView } from '/shared/ws-client.js';
-    import { mountSettingsPanel } from '/shared/admin-settings.js';
     connectView({ viewId: 'admin' });
-    mountSettingsPanel('#settings-panel');
   </script>
 </body>
 </html>

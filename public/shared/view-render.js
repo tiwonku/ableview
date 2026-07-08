@@ -165,16 +165,22 @@ function updateStatusBar({ connected, lastUpdate, payload }) {
 
   const updateText = bar.querySelector('[data-role="last-update"]');
   if (updateText) {
-    updateText.textContent = lastUpdate
-      ? `Last update: ${lastUpdate.toLocaleTimeString()}`
-      : 'Last update: —';
+    if (lastUpdate) {
+      updateText.textContent = lastUpdate.toLocaleTimeString();
+      updateText.title = `Last cue update: ${lastUpdate.toLocaleString()}`;
+    } else {
+      updateText.textContent = '—';
+      updateText.title = 'Last cue update';
+    }
   }
 
-  const simBanner = document.getElementById('sim-banner');
-  if (simBanner) simBanner.hidden = !payload?.simulated;
-
-  const staleBanner = document.getElementById('stale-banner');
-  if (staleBanner) staleBanner.hidden = !payload?.stale;
+  const simPill = document.getElementById('sim-pill');
+  const stalePill = document.getElementById('stale-pill');
+  const simOn = Boolean(payload?.simulated);
+  const staleOn = Boolean(payload?.stale);
+  if (simPill) simPill.hidden = !simOn;
+  if (stalePill) stalePill.hidden = !staleOn;
+  bar.classList.toggle('status-bar--alert', simOn || staleOn);
 }
 
 export function setConnectionState(connected, lastUpdate, payload) {

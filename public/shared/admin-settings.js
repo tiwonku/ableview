@@ -106,32 +106,10 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   const form = el('form', 'settings-form');
   form.noValidate = true;
 
-  const simGroup = el('fieldset', 'settings-group settings-group-sim');
-  simGroup.appendChild(el('legend', null, 'Simulation'));
-  const simEnabled = settings.sim?.enabled === true;
-  const simCheck = el('input');
-  simCheck.type = 'checkbox';
-  simCheck.name = 'simEnabled';
-  simCheck.id = 'simEnabled';
-  simCheck.checked = simEnabled;
-  simCheck.className = 'settings-checkbox';
-  const simRow = el('div', 'settings-field settings-field-checkbox');
-  simRow.appendChild(simCheck);
-  const simLabel = el('label', 'settings-checkbox-label');
-  simLabel.htmlFor = 'simEnabled';
-  simLabel.textContent = 'Simulation mode (fake clip changes — not live Ableton)';
-  simRow.appendChild(simLabel);
-  simGroup.appendChild(simRow);
-  if (simEnabled) {
-    const simWarn = el('p', 'settings-sim-warn');
-    simWarn.textContent = 'Simulation is ON. Operator views show fake data. Turn off before show night.';
-    simGroup.appendChild(simWarn);
-  } else {
-    const simHint = el('p', 'settings-sim-hint');
-    simHint.textContent = 'When off, AbleView listens to the real Ableton session via OSC.';
-    simGroup.appendChild(simHint);
-  }
-  form.appendChild(simGroup);
+  const grid = el('div', 'settings-grid');
+
+  const topRow = el('div', 'settings-row');
+  const bottomRow = el('div', 'settings-row');
 
   const ingestGroup = el('fieldset', 'settings-group');
   ingestGroup.appendChild(el('legend', null, 'Ableton / OSC'));
@@ -146,7 +124,7 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
     'Cue track (name or index)',
     textInput('authoritativeTrack', settings.ingest.authoritative?.track ?? '')
   ));
-  form.appendChild(ingestGroup);
+  topRow.appendChild(ingestGroup);
 
   const sheetsGroup = el('fieldset', 'settings-group');
   sheetsGroup.appendChild(el('legend', null, 'Google Sheet'));
@@ -175,8 +153,34 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   }
 
   syncBtn.addEventListener('click', () => onSync?.());
+  topRow.appendChild(sheetsGroup);
 
-  form.appendChild(sheetsGroup);
+  const simGroup = el('fieldset', 'settings-group settings-group-sim');
+  simGroup.appendChild(el('legend', null, 'Simulation'));
+  const simEnabled = settings.sim?.enabled === true;
+  const simCheck = el('input');
+  simCheck.type = 'checkbox';
+  simCheck.name = 'simEnabled';
+  simCheck.id = 'simEnabled';
+  simCheck.checked = simEnabled;
+  simCheck.className = 'settings-checkbox';
+  const simRow = el('div', 'settings-field settings-field-checkbox');
+  simRow.appendChild(simCheck);
+  const simLabel = el('label', 'settings-checkbox-label');
+  simLabel.htmlFor = 'simEnabled';
+  simLabel.textContent = 'Simulation mode (fake clip changes — not live Ableton)';
+  simRow.appendChild(simLabel);
+  simGroup.appendChild(simRow);
+  if (simEnabled) {
+    const simWarn = el('p', 'settings-sim-warn');
+    simWarn.textContent = 'Simulation is ON. Operator views show fake data. Turn off before show night.';
+    simGroup.appendChild(simWarn);
+  } else {
+    const simHint = el('p', 'settings-sim-hint');
+    simHint.textContent = 'When off, AbleView listens to the real Ableton session via OSC.';
+    simGroup.appendChild(simHint);
+  }
+  bottomRow.appendChild(simGroup);
 
   const matchGroup = el('fieldset', 'settings-group');
   matchGroup.appendChild(el('legend', null, 'Matching'));
@@ -184,7 +188,11 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
     'Confidence threshold (0–1)',
     numberInput('threshold', settings.match.threshold, { min: 0, max: 1, step: 0.05 })
   ));
-  form.appendChild(matchGroup);
+  bottomRow.appendChild(matchGroup);
+
+  grid.appendChild(topRow);
+  grid.appendChild(bottomRow);
+  form.appendChild(grid);
 
   const actions = el('div', 'settings-actions');
   const saveBtn = el('button', 'settings-save', 'Save settings');

@@ -154,7 +154,7 @@ test('GET and PATCH /api/config/settings', async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-test('admin view HTML loads settings panel script', async () => {
+test('admin view HTML does not embed settings panel', async () => {
   const bus = createBus();
   const config = baseConfig();
   config.server.httpPort = 0;
@@ -163,8 +163,24 @@ test('admin view HTML loads settings panel script', async () => {
   const res = await fetch(`http://127.0.0.1:${server.port}/views/admin`);
   assert.equal(res.status, 200);
   const html = await res.text();
+  assert.doesNotMatch(html, /admin-settings\.js/);
+  assert.doesNotMatch(html, /settings-panel/);
+
+  await server.stop();
+});
+
+test('settings view HTML loads settings panel script', async () => {
+  const bus = createBus();
+  const config = baseConfig();
+  config.server.httpPort = 0;
+  const server = await createViewServer({ config, bus, log: silentLog });
+
+  const res = await fetch(`http://127.0.0.1:${server.port}/views/settings`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /AbleView — Settings/);
   assert.match(html, /admin-settings\.js/);
-  assert.match(html, /settings-panel/);
+  assert.match(html, /statusOnly: true/);
 
   await server.stop();
 });

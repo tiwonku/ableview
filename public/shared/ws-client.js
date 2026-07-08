@@ -5,9 +5,14 @@ import { mountViewNav } from './view-nav.js';
 
 const RECONNECT_MS = 1500;
 
-export function connectView({ viewId, rootSelector = '#app' }) {
-  const root = document.querySelector(rootSelector);
-  if (!root) throw new Error(`Missing root element: ${rootSelector}`);
+export function connectView({
+  viewId,
+  rootSelector = '#app',
+  statusOnly = false,
+  settingsActive = false,
+}) {
+  const root = statusOnly ? null : document.querySelector(rootSelector);
+  if (!statusOnly && !root) throw new Error(`Missing root element: ${rootSelector}`);
 
   let ws = null;
   let reconnectTimer = null;
@@ -43,7 +48,7 @@ export function connectView({ viewId, rootSelector = '#app' }) {
         viewId,
       };
       viewsList = msg.views ?? null;
-      mountViewNav(viewId, viewsList);
+      mountViewNav(viewId, viewsList, { settingsActive });
       if (msg.status) lastStatus = msg.status;
       if (msg.payload) {
         lastPayload = msg.payload;
@@ -75,6 +80,10 @@ export function connectView({ viewId, rootSelector = '#app' }) {
       connected,
       lastUpdate,
     };
+    if (statusOnly) {
+      setConnectionState(connected, lastUpdate, lastPayload);
+      return;
+    }
     if (viewConfig.system) renderAdmin(root, ctx);
     else renderView(root, ctx);
   }
