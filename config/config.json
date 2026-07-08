@@ -14,8 +14,9 @@
     "intervalSeconds": 8
   },
   "sheets": {
-    "worksheet": "Cues",
-    "matchColumn": "Clip Name",
+    "worksheet": "MASTER_v1.1",
+    "headerRow": 4,
+    "matchColumn": "Song Title",
     "aliasColumn": "Aliases",
     "refreshSeconds": 30,
     "cacheFile": "./data/sheet-cache.json"

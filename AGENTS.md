@@ -21,7 +21,7 @@ It runs unattended on show nights on a dedicated box (Windows NUC or Raspberry P
 | Milestone | Description | Status |
 |---|---|---|
 | **M1** | Skeleton + ingest + simulator | ✅ **Done** |
-| **M2** | Sheets sync + offline cache | Not started |
+| **M2** | Sheets sync + offline cache | ✅ **Done** |
 | **M3** | Fuzzy matcher | Not started |
 | **M4** | View server + first view | Not started |
 | **M5** | Remaining views + admin/status | Not started |
@@ -173,6 +173,7 @@ Use spec §10 acceptance criteria verbatim. Summary:
 ### M2 — Sheets sync + offline cache
 
 - Service-account read of worksheet → in-memory store
+- **`sheets.headerRow`** — 1-based row number of the header line (default `1`; use `4` for sheets with preamble rows)
 - Periodic refresh (`sheets.refreshSeconds`)
 - Persist to `data/sheet-cache.json`; load on startup and sync failure
 - Wire `getClipNames` into simulator's `sheetClipNames` driver

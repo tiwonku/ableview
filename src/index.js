@@ -2,6 +2,7 @@ import { loadConfig } from './config/index.js';
 import { createLogger } from './core/logger.js';
 import { createBus, EVENTS } from './core/bus.js';
 import { createIngest } from './ingest/index.js';
+import { createSheetsStore } from './sheets/index.js';
 
 const log = createLogger({ app: 'ableview' });
 
@@ -18,7 +19,15 @@ async function main() {
     log.debug({ event }, 'NowPlaying event on bus');
   });
 
-  const { source, simulated } = createIngest({ config, bus, log });
+  const sheets = createSheetsStore({ config, log: log.child({ module: 'sheets' }) });
+  await sheets.start();
+
+  const { source, simulated } = createIngest({
+    config,
+    bus,
+    log,
+    getClipNames: sheets.getClipNames,
+  });
   if (simulated) {
     log.warn('================ SIMULATION MODE ================');
   }
@@ -29,6 +38,7 @@ async function main() {
   const shutdown = (signal) => {
     log.info({ signal }, 'shutting down');
     source.stop();
+    sheets.stop();
     process.exit(0);
   };
   process.on('SIGINT', shutdown);

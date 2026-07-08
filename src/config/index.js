@@ -19,6 +19,7 @@ export const DEFAULTS = Object.freeze({
   },
   sheets: {
     worksheet: 'Cues',
+    headerRow: 1,
     matchColumn: 'Clip Name',
     aliasColumn: 'Aliases',
     refreshSeconds: 30,
@@ -75,6 +76,9 @@ export function validateConfig(config) {
     errors.push('match.threshold must be between 0 and 1');
   }
   if (!(config.sheets.refreshSeconds > 0)) errors.push('sheets.refreshSeconds must be > 0');
+  if (!Number.isInteger(config.sheets.headerRow) || config.sheets.headerRow < 1) {
+    errors.push('sheets.headerRow must be a positive integer (1-based sheet row number)');
+  }
 
   if (errors.length > 0) {
     throw new Error(`Invalid config:\n  - ${errors.join('\n  - ')}`);
