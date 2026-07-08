@@ -1,0 +1,34 @@
+{
+  "ingest": {
+    "oscListenPort": 11001,
+    "oscSendPort": 11000,
+    "abletonHost": "127.0.0.1",
+    "watchedTracks": ["Cue"],
+    "authoritative": { "strategy": "track", "track": "Cue" }
+  },
+  "sim": {
+    "enabled": false,
+    "mode": "internal",
+    "driver": "scenario",
+    "scenario": "./config/scenarios/demo-set.json",
+    "intervalSeconds": 8
+  },
+  "sheets": {
+    "worksheet": "Cues",
+    "matchColumn": "Clip Name",
+    "aliasColumn": "Aliases",
+    "refreshSeconds": 30,
+    "cacheFile": "./data/sheet-cache.json"
+  },
+  "match": {
+    "threshold": 0.4,
+    "normalize": { "lowercase": true, "stripPunctuation": true, "stripVersionTags": true }
+  },
+  "server": { "wsHeartbeatSeconds": 5 },
+  "views": {
+    "band":     { "title": "Band",     "fields": [ { "column": "Key" }, { "column": "BPM" }, { "column": "Band Notes", "label": "Notes" } ] },
+    "visuals":  { "title": "Visuals",  "fields": [ { "column": "Mood" }, { "column": "Visual Notes", "label": "Notes" }, { "column": "Color" } ] },
+    "lighting": { "title": "Lighting", "fields": [ { "column": "Lighting Cue" }, { "column": "BPM" } ] },
+    "admin":    { "title": "Admin",    "system": true }
+  }
+}

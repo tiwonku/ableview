@@ -1,0 +1,10 @@
+{
+  "loop": true,
+  "steps": [
+    { "clipName": "Song A - Intro", "holdSeconds": 8, "tempo": 128 },
+    { "clipName": "Song A - Drop", "holdSeconds": 12, "tempo": 128 },
+    { "clipName": "Song B - Verse", "holdSeconds": 10, "tempo": 100 },
+    { "clipName": "Song B - Chorus", "holdSeconds": 10, "tempo": 100 },
+    { "clipName": "Totally Unknown Clip v3", "holdSeconds": 6 }
+  ]
+}

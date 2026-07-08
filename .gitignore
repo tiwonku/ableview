@@ -1,0 +1,17 @@
+# Secrets — never commit
+.env
+secrets/*
+!secrets/.gitkeep
+
+# Runtime data (offline sheet cache, logs)
+data/*
+!data/.gitkeep
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
