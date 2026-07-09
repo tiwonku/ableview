@@ -1,6 +1,12 @@
 // Shared view rendering (spec §9.4). Maps CuePayload + field config → DOM.
 
 import { parseRgbCell } from './color-parse.js';
+import {
+  captureEditSession,
+  renderRowEditorPanel,
+  renderReadOnlyRowPanel,
+  updateEditContextBanner,
+} from './admin-row-editor.js';
 
 function isLaunching(payload) {
   return Boolean(payload?.pendingLaunch) && !payload?.simulated;
@@ -252,7 +258,20 @@ function addStat(parent, label, value, { warn = false } = {}) {
   parent.appendChild(card);
 }
 
-export function renderAdmin(root, { title, payload, status, connected, lastUpdate }) {
+export function renderAdmin(root, {
+  title,
+  payload,
+  status,
+  connected,
+  lastUpdate,
+  editSession = null,
+  editorColumns = {},
+  saveState = 'idle',
+  saveError = null,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+}) {
   root.innerHTML = '';
 
   const titleEl = document.createElement('h1');
@@ -260,58 +279,76 @@ export function renderAdmin(root, { title, payload, status, connected, lastUpdat
   titleEl.textContent = title ?? 'Admin';
   root.appendChild(titleEl);
 
-  const clipName = payload?.clipName?.trim() || null;
-  renderClipNameRow(root, clipName, payload);
+  const clipHead = document.createElement('div');
+  clipHead.id = 'admin-clip-head';
+  root.appendChild(clipHead);
+  renderAdminClipHead(clipHead, payload);
 
   const stats = document.createElement('div');
+  stats.id = 'admin-stats';
   stats.className = 'admin-stats';
-
-  const matched = payload?.match?.matched === true;
-  addStat(stats, 'Match', matched ? 'Yes' : 'No', { warn: payload && clipName && !matched });
-  addStat(stats, 'Confidence', formatConfidence(payload?.match?.confidence));
-  addStat(stats, 'Row ID', payload?.match?.rowId ?? '—');
-  addStat(stats, 'Matched value', payload?.match?.matchedValue ?? '—');
-  addStat(stats, 'Via alias', payload?.match?.viaAlias ? 'Yes' : 'No');
-  addStat(stats, 'Tempo', formatTempo(payload?.tempo));
-  addStat(stats, 'Beat', formatBeat(payload?.beat));
-  addStat(stats, 'Last sync', formatTimestamp(payload?.syncedAt));
-  addStat(stats, 'Cache', payload?.stale ? 'Stale (offline)' : 'Fresh', { warn: payload?.stale });
-  addStat(stats, 'Connected views', String(status?.connectedViews ?? 0));
-
   root.appendChild(stats);
+  renderAdminStats(stats, payload, status);
 
-  if (payload && clipName && !matched) {
+  if (payload && payload.clipName?.trim() && payload.match?.matched !== true && !editSession) {
     const noMatch = document.createElement('div');
     noMatch.className = 'no-match';
     noMatch.textContent = 'No confident match — check the cue sheet or clip name.';
     root.appendChild(noMatch);
   }
 
-  if (matched && payload.row) {
-    const section = document.createElement('section');
-    section.className = 'admin-section';
-
-    const heading = document.createElement('h2');
-    heading.className = 'section-title';
-    heading.textContent = 'Matched row';
-    section.appendChild(heading);
-
-    const table = document.createElement('dl');
-    table.className = 'row-table';
-    for (const [column, raw] of Object.entries(payload.row)) {
-      const value = raw == null || String(raw).trim() === '' ? '—' : String(raw);
-
-      const dt = document.createElement('dt');
-      dt.textContent = column;
-      table.appendChild(dt);
-
-      const dd = document.createElement('dd');
-      dd.textContent = value;
-      table.appendChild(dd);
-    }
-    section.appendChild(table);
-    root.appendChild(section);
+  if (editSession) {
+    renderRowEditorPanel(root, {
+      session: editSession,
+      editorColumns,
+      livePayload: payload,
+      onCancel: onCancelEdit,
+      onSave: onSaveEdit,
+      saveState,
+      saveError,
+    });
+  } else if (payload?.match?.matched === true && payload.row && onStartEdit) {
+    renderReadOnlyRowPanel(root, { payload, onStartEdit });
+  } else if (payload?.match?.matched === true && payload.row) {
+    renderReadOnlyRowPanel(root, { payload, onStartEdit: () => {} });
   }
 
   updateStatusBar({ connected, lastUpdate, payload });
 }
+
+export function updateAdminLiveChrome(root, { payload, status, connected, lastUpdate, editSession }) {
+  const clipHead = root.querySelector('#admin-clip-head');
+  if (clipHead) renderAdminClipHead(clipHead, payload);
+
+  const stats = root.querySelector('#admin-stats');
+  if (stats) renderAdminStats(stats, payload, status);
+
+  if (editSession) updateEditContextBanner(root, editSession, payload);
+
+  updateStatusBar({ connected, lastUpdate, payload });
+}
+
+function renderAdminClipHead(parent, payload) {
+  parent.innerHTML = '';
+  const clipName = payload?.clipName?.trim() || null;
+  renderClipNameRow(parent, clipName, payload);
+}
+
+function renderAdminStats(parent, payload, status) {
+  parent.innerHTML = '';
+
+  const matched = payload?.match?.matched === true;
+  const clipName = payload?.clipName?.trim() || null;
+  addStat(parent, 'Match', matched ? 'Yes' : 'No', { warn: payload && clipName && !matched });
+  addStat(parent, 'Confidence', formatConfidence(payload?.match?.confidence));
+  addStat(parent, 'Row ID', payload?.match?.rowId ?? '—');
+  addStat(parent, 'Matched value', payload?.match?.matchedValue ?? '—');
+  addStat(parent, 'Via alias', payload?.match?.viaAlias ? 'Yes' : 'No');
+  addStat(parent, 'Tempo', formatTempo(payload?.tempo));
+  addStat(parent, 'Beat', formatBeat(payload?.beat));
+  addStat(parent, 'Last sync', formatTimestamp(payload?.syncedAt));
+  addStat(parent, 'Cache', payload?.stale ? 'Stale (offline)' : 'Fresh', { warn: payload?.stale });
+  addStat(parent, 'Connected views', String(status?.connectedViews ?? 0));
+}
+
+export { captureEditSession };

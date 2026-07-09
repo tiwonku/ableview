@@ -48,6 +48,7 @@ async function main() {
     configRuntime,
     sheetsActions: {
       sync: () => sheets.sync(),
+      updateRow: (rowId, changes) => sheets.updateRow(rowId, changes),
       getSnapshot: sheets.getSnapshot,
       onSynced: () => matcher.rematch(),
     },

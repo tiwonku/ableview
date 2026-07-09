@@ -1,6 +1,13 @@
 // Shared WebSocket client (NFR-6). Auto-reconnect + connection/last-update display.
 
-import { renderView, renderAdmin, setConnectionState } from './view-render.js';
+import {
+  renderView,
+  renderAdmin,
+  updateAdminLiveChrome,
+  captureEditSession,
+  setConnectionState,
+} from './view-render.js';
+import { collectEditorChanges } from './admin-row-editor.js';
 import { mountViewNav } from './view-nav.js';
 
 const RECONNECT_MS = 1500;
@@ -25,6 +32,10 @@ export function connectView({
   let lastUpdate = null;
   let connected = false;
   let stopped = false;
+  let editSession = null;
+  let editorColumns = {};
+  let saveState = 'idle';
+  let saveError = null;
   let serverSimulated = false;
 
   function applySimState(simulated) {
@@ -59,6 +70,7 @@ export function connectView({
         system: msg.system === true,
         viewId,
       };
+      editorColumns = msg.editorColumns ?? {};
       viewsList = msg.views ?? null;
       mountViewNav(viewId, viewsList, { settingsActive });
       if (msg.status) lastStatus = msg.status;
@@ -80,6 +92,16 @@ export function connectView({
 
     if (msg.type === 'status' && msg.status) {
       lastStatus = msg.status;
+      if (editSession && viewConfig?.system && root) {
+        updateAdminLiveChrome(root, {
+          payload: lastPayload,
+          status: lastStatus,
+          connected,
+          lastUpdate,
+          editSession,
+        });
+        return;
+      }
       render();
       return;
     }
@@ -89,6 +111,68 @@ export function connectView({
       lastUpdate = new Date();
       applySimState(msg.payload.simulated === true);
       onPayload?.(lastPayload);
+      if (editSession && viewConfig?.system && root) {
+        updateAdminLiveChrome(root, {
+          payload: lastPayload,
+          status: lastStatus,
+          connected,
+          lastUpdate,
+          editSession,
+        });
+        return;
+      }
+      render();
+    }
+  }
+
+  function startEdit() {
+    if (!lastPayload?.match?.matched || !lastPayload.row) return;
+    editSession = captureEditSession(lastPayload);
+    saveState = 'idle';
+    saveError = null;
+    render();
+  }
+
+  function cancelEdit() {
+    editSession = null;
+    saveState = 'idle';
+    saveError = null;
+    render();
+  }
+
+  async function saveEdit(formSection) {
+    if (!editSession || saveState === 'saving') return;
+
+    const form = formSection.querySelector('.row-editor');
+    if (!form) return;
+
+    const changes = collectEditorChanges(form, editSession.row);
+    if (Object.keys(changes).length === 0) {
+      cancelEdit();
+      return;
+    }
+
+    saveState = 'saving';
+    saveError = null;
+    render();
+
+    try {
+      const res = await fetch(`/api/sheets/rows/${encodeURIComponent(editSession.rowId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changes),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error ?? `Save failed (${res.status})`);
+      }
+      editSession = null;
+      saveState = 'idle';
+      saveError = null;
+      render();
+    } catch (err) {
+      saveState = 'idle';
+      saveError = err.message ?? 'Save failed';
       render();
     }
   }
@@ -103,11 +187,23 @@ export function connectView({
       lastUpdate,
     };
     if (statusOnly) {
-      setConnectionState(connected, lastUpdate, lastPayload);
+      setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);
       return;
     }
-    if (viewConfig.system) renderAdmin(root, ctx);
-    else renderView(root, ctx);
+    if (viewConfig.system) {
+      renderAdmin(root, {
+        ...ctx,
+        editSession,
+        editorColumns,
+        saveState,
+        saveError,
+        onStartEdit: startEdit,
+        onCancelEdit: cancelEdit,
+        onSaveEdit: saveEdit,
+      });
+    } else {
+      renderView(root, ctx);
+    }
   }
 
   function setConnected(next) {

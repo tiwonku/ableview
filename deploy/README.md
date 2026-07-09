@@ -18,24 +18,25 @@ The checklist below assumes M6 is complete: `/health`, production config validat
    - `SHEET_ID`
    - `HTTP_PORT` (default `8080`)
 5. **Place the service account key** at the path in `.env` (e.g. `secrets/service-account.json`).
-6. **Copy and tune local config:**
+6. **Share the Google Sheet** with the service account email (`client_email` in the JSON) as **Editor** (required for admin row edits; Viewer is read-only).
+7. **Copy and tune local config:**
    ```bash
    cp config/config.example.json config/config.json
    ```
    Set `ingest.abletonHost`, cue track, sheet columns, and views for this network.
-7. **Set production mode** in the service environment (not in `.env` unless you prefer):
+8. **Set production mode** in the service environment (not in `.env` unless you prefer):
    - `NODE_ENV=production` **or** `ABLEVIEW_PRODUCTION=1`
    - Enables stricter boot validation (sheet credentials, admin view required when not simulating).
-8. **Confirm `sim.enabled` is `false`** in `config/config.json` for show night.
-9. **Verify manually once** before installing the service:
+9. **Confirm `sim.enabled` is `false`** in `config/config.json` for show night.
+10. **Verify manually once** before installing the service:
    ```bash
    NODE_ENV=production npm start
    curl http://localhost:8080/health
    ```
-10. **Install the OS service** (Linux or Windows section below) and enable start on boot.
-11. **Open operator URLs** on the LAN, e.g. `http://<show-box-ip>:8080/views/band`.
+11. **Install the OS service** (Linux or Windows section below) and enable start on boot.
+12. **Open operator URLs** on the LAN, e.g. `http://<show-box-ip>:8080/views/band`.
 
-Nothing in steps 10–11 runs automatically on a development machine unless you explicitly
+Nothing in steps 11–12 runs automatically on a development machine unless you explicitly
 install and enable a service there.
 
 ---

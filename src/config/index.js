@@ -25,6 +25,14 @@ export const DEFAULTS = Object.freeze({
     aliasColumn: 'Aliases',
     refreshSeconds: 30,
     cacheFile: './data/sheet-cache.json',
+    editorColumns: {
+      BPM: { type: 'number', step: 0.1 },
+      Cue: { type: 'icon', true: '✅', false: '✖' },
+      Pillar: { type: 'icon', true: '✅', false: '✖' },
+      RGB_1: { type: 'color' },
+      RGB_2: { type: 'color' },
+      RGB_3: { type: 'color' },
+    },
   },
   match: {
     threshold: 0.4,

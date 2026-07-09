@@ -13,6 +13,7 @@ Build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claud
 | M5 | Remaining views + admin/status | ✅ done |
 | M6 | Hardening | ✅ done |
 | M7 | Admin settings GUI | ✅ done |
+| M8 | Sheet row editor | ✅ done |
 
 v2026 core scope (spec §10, §13) is complete. Items below are deferred, partial, or
 post-v2026.
@@ -24,6 +25,7 @@ post-v2026.
 | Feature | Description | Status |
 |---|---|---|
 | **Launch anticipation** | Ingest listens to `fired_slot_index` on the cue track; authoritative clip switches on scene fire before the quantization downbeat. OSC sim models the gap via `sim.quantDelaySeconds`. | ✅ done |
+| **Sheet row editor** | Edit matched cue rows from admin; typed widgets for BPM, Cue/Pillar icons, RGB colors; `PATCH /api/sheets/rows/:rowId`; edit session locks row while clip changes. Service account needs Editor + `spreadsheets` scope. | ✅ done |
 
 ---
 

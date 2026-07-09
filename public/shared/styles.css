@@ -454,6 +454,177 @@ main {
   word-break: break-word;
 }
 
+.admin-editor-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.admin-editor-header .section-title {
+  margin: 0;
+}
+
+.admin-editor-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.admin-editor-btn {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-editor-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.admin-editor-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.admin-editor-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.admin-editor-context {
+  margin: 0 0 0.85rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.admin-editor-error {
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.35rem;
+  background: rgba(224, 82, 82, 0.12);
+  border: 1px solid rgba(224, 82, 82, 0.35);
+  color: #f5a5a5;
+  font-size: 0.85rem;
+}
+
+.row-editor {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  gap: 0.5rem 1rem;
+  padding: 1rem 1.15rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.row-editor-field {
+  display: contents;
+}
+
+.row-editor-label {
+  margin: 0;
+  padding-top: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.row-editor-control {
+  min-width: 0;
+}
+
+.row-editor-input {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.row-editor-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.row-editor-color {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.row-editor-color.is-cleared .row-editor-color-input {
+  opacity: 0.35;
+  border-style: dashed;
+}
+
+.row-editor-color-input {
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0.1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.row-editor-color-meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.row-editor-color-clear {
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.row-editor-color-clear:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.row-editor-color-clear:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.row-editor-icon-toggle {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.icon-toggle-btn {
+  min-width: 2.5rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--bg);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-toggle-btn.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 .settings-hint {
   margin: 0 0 1rem;
   font-size: 0.85rem;

@@ -45,6 +45,10 @@ export async function createViewServer({
     return { ...payload, simulated: isSimulated() };
   }
 
+  function getLiveConfig() {
+    return configRuntime?.getConfig() ?? config;
+  }
+
   function broadcast(msg) {
     const data = JSON.stringify(msg);
     for (const [ws] of clients) {
@@ -156,6 +160,7 @@ export async function createViewServer({
     if (viewConfig.system) {
       init.system = true;
       init.status = buildStatus();
+      init.editorColumns = getLiveConfig().sheets?.editorColumns ?? {};
     }
     ws.send(JSON.stringify(init));
     if (viewId !== 'admin') broadcastStatus();

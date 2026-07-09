@@ -1,4 +1,4 @@
-/** REST handlers for manual sheet sync from admin (M7). */
+/** REST handlers for manual sheet sync and row edits from admin. */
 
 export function registerSheetsRoutes(app, { sheetsActions, log }) {
   app.get('/api/sheets/status', async (_req, reply) => {
@@ -31,6 +31,40 @@ export function registerSheetsRoutes(app, { sheetsActions, log }) {
         error: err.message,
         syncedAt: snapshot.syncedAt,
         rowCount: snapshot.rows?.length ?? 0,
+        stale: snapshot.stale,
+      });
+    }
+  });
+
+  app.patch('/api/sheets/rows/:rowId', async (req, reply) => {
+    const { rowId } = req.params;
+    const changes = req.body;
+    if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
+      return reply.code(400).send({ ok: false, error: 'request body must be a JSON object of column changes' });
+    }
+
+    try {
+      await sheetsActions.updateRow(rowId, changes);
+      sheetsActions.onSynced?.();
+      const snapshot = sheetsActions.getSnapshot();
+      const row = snapshot.rows?.find((r) => r.rowId === String(rowId));
+      log.info({ rowId, columns: Object.keys(changes) }, 'sheet row saved from admin');
+      return reply.send({
+        ok: true,
+        rowId: String(rowId),
+        row: row?.data ?? null,
+        syncedAt: snapshot.syncedAt,
+        stale: snapshot.stale,
+      });
+    } catch (err) {
+      const snapshot = sheetsActions.getSnapshot();
+      const message = err.message ?? 'update failed';
+      const code = /unknown column|invalid rowId|row not found|no changes|must be/i.test(message) ? 400 : 502;
+      log.warn({ err: message, rowId }, 'sheet row update failed');
+      return reply.code(code).send({
+        ok: false,
+        error: message,
+        syncedAt: snapshot.syncedAt,
         stale: snapshot.stale,
       });
     }
