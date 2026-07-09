@@ -2,13 +2,12 @@ import osc from 'osc';
 import { EVENTS } from '../../core/bus.js';
 import { makeNowPlaying, SOURCES } from '../../core/now-playing.js';
 import { assertReadOnlyAddress } from '../osc-addresses.js';
+import { isValidSlot, isPendingLaunch, resolveAuthoritativeClipWithLatch } from '../authoritative-clip.js';
 
-const NOTHING_PLAYING = -1; // AbletonOSC: -1 = stopped, -2 = no clip slots
-
-// Read-only AbletonOSC listener (spec §6). Registers listeners for the
-// playing slot on each watched track, resolves clip names on change, and
-// emits NowPlaying events. All outbound messages pass through send(), which
-// enforces the NFR-1 read-only allowlist.
+// Read-only AbletonOSC listener (spec §6). Registers listeners for playing
+// and fired slots on each watched track, resolves clip names on change, and
+// emits NowPlaying events. Fired slots switch the authoritative clip before
+// quantization so operator views anticipate scene launches.
 export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   const getIngest = getIngestConfig ?? (() => config.ingest);
   const { oscListenPort } = getIngest();
@@ -17,7 +16,8 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   let lastInboundAt = 0;
   let silenceTimer = null;
 
-  // trackIndex -> { trackName, slotIndex, clipName }
+  // trackIndex -> { trackName, playingSlotIndex, playingClipName, firedSlotIndex,
+  //   firedClipName, latchedClipName?, latchedSlotIndex? }
   const trackState = new Map();
   let tempo = null;
   let beat = null;
@@ -35,45 +35,69 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     return watchedTracks.some((t) => t === trackName || t === trackIndex);
   }
 
-  function authoritativeClipOf() {
+  function authoritativeTrackState() {
     const { authoritative } = getIngest();
     if (authoritative.strategy === 'track') {
       for (const [index, state] of trackState) {
         if (state.trackName === authoritative.track || index === authoritative.track) {
-          return state.clipName ?? null;
+          return state;
         }
       }
       return null;
     }
+    return null;
+  }
+
+  function authoritativeClipOf() {
+    const { authoritative } = getIngest();
+    if (authoritative.strategy === 'track') {
+      const state = authoritativeTrackState();
+      return state ? resolveAuthoritativeClipWithLatch(state) : null;
+    }
     // 'scene' and 'mostRecent' strategies are config-selectable but not
-    // implemented in v2026 M1; fall back to "any playing watched clip".
+    // implemented in v2026 M1; fall back to fired-then-playing on watched tracks.
     for (const state of trackState.values()) {
-      if (state.clipName) return state.clipName;
+      const clip = resolveAuthoritativeClipWithLatch(state);
+      if (clip) return clip;
     }
     return null;
   }
 
+  function pendingLaunchOf() {
+    const state = authoritativeTrackState();
+    if (!state) return false;
+    return isPendingLaunch(state.playingSlotIndex, state.firedSlotIndex);
+  }
+
   function emitNowPlaying() {
     const tracks = [...trackState.entries()]
-      .filter(([, s]) => s.clipName != null)
+      .filter(([, s]) => s.playingClipName != null)
       .map(([trackIndex, s]) => ({
         trackIndex,
         trackName: s.trackName,
-        clipName: s.clipName,
-        slotIndex: s.slotIndex,
+        clipName: s.playingClipName,
+        slotIndex: s.playingSlotIndex,
       }));
 
+    const pendingLaunch = pendingLaunchOf();
     const event = makeNowPlaying({
       source: SOURCES.ABLETONOSC,
       tracks,
       authoritativeClip: authoritativeClipOf(),
       tempo,
       beat,
+      pendingLaunch,
     });
 
     // Registration replies and explicit state queries can both report the
-    // same state; only emit when clip, tempo, or beat actually changed.
-    const key = JSON.stringify([event.authoritativeClip, tracks, event.tempo, event.beat]);
+    // same state; only emit when clip, tempo, beat, or launch state changed.
+    const key = JSON.stringify([
+      event.authoritativeClip,
+      event.pendingLaunch,
+      tracks,
+      event.tempo,
+      event.beat,
+    ]);
     if (key === lastEmittedKey) return;
     lastEmittedKey = key;
 
@@ -95,12 +119,20 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     args.forEach((name, index) => {
       if (!isWatched(name, index)) return;
       if (!trackState.has(index)) {
-        trackState.set(index, { trackName: name, slotIndex: null, clipName: null });
+        trackState.set(index, {
+          trackName: name,
+          playingSlotIndex: null,
+          playingClipName: null,
+          firedSlotIndex: null,
+          firedClipName: null,
+        });
       } else {
         trackState.get(index).trackName = name;
       }
       send('/live/track/start_listen/playing_slot_index', [index]);
       send('/live/track/get/playing_slot_index', [index]);
+      send('/live/track/start_listen/fired_slot_index', [index]);
+      send('/live/track/get/fired_slot_index', [index]);
     });
     log.info({ watched: [...trackState.keys()] }, 'watching tracks');
   }
@@ -109,9 +141,22 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     const [trackIndex, slotIndex] = args;
     const state = trackState.get(trackIndex);
     if (!state) return;
-    state.slotIndex = slotIndex;
-    if (slotIndex == null || slotIndex <= NOTHING_PLAYING) {
-      state.clipName = null;
+    state.playingSlotIndex = slotIndex;
+    if (!isValidSlot(slotIndex)) {
+      state.playingClipName = null;
+      emitNowPlaying();
+    } else {
+      send('/live/clip/get/name', [trackIndex, slotIndex]);
+    }
+  }
+
+  function onFiredSlotIndex(args) {
+    const [trackIndex, slotIndex] = args;
+    const state = trackState.get(trackIndex);
+    if (!state) return;
+    state.firedSlotIndex = slotIndex;
+    if (!isValidSlot(slotIndex)) {
+      state.firedClipName = null;
       emitNowPlaying();
     } else {
       send('/live/clip/get/name', [trackIndex, slotIndex]);
@@ -119,10 +164,15 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   }
 
   function onClipName(args) {
-    const [trackIndex, , clipName] = args;
+    const [trackIndex, slotIndex, clipName] = args;
     const state = trackState.get(trackIndex);
     if (!state) return;
-    state.clipName = clipName;
+    if (state.playingSlotIndex === slotIndex) {
+      state.playingClipName = clipName;
+    }
+    if (state.firedSlotIndex === slotIndex) {
+      state.firedClipName = clipName;
+    }
     emitNowPlaying();
   }
 
@@ -131,6 +181,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     switch (msg.address) {
       case '/live/song/get/track_names': return onTrackNames(msg.args);
       case '/live/track/get/playing_slot_index': return onPlayingSlotIndex(msg.args);
+      case '/live/track/get/fired_slot_index': return onFiredSlotIndex(msg.args);
       case '/live/clip/get/name': return onClipName(msg.args);
       case '/live/song/get/tempo':
         tempo = msg.args[0];
@@ -185,6 +236,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
         send('/live/song/stop_listen/beat');
         for (const index of trackState.keys()) {
           send('/live/track/stop_listen/playing_slot_index', [index]);
+          send('/live/track/stop_listen/fired_slot_index', [index]);
         }
       } catch { /* best effort on shutdown */ }
       udp.close();

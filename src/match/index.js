@@ -155,6 +155,7 @@ function nowPlayingKey(event) {
     tempo: event.tempo,
     beat: event.beat,
     source: event.source,
+    pendingLaunch: event.pendingLaunch ?? false,
   });
 }
 
@@ -183,13 +184,19 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
 
     let payload;
     if (transportOnly) {
-      payload = { ...lastPayload, tempo: event.tempo, beat: event.beat };
+      payload = {
+        ...lastPayload,
+        tempo: event.tempo,
+        beat: event.beat,
+        pendingLaunch: event.pendingLaunch ?? false,
+      };
     } else {
       const snapshot = getSnapshot();
       payload = matchClip(event.authoritativeClip, snapshot, resolveConfig());
       payload.tempo = event.tempo;
       payload.beat = event.beat;
       payload.simulated = event.source === SOURCES.SIMULATOR;
+      payload.pendingLaunch = event.pendingLaunch ?? false;
     }
     lastClipKey = ck;
     lastPayload = payload;

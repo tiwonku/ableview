@@ -182,12 +182,45 @@ main {
   height: 1.05em;
 }
 
-.clip-name {
+.clip-head {
   margin: 0 0 1.5rem;
+}
+
+.clip-head--launching {
+  padding-left: 0.85rem;
+  border-left: 4px solid var(--ok);
+}
+
+.clip-name {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.65rem 0.85rem;
   font-size: clamp(1.75rem, 5vw, 2.75rem);
   font-weight: 700;
   line-height: 1.15;
   word-break: break-word;
+}
+
+.clip-name-text {
+  min-width: 0;
+}
+
+.clip-launching-badge {
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 0.28em 0.55em;
+  font-size: max(0.72rem, 0.34em);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: #8ef0b8;
+  background: #0f2e1f;
+  border-radius: 0.35em;
+  box-shadow: inset 3px 0 0 var(--ok);
+  vertical-align: middle;
 }
 
 .no-match {

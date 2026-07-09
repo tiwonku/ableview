@@ -9,6 +9,7 @@ export function makeCuePayload({
   syncedAt = null,
   stale = false,
   simulated = false,
+  pendingLaunch = false,
 }) {
   const payload = {
     clipName,
@@ -18,6 +19,7 @@ export function makeCuePayload({
     syncedAt,
     stale,
     simulated,
+    pendingLaunch,
   };
   if (row != null) payload.row = row;
   return payload;

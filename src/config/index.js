@@ -16,6 +16,7 @@ export const DEFAULTS = Object.freeze({
     driver: 'scenario',
     scenario: './config/scenarios/demo-set.json',
     intervalSeconds: 8,
+    quantDelaySeconds: 1,
   },
   sheets: {
     worksheet: 'Cues',
@@ -72,6 +73,9 @@ export function validateConfig(config) {
     errors.push(`sim.driver must be one of: ${VALID_SIM_DRIVERS.join(', ')}`);
   }
   if (!(config.sim.intervalSeconds > 0)) errors.push('sim.intervalSeconds must be > 0');
+  if (config.sim.quantDelaySeconds != null && !(config.sim.quantDelaySeconds >= 0)) {
+    errors.push('sim.quantDelaySeconds must be >= 0');
+  }
   if (!(config.match.threshold >= 0 && config.match.threshold <= 1)) {
     errors.push('match.threshold must be between 0 and 1');
   }

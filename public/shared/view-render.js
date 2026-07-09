@@ -2,6 +2,39 @@
 
 import { parseRgbCell } from './color-parse.js';
 
+function isLaunching(payload) {
+  return Boolean(payload?.pendingLaunch) && !payload?.simulated;
+}
+
+function renderClipNameRow(parent, clipName, payload) {
+  const row = document.createElement('div');
+  row.className = 'clip-head' + (isLaunching(payload) ? ' clip-head--launching' : '');
+
+  const clipEl = document.createElement('p');
+  clipEl.className = 'clip-name' + (clipName ? '' : ' empty-clip');
+
+  if (clipName) {
+    const text = document.createElement('span');
+    text.className = 'clip-name-text';
+    text.textContent = clipName;
+    clipEl.appendChild(text);
+
+    if (isLaunching(payload)) {
+      const badge = document.createElement('span');
+      badge.className = 'clip-launching-badge';
+      badge.textContent = 'LAUNCHING';
+      badge.setAttribute('role', 'status');
+      badge.title = 'Clip launched — waiting for downbeat';
+      clipEl.appendChild(badge);
+    }
+  } else {
+    clipEl.textContent = 'Nothing playing';
+  }
+
+  row.appendChild(clipEl);
+  parent.appendChild(row);
+}
+
 export function renderView(root, { title, fields, payload, connected, lastUpdate }) {
   root.innerHTML = '';
 
@@ -11,15 +44,7 @@ export function renderView(root, { title, fields, payload, connected, lastUpdate
   root.appendChild(titleEl);
 
   const clipName = payload?.clipName?.trim() || null;
-  const clipEl = document.createElement('p');
-  clipEl.className = 'clip-name';
-  if (clipName) {
-    clipEl.textContent = clipName;
-  } else {
-    clipEl.className += ' empty-clip';
-    clipEl.textContent = 'Nothing playing';
-  }
-  root.appendChild(clipEl);
+  renderClipNameRow(root, clipName, payload);
 
   const matched = payload?.match?.matched === true;
   if (payload && clipName && !matched) {
@@ -236,10 +261,7 @@ export function renderAdmin(root, { title, payload, status, connected, lastUpdat
   root.appendChild(titleEl);
 
   const clipName = payload?.clipName?.trim() || null;
-  const clipEl = document.createElement('p');
-  clipEl.className = 'clip-name' + (clipName ? '' : ' empty-clip');
-  clipEl.textContent = clipName ?? 'Nothing playing';
-  root.appendChild(clipEl);
+  renderClipNameRow(root, clipName, payload);
 
   const stats = document.createElement('div');
   stats.className = 'admin-stats';

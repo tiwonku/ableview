@@ -19,6 +19,14 @@ post-v2026.
 
 ---
 
+## Post-v2026 additions
+
+| Feature | Description | Status |
+|---|---|---|
+| **Launch anticipation** | Ingest listens to `fired_slot_index` on the cue track; authoritative clip switches on scene fire before the quantization downbeat. OSC sim models the gap via `sim.quantDelaySeconds`. | ✅ done |
+
+---
+
 ## Partially implemented (spec gaps)
 
 These are mentioned in the spec but not fully built. The app works without them using the

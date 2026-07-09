@@ -16,7 +16,8 @@
     "mode": "internal",
     "driver": "scenario",
     "scenario": "./config/scenarios/sheet-demo.json",
-    "intervalSeconds": 8
+    "intervalSeconds": 8,
+    "quantDelaySeconds": 1
   },
   "sheets": {
     "worksheet": "MASTER_v1.1",

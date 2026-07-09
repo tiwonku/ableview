@@ -197,6 +197,7 @@ test('CuePayload contract keys', () => {
     'beat',
     'clipName',
     'match',
+    'pendingLaunch',
     'row',
     'simulated',
     'stale',

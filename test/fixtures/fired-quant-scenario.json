@@ -1,0 +1,7 @@
+{
+  "loop": false,
+  "steps": [
+    { "clipName": "Song A - Intro", "holdSeconds": 0.25 },
+    { "clipName": "Song B - Verse", "holdSeconds": 30 }
+  ]
+}

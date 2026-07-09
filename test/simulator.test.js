@@ -30,7 +30,15 @@ test('manual driver emits a NowPlaying event matching the §9.1 contract', () =>
   assert.equal(e.authoritativeClip, 'Song A - Intro');
   assert.equal(e.tempo, 128);
   assert.ok(!Number.isNaN(Date.parse(e.timestamp)), 'timestamp is ISO-8601');
-  assert.deepEqual(Object.keys(e).sort(), ['authoritativeClip', 'beat', 'source', 'tempo', 'timestamp', 'tracks']);
+  assert.deepEqual(Object.keys(e).sort(), [
+    'authoritativeClip',
+    'beat',
+    'pendingLaunch',
+    'source',
+    'tempo',
+    'timestamp',
+    'tracks',
+  ]);
   assert.equal(e.tracks[0].clipName, 'Song A - Intro');
 });
 

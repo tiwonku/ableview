@@ -17,6 +17,9 @@ export const OSC_READ_ALLOWLIST = Object.freeze([
   '/live/track/get/playing_slot_index',
   '/live/track/start_listen/playing_slot_index',
   '/live/track/stop_listen/playing_slot_index',
+  '/live/track/get/fired_slot_index',
+  '/live/track/start_listen/fired_slot_index',
+  '/live/track/stop_listen/fired_slot_index',
   '/live/clip/get/name',
 ]);
 

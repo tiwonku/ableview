@@ -12,6 +12,7 @@ export function makeNowPlaying({
   authoritativeClip = null,
   tempo = null,
   beat = null,
+  pendingLaunch = false,
 }) {
   if (source !== SOURCES.ABLETONOSC && source !== SOURCES.SIMULATOR) {
     throw new Error(`Invalid NowPlaying source: ${source}`);
@@ -23,5 +24,6 @@ export function makeNowPlaying({
     authoritativeClip,
     tempo,
     beat,
+    pendingLaunch,
   };
 }
