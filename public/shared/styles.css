@@ -366,7 +366,39 @@ main {
 
 @media (max-width: 36rem) {
   .colors-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .field-color {
+    padding: 0.65rem 0.5rem;
+  }
+
+  .field-color .field-label {
+    font-size: 0.68rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .color-swatch {
+    width: 100%;
+    height: 2.75rem;
+    aspect-ratio: unset;
+    margin-bottom: 0.4rem;
+  }
+
+  .color-copy {
+    padding: 0.3rem 0.35rem;
+    font-size: 0.75rem;
+    gap: 0.35rem;
+  }
+
+  .color-copy-kind {
+    min-width: 1.65rem;
+    font-size: 0.65rem;
+  }
+
+  .color-copy-value {
+    font-size: 0.72rem;
   }
 }
 
@@ -582,8 +614,13 @@ main {
 }
 
 .row-editor-color-input {
+  flex-shrink: 0;
   width: 2.75rem;
   height: 2.75rem;
+  min-width: 2.75rem;
+  max-width: 2.75rem;
+  min-height: 2.75rem;
+  max-height: 2.75rem;
   padding: 0.1rem;
   border: 1px solid var(--border);
   border-radius: 0.35rem;
@@ -592,6 +629,9 @@ main {
 }
 
 .row-editor-color-meta {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
   font-size: 0.85rem;
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -616,6 +656,40 @@ main {
 .row-editor-color-clear:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+@media (max-width: 36rem) {
+  .row-editor {
+    grid-template-columns: 1fr;
+    gap: 0.15rem 0;
+  }
+
+  .row-editor > .row-editor-label {
+    padding-top: 0.65rem;
+    padding-bottom: 0.1rem;
+  }
+
+  .row-editor > .row-editor-label:first-child {
+    padding-top: 0;
+  }
+
+  .row-editor-color {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .row-editor-color-input {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .row-editor-color-meta {
+    min-width: 6rem;
+  }
+
+  .row-editor-color-clear {
+    margin-left: auto;
+  }
 }
 
 .row-editor-icon-toggle {
