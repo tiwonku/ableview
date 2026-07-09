@@ -2,6 +2,8 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { google } from 'googleapis';
 import { parseSheetGrid, getMatchValues } from './parse.js';
+import { buildAppendRowValues, parseAppendedRowId, appendSnapshotRow } from './append-row.js';
+import { escapeWorksheetName } from './column-letter.js';
 import { buildRowUpdateRanges, formatChangesForSheet, patchSnapshotRow } from './update-row.js';
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
@@ -147,6 +149,44 @@ export function createSheetsStore({ config, getConfig, log }) {
     log.info({ rowId, columns: Object.keys(formatted) }, 'sheet row updated');
   }
 
+  async function appendRow(changes) {
+    if (!snapshot.headers.length) {
+      throw new Error('sheet headers not loaded');
+    }
+
+    const { matchColumn, editorColumns = {} } = sheetSettings();
+    const formatted = formatChangesForSheet(changes, editorColumns, snapshot.headers);
+    if (!formatted[matchColumn]?.trim()) {
+      throw new Error(`${matchColumn} is required`);
+    }
+
+    const { client, sheetId } = sheetsClient();
+    const { worksheet } = sheetSettings();
+    const rowValues = buildAppendRowValues(snapshot.headers, formatted);
+    const range = `${escapeWorksheetName(worksheet)}!A:ZZ`;
+
+    const res = await client.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [rowValues] },
+    });
+
+    const rowId = parseAppendedRowId(res.data.updates?.updatedRange);
+    const data = Object.fromEntries(
+      snapshot.headers
+        .filter(Boolean)
+        .map((name, index) => [name, rowValues[index] ?? ''])
+    );
+    appendSnapshotRow(snapshot, rowId, data);
+    snapshot.syncedAt = new Date().toISOString();
+    snapshot.stale = false;
+    persistCache();
+    log.info({ rowId, columns: Object.keys(formatted) }, 'sheet row appended');
+    return { rowId, row: data };
+  }
+
   async function sync() {
     try {
       await fetchFromGoogle();
@@ -209,5 +249,5 @@ export function createSheetsStore({ config, getConfig, log }) {
     sync().catch(() => {});
   }
 
-  return { start, stop, sync, updateRow, getClipNames, getSnapshot, applySettings };
+  return { start, stop, sync, updateRow, appendRow, getClipNames, getSnapshot, applySettings };
 }

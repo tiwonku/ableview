@@ -269,6 +269,7 @@ export function renderAdmin(root, {
   saveState = 'idle',
   saveError = null,
   onStartEdit,
+  onStartCreate,
   onCancelEdit,
   onSaveEdit,
 }) {
@@ -292,8 +293,22 @@ export function renderAdmin(root, {
 
   if (payload && payload.clipName?.trim() && payload.match?.matched !== true && !editSession) {
     const noMatch = document.createElement('div');
-    noMatch.className = 'no-match';
-    noMatch.textContent = 'No confident match — check the cue sheet or clip name.';
+    noMatch.className = 'no-match-panel';
+
+    const message = document.createElement('p');
+    message.className = 'no-match';
+    message.textContent = 'No confident match — check the cue sheet or clip name.';
+    noMatch.appendChild(message);
+
+    if (onStartCreate) {
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'admin-editor-btn admin-editor-btn--primary';
+      addBtn.textContent = 'Add cue row';
+      addBtn.addEventListener('click', onStartCreate);
+      noMatch.appendChild(addBtn);
+    }
+
     root.appendChild(noMatch);
   }
 

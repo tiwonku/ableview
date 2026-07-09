@@ -91,6 +91,12 @@
         },
         {
           "column": "Ghost Cloud"
+        },
+        {
+          "column": "Viz Notes"
+        },
+        {
+          "column": "CS Panels"
         }
       ]
     },
@@ -102,6 +108,9 @@
         },
         {
           "column": "Lasers"
+        },
+        {
+          "column": "Lighting Notes"
         },
         {
           "column": "Notch"

@@ -161,6 +161,11 @@ export async function createViewServer({
       init.system = true;
       init.status = buildStatus();
       init.editorColumns = getLiveConfig().sheets?.editorColumns ?? {};
+      const snapshot = sheetsActions?.getSnapshot?.();
+      if (snapshot) {
+        init.sheetHeaders = snapshot.headers ?? [];
+        init.matchColumn = snapshot.matchColumn ?? getLiveConfig().sheets?.matchColumn ?? null;
+      }
     }
     ws.send(JSON.stringify(init));
     if (viewId !== 'admin') broadcastStatus();

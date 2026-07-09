@@ -10,12 +10,29 @@ import { parseRgbCell } from './color-parse.js';
 export function captureEditSession(payload) {
   const row = payload?.row ?? {};
   return {
+    mode: 'edit',
     rowId: String(payload.match.rowId),
     row: Object.fromEntries(
       Object.entries(row).map(([k, v]) => [k, v == null ? '' : String(v)])
     ),
     clipNameAtEdit: payload.clipName?.trim() ?? '',
     matchedValueAtEdit: payload.match.matchedValue ?? '',
+  };
+}
+
+export function captureCreateSession({ clipName, headers, matchColumn }) {
+  const row = Object.fromEntries(
+    headers
+      .filter(Boolean)
+      .map((name) => [name, name === matchColumn ? (clipName?.trim() ?? '') : ''])
+  );
+
+  return {
+    mode: 'create',
+    rowId: null,
+    row,
+    clipNameAtEdit: clipName?.trim() ?? '',
+    matchedValueAtEdit: '',
   };
 }
 
@@ -37,7 +54,7 @@ export function renderRowEditorPanel(parent, {
 
   const heading = document.createElement('h2');
   heading.className = 'section-title';
-  heading.textContent = 'Edit row';
+  heading.textContent = session.mode === 'create' ? 'Add cue row' : 'Edit row';
   header.appendChild(heading);
 
   const actions = document.createElement('div');
@@ -77,7 +94,7 @@ export function renderRowEditorPanel(parent, {
 
   const form = document.createElement('div');
   form.className = 'row-editor';
-  form.dataset.rowId = session.rowId;
+  if (session.rowId != null) form.dataset.rowId = session.rowId;
 
   for (const [column, raw] of Object.entries(session.row)) {
     form.appendChild(renderEditorField(column, raw, editorColumns[column]));
@@ -89,6 +106,16 @@ export function renderRowEditorPanel(parent, {
 
 function buildEditContext(session, livePayload) {
   const liveClip = livePayload?.clipName?.trim() ?? '';
+
+  if (session.mode === 'create') {
+    const clip = session.clipNameAtEdit || liveClip || 'unknown clip';
+    let text = `Adding cue for "${clip}" (no match found)`;
+    if (liveClip && liveClip !== session.clipNameAtEdit) {
+      text += `. Now playing: "${liveClip}".`;
+    }
+    return text;
+  }
+
   const opened = session.clipNameAtEdit || session.matchedValueAtEdit || 'unknown clip';
   const label = session.matchedValueAtEdit || opened;
   let text = `Editing row ${session.rowId}`;
@@ -274,6 +301,17 @@ export function collectEditorChanges(formEl, originalRow) {
   }
 
   return changes;
+}
+
+export function collectEditorValues(formEl) {
+  const values = {};
+
+  for (const field of formEl.querySelectorAll('.row-editor-field')) {
+    const column = field.dataset.column;
+    values[column] = readFieldValue(field);
+  }
+
+  return values;
 }
 
 function readFieldValue(field) {

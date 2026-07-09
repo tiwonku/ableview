@@ -7,7 +7,7 @@ import {
   captureEditSession,
   setConnectionState,
 } from './view-render.js';
-import { collectEditorChanges } from './admin-row-editor.js';
+import { collectEditorChanges, collectEditorValues, captureCreateSession } from './admin-row-editor.js';
 import { mountViewNav } from './view-nav.js';
 
 const RECONNECT_MS = 1500;
@@ -34,6 +34,8 @@ export function connectView({
   let stopped = false;
   let editSession = null;
   let editorColumns = {};
+  let sheetHeaders = [];
+  let matchColumn = null;
   let saveState = 'idle';
   let saveError = null;
   let serverSimulated = false;
@@ -71,6 +73,8 @@ export function connectView({
         viewId,
       };
       editorColumns = msg.editorColumns ?? {};
+      sheetHeaders = msg.sheetHeaders ?? [];
+      matchColumn = msg.matchColumn ?? null;
       viewsList = msg.views ?? null;
       mountViewNav(viewId, viewsList, { settingsActive });
       if (msg.status) lastStatus = msg.status;
@@ -133,6 +137,17 @@ export function connectView({
     render();
   }
 
+  function startCreate() {
+    const clipName = lastPayload?.clipName?.trim();
+    if (!clipName || lastPayload?.match?.matched === true) return;
+    if (!sheetHeaders.length || !matchColumn) return;
+
+    editSession = captureCreateSession({ clipName, headers: sheetHeaders, matchColumn });
+    saveState = 'idle';
+    saveError = null;
+    render();
+  }
+
   function cancelEdit() {
     editSession = null;
     saveState = 'idle';
@@ -146,8 +161,12 @@ export function connectView({
     const form = formSection.querySelector('.row-editor');
     if (!form) return;
 
-    const changes = collectEditorChanges(form, editSession.row);
-    if (Object.keys(changes).length === 0) {
+    const isCreate = editSession.mode === 'create';
+    const payloadBody = isCreate
+      ? collectEditorValues(form)
+      : collectEditorChanges(form, editSession.row);
+
+    if (!isCreate && Object.keys(payloadBody).length === 0) {
       cancelEdit();
       return;
     }
@@ -157,10 +176,13 @@ export function connectView({
     render();
 
     try {
-      const res = await fetch(`/api/sheets/rows/${encodeURIComponent(editSession.rowId)}`, {
-        method: 'PATCH',
+      const url = isCreate
+        ? '/api/sheets/rows'
+        : `/api/sheets/rows/${encodeURIComponent(editSession.rowId)}`;
+      const res = await fetch(url, {
+        method: isCreate ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(changes),
+        body: JSON.stringify(payloadBody),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -198,6 +220,7 @@ export function connectView({
         saveState,
         saveError,
         onStartEdit: startEdit,
+        onStartCreate: startCreate,
         onCancelEdit: cancelEdit,
         onSaveEdit: saveEdit,
       });

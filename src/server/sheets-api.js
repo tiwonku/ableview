@@ -36,6 +36,38 @@ export function registerSheetsRoutes(app, { sheetsActions, log }) {
     }
   });
 
+  app.post('/api/sheets/rows', async (req, reply) => {
+    const changes = req.body;
+    if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
+      return reply.code(400).send({ ok: false, error: 'request body must be a JSON object of column values' });
+    }
+
+    try {
+      const { rowId, row } = await sheetsActions.appendRow(changes);
+      sheetsActions.onSynced?.();
+      const snapshot = sheetsActions.getSnapshot();
+      log.info({ rowId, columns: Object.keys(changes) }, 'sheet row appended from admin');
+      return reply.send({
+        ok: true,
+        rowId: String(rowId),
+        row,
+        syncedAt: snapshot.syncedAt,
+        stale: snapshot.stale,
+      });
+    } catch (err) {
+      const snapshot = sheetsActions.getSnapshot();
+      const message = err.message ?? 'append failed';
+      const code = /unknown column|invalid rowId|row not found|no changes|must be|is required|headers not loaded|already exists|could not parse/i.test(message) ? 400 : 502;
+      log.warn({ err: message }, 'sheet row append failed');
+      return reply.code(code).send({
+        ok: false,
+        error: message,
+        syncedAt: snapshot.syncedAt,
+        stale: snapshot.stale,
+      });
+    }
+  });
+
   app.patch('/api/sheets/rows/:rowId', async (req, reply) => {
     const { rowId } = req.params;
     const changes = req.body;

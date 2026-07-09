@@ -105,6 +105,100 @@ test('POST /api/sheets/sync returns 502 on failure', async () => {
   await server.stop();
 });
 
+test('POST /api/sheets/rows appends row and rematches', async () => {
+  const bus = createBus();
+  let appended = null;
+  let rematched = false;
+  const rows = [{ rowId: '12', data: { 'Song Title': 'Existing', BPM: '95' } }];
+
+  const server = await createViewServer({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    sheetsActions: {
+      sync: async () => {},
+      appendRow: async (changes) => {
+        appended = changes;
+        const row = { 'Song Title': 'New Song', BPM: '120' };
+        rows.push({ rowId: '13', data: row });
+        return { rowId: '13', row };
+      },
+      getSnapshot: () => ({
+        syncedAt: '2026-07-09T12:00:00.000Z',
+        stale: false,
+        rows,
+        worksheet: 'Cues',
+        headers: ['Song Title', 'BPM'],
+      }),
+      onSynced: () => { rematched = true; },
+    },
+  });
+
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/sheets/rows`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 'Song Title': 'New Song', BPM: '120' }),
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.rowId, '13');
+  assert.equal(body.row['Song Title'], 'New Song');
+  assert.deepEqual(appended, { 'Song Title': 'New Song', BPM: '120' });
+  assert.equal(rematched, true);
+
+  await server.stop();
+});
+
+test('POST /api/sheets/rows returns 400 for invalid body', async () => {
+  const bus = createBus();
+  const server = await createViewServer({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    sheetsActions: {
+      sync: async () => {},
+      appendRow: async () => {},
+      getSnapshot: () => ({ syncedAt: null, stale: true, rows: [], worksheet: 'Cues' }),
+    },
+  });
+
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/sheets/rows`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(['not', 'an', 'object']),
+  });
+  assert.equal(res.status, 400);
+
+  await server.stop();
+});
+
+test('POST /api/sheets/rows returns 400 when appendRow rejects', async () => {
+  const bus = createBus();
+  const server = await createViewServer({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    sheetsActions: {
+      sync: async () => {},
+      appendRow: async () => { throw new Error('Song Title is required'); },
+      getSnapshot: () => ({ syncedAt: null, stale: true, rows: [], worksheet: 'Cues' }),
+    },
+  });
+
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/sheets/rows`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ BPM: '120' }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.ok, false);
+  assert.match(body.error, /Song Title is required/);
+
+  await server.stop();
+});
+
 test('PATCH /api/sheets/rows/:rowId updates row and rematches', async () => {
   const bus = createBus();
   let updated = null;

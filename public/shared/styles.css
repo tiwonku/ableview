@@ -224,13 +224,21 @@ main {
 }
 
 .no-match {
+  margin: 0 0 0.75rem;
+  color: #ffd591;
+  font-size: 1.05rem;
+}
+
+.no-match-panel {
   padding: 1rem 1.25rem;
   margin-bottom: 1.5rem;
   border: 1px solid var(--warn);
   border-radius: 0.5rem;
   background: rgba(230, 162, 60, 0.08);
-  color: #ffd591;
-  font-size: 1.05rem;
+}
+
+.no-match-panel .admin-editor-btn {
+  margin-top: 0.25rem;
 }
 
 .fields {
