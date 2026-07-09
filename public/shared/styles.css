@@ -462,6 +462,12 @@ main {
   word-break: break-word;
 }
 
+.view-edit-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0.35rem 0 0.85rem;
+}
+
 .admin-editor-header {
   display: flex;
   flex-wrap: wrap;

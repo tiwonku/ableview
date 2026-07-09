@@ -166,6 +166,11 @@ export async function createViewServer({
         init.sheetHeaders = snapshot.headers ?? [];
         init.matchColumn = snapshot.matchColumn ?? getLiveConfig().sheets?.matchColumn ?? null;
       }
+    } else {
+      init.editable = viewConfig.editable !== false;
+      if (init.editable) {
+        init.editorColumns = getLiveConfig().sheets?.editorColumns ?? {};
+      }
     }
     ws.send(JSON.stringify(init));
     if (viewId !== 'admin') broadcastStatus();

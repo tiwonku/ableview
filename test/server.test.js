@@ -112,6 +112,8 @@ test('WebSocket init includes view config and cue broadcast on bus emit', async 
   assert.deepEqual(init.fields.map((f) => f.column), ['Key', 'Relative Key', 'BPM']);
   assert.equal(init.payload, null);
   assert.deepEqual(init.views, [{ id: 'band', title: 'Band' }]);
+  assert.equal(init.editable, true);
+  assert.ok(init.editorColumns);
 
   const payload = makeCuePayload({
     clipName: 'Song A - Intro',
@@ -168,6 +170,62 @@ test('CuePayload broadcast reaches client in under 200 ms', async () => {
   assert.equal(msg.type, 'cue');
   assert.equal(msg.payload.clipName, 'Fast Clip');
   assert.ok(elapsed < 200, `expected < 200 ms, got ${elapsed.toFixed(1)} ms`);
+
+  ws.close();
+  await server.stop();
+});
+
+test('editable view WebSocket init includes editorColumns by default', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    sheets: {
+      ...DEFAULTS.sheets,
+      editorColumns: {
+        BPM: { type: 'number', step: 0.1 },
+        RGB_1: { type: 'color' },
+      },
+    },
+    views: {
+      band: {
+        title: 'Band',
+        fields: [{ column: 'Key' }, { column: 'BPM' }],
+      },
+    },
+  });
+  const server = await createViewServer({ config, bus, log: silentLog });
+
+  const { ws, messages } = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=band`);
+
+  const init = await waitForMessage(messages, ws);
+  assert.equal(init.editable, true);
+  assert.deepEqual(init.editorColumns, {
+    BPM: { type: 'number', step: 0.1 },
+    RGB_1: { type: 'color' },
+  });
+  assert.equal(init.system, undefined);
+
+  ws.close();
+  await server.stop();
+});
+
+test('editable: false disables row editing on a view', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    views: {
+      band: {
+        title: 'Band',
+        editable: false,
+        fields: [{ column: 'Key' }],
+      },
+    },
+  });
+  const server = await createViewServer({ config, bus, log: silentLog });
+
+  const { ws, messages } = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=band`);
+
+  const init = await waitForMessage(messages, ws);
+  assert.equal(init.editable, false);
+  assert.equal(init.editorColumns, undefined);
 
   ws.close();
   await server.stop();

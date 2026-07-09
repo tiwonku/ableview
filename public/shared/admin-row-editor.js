@@ -7,13 +7,36 @@ import {
 } from './sheet-format.js';
 import { parseRgbCell } from './color-parse.js';
 
-export function captureEditSession(payload) {
+export function viewFieldColumns(fields) {
+  return (fields ?? []).map((field) => field.column).filter(Boolean);
+}
+
+export function buildFieldLabels(fields) {
+  return Object.fromEntries(
+    (fields ?? [])
+      .filter((field) => field?.column)
+      .map((field) => [field.column, field.label ?? field.column])
+  );
+}
+
+export function buildViewEditorColumns(fields, editorColumns = {}) {
+  const result = {};
+  for (const field of fields ?? []) {
+    if (!field?.column) continue;
+    result[field.column] = editorColumns[field.column]
+      ?? (field.type === 'color' ? { type: 'color' } : { type: 'text' });
+  }
+  return result;
+}
+
+export function captureEditSession(payload, { columns } = {}) {
   const row = payload?.row ?? {};
+  const keys = columns?.length ? columns : Object.keys(row);
   return {
     mode: 'edit',
     rowId: String(payload.match.rowId),
     row: Object.fromEntries(
-      Object.entries(row).map(([k, v]) => [k, v == null ? '' : String(v)])
+      keys.map((column) => [column, row[column] == null ? '' : String(row[column])])
     ),
     clipNameAtEdit: payload.clipName?.trim() ?? '',
     matchedValueAtEdit: payload.match.matchedValue ?? '',
@@ -39,6 +62,8 @@ export function captureCreateSession({ clipName, headers, matchColumn }) {
 export function renderRowEditorPanel(parent, {
   session,
   editorColumns = {},
+  fieldLabels = {},
+  panelId = 'admin-row-panel',
   livePayload,
   onCancel,
   onSave,
@@ -47,7 +72,7 @@ export function renderRowEditorPanel(parent, {
 }) {
   const section = document.createElement('section');
   section.className = 'admin-section admin-editor';
-  section.id = 'admin-row-panel';
+  section.id = panelId;
 
   const header = document.createElement('div');
   header.className = 'admin-editor-header';
@@ -97,7 +122,7 @@ export function renderRowEditorPanel(parent, {
   if (session.rowId != null) form.dataset.rowId = session.rowId;
 
   for (const [column, raw] of Object.entries(session.row)) {
-    form.appendChild(renderEditorField(column, raw, editorColumns[column]));
+    form.appendChild(renderEditorField(column, raw, editorColumns[column], fieldLabels[column]));
   }
 
   section.appendChild(form);
@@ -132,7 +157,7 @@ export function updateEditContextBanner(root, session, livePayload) {
   if (banner) banner.textContent = buildEditContext(session, livePayload);
 }
 
-function renderEditorField(column, raw, columnConfig) {
+function renderEditorField(column, raw, columnConfig, fieldLabel) {
   const cfg = normalizeColumnConfig(columnConfig);
   const field = document.createElement('div');
   field.className = 'row-editor-field';
@@ -140,7 +165,7 @@ function renderEditorField(column, raw, columnConfig) {
 
   const label = document.createElement('label');
   label.className = 'row-editor-label';
-  label.textContent = column;
+  label.textContent = fieldLabel ?? column;
   label.htmlFor = `edit-${cssEscape(column)}`;
   field.appendChild(label);
 

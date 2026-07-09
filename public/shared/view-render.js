@@ -6,6 +6,8 @@ import {
   renderRowEditorPanel,
   renderReadOnlyRowPanel,
   updateEditContextBanner,
+  buildViewEditorColumns,
+  buildFieldLabels,
 } from './admin-row-editor.js';
 
 function isLaunching(payload) {
@@ -41,7 +43,21 @@ function renderClipNameRow(parent, clipName, payload) {
   parent.appendChild(row);
 }
 
-export function renderView(root, { title, fields, payload, connected, lastUpdate }) {
+export function renderView(root, {
+  title,
+  fields,
+  payload,
+  connected,
+  lastUpdate,
+  editable = false,
+  editSession = null,
+  editorColumns = {},
+  saveState = 'idle',
+  saveError = null,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+}) {
   root.innerHTML = '';
 
   const titleEl = document.createElement('h1');
@@ -49,18 +65,49 @@ export function renderView(root, { title, fields, payload, connected, lastUpdate
   titleEl.textContent = title ?? 'View';
   root.appendChild(titleEl);
 
-  const clipName = payload?.clipName?.trim() || null;
-  renderClipNameRow(root, clipName, payload);
+  const clipHead = document.createElement('div');
+  clipHead.id = 'view-clip-head';
+  root.appendChild(clipHead);
+  renderViewClipHead(clipHead, payload);
 
   const matched = payload?.match?.matched === true;
-  if (payload && clipName && !matched) {
+  if (payload && payload.clipName?.trim() && !matched) {
     const noMatch = document.createElement('div');
     noMatch.className = 'no-match';
     noMatch.textContent = 'No confident match — check the cue sheet or clip name.';
     root.appendChild(noMatch);
   }
 
-  if (matched && fields?.length) {
+  const viewEditorColumns = buildViewEditorColumns(fields, editorColumns);
+  const fieldLabels = buildFieldLabels(fields);
+
+  if (editSession) {
+    renderRowEditorPanel(root, {
+      session: editSession,
+      editorColumns: viewEditorColumns,
+      fieldLabels,
+      panelId: 'view-row-panel',
+      livePayload: payload,
+      onCancel: onCancelEdit,
+      onSave: onSaveEdit,
+      saveState,
+      saveError,
+    });
+  } else if (matched && fields?.length) {
+    if (editable && onStartEdit) {
+      const editBar = document.createElement('div');
+      editBar.className = 'view-edit-bar';
+
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'admin-editor-btn';
+      editBtn.textContent = 'Edit';
+      editBtn.addEventListener('click', onStartEdit);
+      editBar.appendChild(editBtn);
+
+      root.appendChild(editBar);
+    }
+
     const grid = document.createElement('div');
     grid.className = 'fields';
 
@@ -83,6 +130,21 @@ export function renderView(root, { title, fields, payload, connected, lastUpdate
   }
 
   updateStatusBar({ connected, lastUpdate, payload });
+}
+
+export function updateViewLiveChrome(root, { payload, connected, lastUpdate, editSession }) {
+  const clipHead = root.querySelector('#view-clip-head');
+  if (clipHead) renderViewClipHead(clipHead, payload);
+
+  if (editSession) updateEditContextBanner(root, editSession, payload);
+
+  updateStatusBar({ connected, lastUpdate, payload });
+}
+
+function renderViewClipHead(parent, payload) {
+  parent.innerHTML = '';
+  const clipName = payload?.clipName?.trim() || null;
+  renderClipNameRow(parent, clipName, payload);
 }
 
 function renderTextField(field, payload) {

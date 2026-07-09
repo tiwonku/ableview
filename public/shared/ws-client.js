@@ -4,10 +4,16 @@ import {
   renderView,
   renderAdmin,
   updateAdminLiveChrome,
+  updateViewLiveChrome,
   captureEditSession,
   setConnectionState,
 } from './view-render.js';
-import { collectEditorChanges, collectEditorValues, captureCreateSession } from './admin-row-editor.js';
+import {
+  collectEditorChanges,
+  collectEditorValues,
+  captureCreateSession,
+  viewFieldColumns,
+} from './admin-row-editor.js';
 import { mountViewNav } from './view-nav.js';
 
 const RECONNECT_MS = 1500;
@@ -57,6 +63,21 @@ export function connectView({
     }, RECONNECT_MS);
   }
 
+  function updateLiveChromeDuringEdit() {
+    if (!editSession || !root) return;
+    const chrome = {
+      payload: lastPayload,
+      connected,
+      lastUpdate,
+      editSession,
+    };
+    if (viewConfig.system) {
+      updateAdminLiveChrome(root, { ...chrome, status: lastStatus });
+    } else {
+      updateViewLiveChrome(root, chrome);
+    }
+  }
+
   function onMessage(event) {
     let msg;
     try {
@@ -70,6 +91,7 @@ export function connectView({
         title: msg.title,
         fields: msg.fields ?? [],
         system: msg.system === true,
+        editable: msg.system !== true && msg.editable !== false,
         viewId,
       };
       editorColumns = msg.editorColumns ?? {};
@@ -96,14 +118,8 @@ export function connectView({
 
     if (msg.type === 'status' && msg.status) {
       lastStatus = msg.status;
-      if (editSession && viewConfig?.system && root) {
-        updateAdminLiveChrome(root, {
-          payload: lastPayload,
-          status: lastStatus,
-          connected,
-          lastUpdate,
-          editSession,
-        });
+      if (editSession) {
+        updateLiveChromeDuringEdit();
         return;
       }
       render();
@@ -115,14 +131,8 @@ export function connectView({
       lastUpdate = new Date();
       applySimState(msg.payload.simulated === true);
       onPayload?.(lastPayload);
-      if (editSession && viewConfig?.system && root) {
-        updateAdminLiveChrome(root, {
-          payload: lastPayload,
-          status: lastStatus,
-          connected,
-          lastUpdate,
-          editSession,
-        });
+      if (editSession) {
+        updateLiveChromeDuringEdit();
         return;
       }
       render();
@@ -131,7 +141,10 @@ export function connectView({
 
   function startEdit() {
     if (!lastPayload?.match?.matched || !lastPayload.row) return;
-    editSession = captureEditSession(lastPayload);
+    const scope = viewConfig.editable
+      ? { columns: viewFieldColumns(viewConfig.fields) }
+      : undefined;
+    editSession = captureEditSession(lastPayload, scope);
     saveState = 'idle';
     saveError = null;
     render();
@@ -225,7 +238,17 @@ export function connectView({
         onSaveEdit: saveEdit,
       });
     } else {
-      renderView(root, ctx);
+      renderView(root, {
+        ...ctx,
+        editable: viewConfig.editable,
+        editSession,
+        editorColumns,
+        saveState,
+        saveError,
+        onStartEdit: viewConfig.editable ? startEdit : undefined,
+        onCancelEdit: cancelEdit,
+        onSaveEdit: saveEdit,
+      });
     }
   }
 
