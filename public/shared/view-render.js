@@ -179,7 +179,7 @@ function makeCopyButton(kind, text) {
   return btn;
 }
 
-function updateStatusBar({ connected, lastUpdate, payload }) {
+function updateStatusBar({ connected, lastUpdate, payload, simulated = null }) {
   const bar = document.getElementById('status-bar');
   if (!bar) return;
 
@@ -201,15 +201,15 @@ function updateStatusBar({ connected, lastUpdate, payload }) {
 
   const simPill = document.getElementById('sim-pill');
   const stalePill = document.getElementById('stale-pill');
-  const simOn = Boolean(payload?.simulated);
+  const simOn = simulated != null ? Boolean(simulated) : Boolean(payload?.simulated);
   const staleOn = Boolean(payload?.stale);
   if (simPill) simPill.hidden = !simOn;
   if (stalePill) stalePill.hidden = !staleOn;
   bar.classList.toggle('status-bar--alert', simOn || staleOn);
 }
 
-export function setConnectionState(connected, lastUpdate, payload) {
-  updateStatusBar({ connected, lastUpdate, payload });
+export function setConnectionState(connected, lastUpdate, payload, simulated = null) {
+  updateStatusBar({ connected, lastUpdate, payload, simulated });
 }
 
 function formatTimestamp(iso) {

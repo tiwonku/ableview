@@ -51,6 +51,16 @@ async function main() {
       getSnapshot: sheets.getSnapshot,
       onSynced: () => matcher.rematch(),
     },
+    simActions: {
+      isAvailable: () => ingest.isSimControlAvailable(),
+      canControl: () => ingest.canSimControl(),
+      fire: (clipName, opts) => ingest.fireSimClip(clipName, opts),
+      clear: () => ingest.clearSimClip(),
+      getStatus: () => ingest.getSimStatus(),
+      pause: () => ingest.pauseSim(),
+      resume: () => ingest.resumeSim(),
+      step: (direction) => ingest.stepSim(direction),
+    },
     getHealthContext: () => ({
       simulated: ingest.simulated,
       getSheetSnapshot: sheets.getSnapshot,
@@ -71,6 +81,7 @@ async function main() {
       matcher.rematch();
     }
     if (sections.includes('match') || sections.includes('sim')) matcher.rematch();
+    if (sections.includes('sim')) viewServer.rebroadcastSimState();
   });
 
   if (ingest.simulated) {

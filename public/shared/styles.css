@@ -651,3 +651,141 @@ main {
   opacity: 0.6;
   cursor: wait;
 }
+
+#sim-controls-host {
+  padding: 1.5rem 1.25rem 0;
+  max-width: 56rem;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.sim-controls {
+  padding: 1rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid rgba(255, 214, 102, 0.35);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.sim-controls-state {
+  margin: 0 0 0.85rem;
+  font-size: 0.88rem;
+  color: var(--warn);
+}
+
+.sim-controls-transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.sim-controls-transport-btn {
+  padding: 0.45rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sim-controls-transport-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sim-controls-transport-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.sim-controls-select {
+  cursor: pointer;
+}
+
+.sim-controls-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sim-controls-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sim-controls-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.sim-controls-input {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.sim-controls-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.sim-controls-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sim-controls-fire,
+.sim-controls-clear {
+  padding: 0.5rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sim-controls-fire {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sim-controls-clear {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.sim-controls-fire:hover:not(:disabled),
+.sim-controls-clear:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.sim-controls-fire:disabled,
+.sim-controls-clear:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.sim-controls-status {
+  margin-bottom: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+
+.sim-controls-status.ok {
+  background: rgba(62, 207, 142, 0.12);
+  color: var(--ok);
+}
+
+.sim-controls-status.err {
+  background: rgba(224, 82, 82, 0.12);
+  color: var(--danger);
+}

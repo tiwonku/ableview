@@ -10,6 +10,8 @@ export function connectView({
   rootSelector = '#app',
   statusOnly = false,
   settingsActive = false,
+  onPayload = null,
+  onSimModeChange = null,
 }) {
   const root = statusOnly ? null : document.querySelector(rootSelector);
   if (!statusOnly && !root) throw new Error(`Missing root element: ${rootSelector}`);
@@ -23,6 +25,16 @@ export function connectView({
   let lastUpdate = null;
   let connected = false;
   let stopped = false;
+  let serverSimulated = false;
+
+  function applySimState(simulated) {
+    serverSimulated = simulated === true;
+    onSimModeChange?.(serverSimulated);
+    if (lastPayload) {
+      lastPayload = { ...lastPayload, simulated: serverSimulated };
+    }
+    setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);
+  }
 
   function scheduleReconnect() {
     if (stopped || reconnectTimer) return;
@@ -50,10 +62,18 @@ export function connectView({
       viewsList = msg.views ?? null;
       mountViewNav(viewId, viewsList, { settingsActive });
       if (msg.status) lastStatus = msg.status;
+      applySimState(msg.simulated === true);
       if (msg.payload) {
         lastPayload = msg.payload;
         lastUpdate = new Date();
+        onPayload?.(lastPayload);
       }
+      render();
+      return;
+    }
+
+    if (msg.type === 'simState') {
+      applySimState(msg.simulated === true);
       render();
       return;
     }
@@ -67,6 +87,8 @@ export function connectView({
     if (msg.type === 'cue' && msg.payload) {
       lastPayload = msg.payload;
       lastUpdate = new Date();
+      applySimState(msg.payload.simulated === true);
+      onPayload?.(lastPayload);
       render();
     }
   }
@@ -90,7 +112,7 @@ export function connectView({
 
   function setConnected(next) {
     connected = next;
-    setConnectionState(connected, lastUpdate, lastPayload);
+    setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);
   }
 
   function connect() {

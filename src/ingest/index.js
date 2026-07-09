@@ -87,5 +87,47 @@ export function createIngest({ config, getConfig, bus, log, getClipNames = null 
       recreate();
       await active.source.start();
     },
+    isSimControlAvailable() {
+      return active?.simulated === true;
+    },
+    canSimControl() {
+      return active?.simulated === true && typeof active.source.fire === 'function';
+    },
+    fireSimClip(clipName, opts) {
+      if (!this.canSimControl()) {
+        throw new Error('Manual sim controls require sim.enabled with sim.mode "internal"');
+      }
+      return active.source.fire(clipName, opts);
+    },
+    clearSimClip() {
+      if (!this.canSimControl()) {
+        throw new Error('Manual sim controls require sim.enabled with sim.mode "internal"');
+      }
+      return active.source.clear();
+    },
+    getSimStatus() {
+      if (!this.canSimControl()) {
+        throw new Error('Manual sim controls require sim.enabled with sim.mode "internal"');
+      }
+      return active.source.getStatus();
+    },
+    pauseSim() {
+      if (!this.canSimControl()) {
+        throw new Error('Manual sim controls require sim.enabled with sim.mode "internal"');
+      }
+      return active.source.pause();
+    },
+    resumeSim() {
+      if (!this.canSimControl()) {
+        throw new Error('Manual sim controls require sim.enabled with sim.mode "internal"');
+      }
+      return active.source.resume();
+    },
+    stepSim(direction) {
+      if (!this.canSimControl()) {
+        throw new Error('Manual sim controls require sim.enabled with sim.mode "internal"');
+      }
+      return active.source.step(direction);
+    },
   };
 }

@@ -5,13 +5,22 @@ import { readPublicFile } from './static.js';
 import { buildHealthReport } from './health.js';
 import { registerConfigRoutes } from './config-api.js';
 import { registerSheetsRoutes } from './sheets-api.js';
+import { registerSimRoutes } from './sim-api.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
   return url.searchParams.get('view') || 'band';
 }
 
-export async function createViewServer({ config, bus, log, getHealthContext, configRuntime, sheetsActions }) {
+export async function createViewServer({
+  config,
+  bus,
+  log,
+  getHealthContext,
+  configRuntime,
+  sheetsActions,
+  simActions,
+}) {
   let lastPayload = null;
   const clients = new Map();
 
@@ -25,6 +34,15 @@ export async function createViewServer({ config, bus, log, getHealthContext, con
 
   function buildStatus() {
     return { connectedViews: getConnectedViewCount() };
+  }
+
+  function isSimulated() {
+    return getHealthContext?.()?.simulated === true;
+  }
+
+  function clientPayload(payload = lastPayload) {
+    if (!payload) return null;
+    return { ...payload, simulated: isSimulated() };
   }
 
   function broadcast(msg) {
@@ -43,8 +61,8 @@ export async function createViewServer({ config, bus, log, getHealthContext, con
   }
 
   bus.on(EVENTS.CUE_PAYLOAD, (payload) => {
-    lastPayload = payload;
-    broadcast({ type: 'cue', payload });
+    lastPayload = clientPayload(payload);
+    broadcast({ type: 'cue', payload: lastPayload });
     log.debug({ clipName: payload.clipName, clients: clients.size }, 'broadcast cue');
   });
 
@@ -70,6 +88,10 @@ export async function createViewServer({ config, bus, log, getHealthContext, con
 
   if (sheetsActions) {
     registerSheetsRoutes(app, { sheetsActions, log });
+  }
+
+  if (simActions) {
+    registerSimRoutes(app, { simActions, log });
   }
 
   app.get('/views/:name', async (req, reply) => {
@@ -124,7 +146,8 @@ export async function createViewServer({ config, bus, log, getHealthContext, con
       viewId,
       title: viewConfig.title ?? viewId,
       fields: viewConfig.fields ?? [],
-      payload: lastPayload,
+      payload: clientPayload(),
+      simulated: isSimulated(),
       views: Object.entries(config.views).map(([id, v]) => ({
         id,
         title: v.title ?? id,
@@ -158,10 +181,20 @@ export async function createViewServer({ config, bus, log, getHealthContext, con
     heartbeatTimer.unref?.();
   }
 
+  function rebroadcastSimState() {
+    if (lastPayload) {
+      lastPayload = clientPayload();
+      broadcast({ type: 'cue', payload: lastPayload });
+      return;
+    }
+    broadcast({ type: 'simState', simulated: isSimulated() });
+  }
+
   return {
     port,
     getClientCount: () => clients.size,
     getConnectedViewCount,
+    rebroadcastSimState,
     async stop() {
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       for (const ws of clients.keys()) ws.close();

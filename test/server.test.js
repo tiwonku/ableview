@@ -96,7 +96,12 @@ test('serves visuals, lighting, and admin view HTML', async () => {
 
 test('WebSocket init includes view config and cue broadcast on bus emit', async () => {
   const bus = createBus();
-  const server = await createViewServer({ config: testConfig(), bus, log: silentLog });
+  const server = await createViewServer({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    getHealthContext: () => ({ simulated: true }),
+  });
 
   const { ws, messages } = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=band`);
 

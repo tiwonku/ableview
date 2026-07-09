@@ -1,6 +1,5 @@
 import Fuse from 'fuse.js';
 import { EVENTS } from '../core/bus.js';
-import { SOURCES } from '../core/now-playing.js';
 import { makeCuePayload, makeMatchResult } from '../core/cue-payload.js';
 import { normalizeClipName, parseAliases } from './normalize.js';
 
@@ -183,19 +182,22 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
     const transportOnly = !force && lastClipKey === ck && lastPayload != null;
 
     let payload;
+    const simulated = resolveConfig().sim.enabled === true;
+
     if (transportOnly) {
       payload = {
         ...lastPayload,
         tempo: event.tempo,
         beat: event.beat,
         pendingLaunch: event.pendingLaunch ?? false,
+        simulated,
       };
     } else {
       const snapshot = getSnapshot();
       payload = matchClip(event.authoritativeClip, snapshot, resolveConfig());
       payload.tempo = event.tempo;
       payload.beat = event.beat;
-      payload.simulated = event.source === SOURCES.SIMULATOR;
+      payload.simulated = simulated;
       payload.pendingLaunch = event.pendingLaunch ?? false;
     }
     lastClipKey = ck;

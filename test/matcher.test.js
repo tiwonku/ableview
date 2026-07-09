@@ -219,7 +219,7 @@ test('createMatcher emits CuePayload on NowPlaying change', () => {
   bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
 
   createMatcher({
-    config: testConfig(),
+    config: testConfig({ sim: { ...DEFAULTS.sim, enabled: true } }),
     bus,
     log: silentLog,
     getSnapshot: () => snapshot(),
@@ -240,6 +240,34 @@ test('createMatcher emits CuePayload on NowPlaying change', () => {
   assert.equal(payloads[0].match.rowId, '7');
   assert.equal(payloads[0].simulated, true);
   assert.equal(payloads[0].tempo, 100);
+});
+
+test('createMatcher rematch clears simulated when sim.enabled is false', () => {
+  const bus = createBus();
+  const payloads = [];
+  bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
+
+  let simEnabled = true;
+  const matcher = createMatcher({
+    getConfig: () => testConfig({ sim: { ...DEFAULTS.sim, enabled: simEnabled } }),
+    bus,
+    log: silentLog,
+    getSnapshot: () => snapshot(),
+  });
+
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.SIMULATOR,
+      authoritativeClip: 'Song A - Intro',
+      tempo: 128,
+    })
+  );
+  assert.equal(payloads.at(-1).simulated, true);
+
+  simEnabled = false;
+  matcher.rematch();
+  assert.equal(payloads.at(-1).simulated, false);
 });
 
 test('createMatcher dedupes identical NowPlaying events', () => {

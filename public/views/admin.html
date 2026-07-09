@@ -17,10 +17,17 @@
     <span class="status-sep" aria-hidden="true">·</span>
     <span data-role="last-update" title="Last cue update">—</span>
   </header>
+  <div id="sim-controls-host"></div>
   <main id="app" class="admin-main" aria-live="polite"></main>
   <script type="module">
     import { connectView } from '/shared/ws-client.js';
-    connectView({ viewId: 'admin' });
+    import { mountSimControls } from '/shared/admin-sim-controls.js';
+
+    const simControls = mountSimControls('#sim-controls-host');
+    connectView({
+      viewId: 'admin',
+      onSimModeChange: (simulated) => simControls.setVisible(simulated),
+    });
   </script>
 </body>
 </html>

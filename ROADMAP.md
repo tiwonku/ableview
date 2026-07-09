@@ -35,7 +35,7 @@ default `track` strategy and the other sim drivers.
 | Item | Spec ref | Current state |
 |---|---|---|
 | **`scene` / `mostRecent` cue strategies** | §6 | Config-valid, but only `track` is fully implemented. Other strategies fall back to “any playing watched clip.” |
-| **Manual sim driver from admin** | §7 | `sim.driver: "manual"` works programmatically (`.fire(clipName)` on the simulator). No admin UI or REST endpoint to fire clips on demand yet. |
+| **Manual sim driver from admin** | §7 | Admin sim panel (internal mode): fire/clear, pause/resume, prev/next, clip picker from scenario or sheet. OSC sim mode still has no manual controls. |
 | **View field maps in admin** | M7 scope note | Still edited in local `config/config.json` (or SSH). Admin covers ingest, sim, sheets, and match — not per-view layouts. |
 | **`.env` secrets in admin** | M7 scope note | `SHEET_ID`, service account key path, and `HTTP_PORT` remain in `.env` only. |
 
