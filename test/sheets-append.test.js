@@ -2,9 +2,50 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildAppendRowValues,
-  parseAppendedRowId,
+  buildExplicitRowRange,
+  nextAppendRow,
   appendSnapshotRow,
+  snapshotRowData,
 } from '../src/sheets/append-row.js';
+
+test('nextAppendRow returns row after last seen data row', () => {
+  const rows = [
+    { rowId: '6', data: {} },
+    { rowId: '180', data: {} },
+    { rowId: '184', data: {} },
+  ];
+  assert.equal(nextAppendRow({ rows, headerRow: 4 }), 185);
+});
+
+test('nextAppendRow skips header and gap when sheet has no data rows yet', () => {
+  assert.equal(nextAppendRow({ rows: [], headerRow: 4 }), 6);
+});
+
+test('nextAppendRow rejects invalid headerRow', () => {
+  assert.throws(() => nextAppendRow({ rows: [], headerRow: 0 }), /positive integer/);
+});
+
+test('buildExplicitRowRange targets a single row from column A', () => {
+  assert.equal(
+    buildExplicitRowRange('MASTER_v1.1', '185', ['Song Title', 'BPM', 'Cue']),
+    "'MASTER_v1.1'!A185:C185"
+  );
+});
+
+test('buildExplicitRowRange spans full header width', () => {
+  const headers = Array.from({ length: 42 }, (_, i) => `Col${i}`);
+  assert.equal(
+    buildExplicitRowRange('Sheet', '10', headers),
+    "'Sheet'!A10:AP10"
+  );
+});
+
+test('buildExplicitRowRange escapes worksheet quotes', () => {
+  assert.equal(
+    buildExplicitRowRange("O'Brien", '12', ['A']),
+    "'O''Brien'!A12:A12"
+  );
+});
 
 test('buildAppendRowValues maps headers to row array with blanks for missing columns', () => {
   const values = buildAppendRowValues(
@@ -20,17 +61,16 @@ test('buildAppendRowValues preserves empty header slots', () => {
   assert.deepEqual(values, ['', '', '95']);
 });
 
-test('parseAppendedRowId extracts row number from multi-column range', () => {
-  assert.equal(parseAppendedRowId("'MASTER_v1.1'!A42:Z42"), '42');
-});
+test('snapshotRowData maps row values by header index not filtered index', () => {
+  const data = snapshotRowData(
+    ['Song Title', '', 'BPM'],
+    ['New Song', 'ignored', '120']
+  );
 
-test('parseAppendedRowId extracts row number from single cell range', () => {
-  assert.equal(parseAppendedRowId('Sheet1!B15'), '15');
-});
-
-test('parseAppendedRowId throws when range is missing or unparseable', () => {
-  assert.throws(() => parseAppendedRowId(null), /missing updatedRange/);
-  assert.throws(() => parseAppendedRowId('invalid'), /could not parse row id/);
+  assert.deepEqual(data, {
+    'Song Title': 'New Song',
+    BPM: '120',
+  });
 });
 
 test('appendSnapshotRow adds row to snapshot', () => {

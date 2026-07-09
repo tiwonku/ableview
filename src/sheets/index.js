@@ -2,8 +2,13 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { google } from 'googleapis';
 import { parseSheetGrid, getMatchValues } from './parse.js';
-import { buildAppendRowValues, parseAppendedRowId, appendSnapshotRow } from './append-row.js';
-import { escapeWorksheetName } from './column-letter.js';
+import {
+  buildAppendRowValues,
+  buildExplicitRowRange,
+  nextAppendRow,
+  appendSnapshotRow,
+  snapshotRowData,
+} from './append-row.js';
 import { buildRowUpdateRanges, formatChangesForSheet, patchSnapshotRow } from './update-row.js';
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
@@ -161,24 +166,19 @@ export function createSheetsStore({ config, getConfig, log }) {
     }
 
     const { client, sheetId } = sheetsClient();
-    const { worksheet } = sheetSettings();
+    const { worksheet, headerRow } = sheetSettings();
     const rowValues = buildAppendRowValues(snapshot.headers, formatted);
-    const range = `${escapeWorksheetName(worksheet)}!A:ZZ`;
+    const rowId = String(nextAppendRow({ rows: snapshot.rows, headerRow }));
+    const range = buildExplicitRowRange(worksheet, rowId, snapshot.headers);
 
-    const res = await client.spreadsheets.values.append({
+    await client.spreadsheets.values.update({
       spreadsheetId: sheetId,
       range,
       valueInputOption: 'USER_ENTERED',
-      insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [rowValues] },
     });
 
-    const rowId = parseAppendedRowId(res.data.updates?.updatedRange);
-    const data = Object.fromEntries(
-      snapshot.headers
-        .filter(Boolean)
-        .map((name, index) => [name, rowValues[index] ?? ''])
-    );
+    const data = snapshotRowData(snapshot.headers, rowValues);
     appendSnapshotRow(snapshot, rowId, data);
     snapshot.syncedAt = new Date().toISOString();
     snapshot.stale = false;

@@ -1,4 +1,33 @@
-/** Build a full row array and patch in-memory snapshot after append. */
+/** Build a full row array and write to an explicit bottom row (no Google table detection). */
+
+import { columnIndexToLetter, escapeWorksheetName } from './column-letter.js';
+
+/** Next sheet row after the last parsed data row AbleView has seen. */
+export function nextAppendRow({ rows, headerRow }) {
+  if (!Number.isInteger(headerRow) || headerRow < 1) {
+    throw new Error(`headerRow must be a positive integer, got ${headerRow}`);
+  }
+
+  if (!rows.length) {
+    // Header row + preserved gap row → first data row.
+    return headerRow + 2;
+  }
+
+  return Math.max(...rows.map((r) => Number(r.rowId))) + 1;
+}
+
+export function buildExplicitRowRange(worksheet, rowId, headers) {
+  const rowNumber = Number(rowId);
+  if (!Number.isInteger(rowNumber) || rowNumber < 1) {
+    throw new Error(`invalid rowId: ${rowId}`);
+  }
+  if (!headers.length) {
+    throw new Error('headers must not be empty');
+  }
+
+  const lastCol = columnIndexToLetter(headers.length - 1);
+  return `${escapeWorksheetName(worksheet)}!A${rowNumber}:${lastCol}${rowNumber}`;
+}
 
 export function buildAppendRowValues(headers, formattedChanges) {
   return headers.map((name) => {
@@ -7,18 +36,15 @@ export function buildAppendRowValues(headers, formattedChanges) {
   });
 }
 
-export function parseAppendedRowId(updatedRange) {
-  if (!updatedRange || typeof updatedRange !== 'string') {
-    throw new Error('append response missing updatedRange');
+/** Map a header-aligned row array back to a column-name data object. */
+export function snapshotRowData(headers, rowValues) {
+  const data = {};
+  for (let i = 0; i < headers.length; i++) {
+    const name = headers[i];
+    if (!name) continue;
+    data[name] = rowValues[i] ?? '';
   }
-
-  const rangeMatch = updatedRange.match(/:(\d+)$/);
-  if (rangeMatch) return String(rangeMatch[1]);
-
-  const cellMatch = updatedRange.match(/!.*?(\d+)$/);
-  if (cellMatch) return String(cellMatch[1]);
-
-  throw new Error(`could not parse row id from updatedRange: ${updatedRange}`);
+  return data;
 }
 
 export function appendSnapshotRow(snapshot, rowId, data) {
