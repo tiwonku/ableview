@@ -198,6 +198,7 @@ test('editable view WebSocket init includes editorColumns by default', async () 
 
   const init = await waitForMessage(messages, ws);
   assert.equal(init.editable, true);
+  assert.equal(init.matchColumn, 'Clip Name');
   assert.deepEqual(init.editorColumns, {
     BPM: { type: 'number', step: 0.1 },
     RGB_1: { type: 'color' },
@@ -225,6 +226,7 @@ test('editable: false disables row editing on a view', async () => {
 
   const init = await waitForMessage(messages, ws);
   assert.equal(init.editable, false);
+  assert.equal(init.matchColumn, undefined);
   assert.equal(init.editorColumns, undefined);
 
   ws.close();

@@ -27,7 +27,7 @@ post-v2026.
 | **Launch anticipation** | Ingest listens to `fired_slot_index` on the cue track; authoritative clip switches on scene fire before the quantization downbeat. OSC sim models the gap via `sim.quantDelaySeconds`. | ✅ done |
 | **Sheet row editor** | Edit matched cue rows from admin; typed widgets for BPM, Cue/Pillar icons, RGB colors; `PATCH /api/sheets/rows/:rowId`; edit session locks row while clip changes. Service account needs Editor + `spreadsheets` scope. | ✅ done |
 | **View-scoped row editor** | Operator views edit their configured fields by default; set `editable: false` to hide the button. Same widgets and edit-session locking as admin. | ✅ done |
-| **Sheet row append** | Add cue rows from admin on no-match; pre-fills match column from playing clip; `POST /api/sheets/rows`; appends to Google Sheet, updates cache, rematches. | ✅ done |
+| **Sheet row append** | Add cue rows on no-match from admin (full sheet) or operator views (view fields only; match column injected from clip); `POST /api/sheets/rows`; appends to Google Sheet, updates cache, rematches. | ✅ done |
 
 ---
 

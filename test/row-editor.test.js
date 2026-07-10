@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   captureEditSession,
+  captureCreateSession,
   buildViewEditorColumns,
   buildFieldLabels,
   viewFieldColumns,
@@ -51,6 +52,44 @@ test('buildFieldLabels uses view labels', () => {
   assert.deepEqual(buildFieldLabels(fields), {
     RGB_1: 'Color 1',
     BPM: 'BPM',
+  });
+});
+
+test('captureCreateSession scopes row to view columns', () => {
+  const session = captureCreateSession({
+    clipName: 'New Clip',
+    headers: ['Song Title', 'Key', 'BPM', 'Lighting Notes'],
+    matchColumn: 'Song Title',
+    columns: ['Key', 'BPM'],
+  });
+
+  assert.equal(session.mode, 'create');
+  assert.deepEqual(session.row, { Key: '', BPM: '' });
+  assert.equal(session.clipNameAtEdit, 'New Clip');
+});
+
+test('captureCreateSession pre-fills matchColumn when in scoped list', () => {
+  const session = captureCreateSession({
+    clipName: 'New Clip',
+    headers: ['Song Title', 'Key', 'BPM'],
+    matchColumn: 'Song Title',
+    columns: ['Song Title', 'Key'],
+  });
+
+  assert.deepEqual(session.row, { 'Song Title': 'New Clip', Key: '' });
+});
+
+test('captureCreateSession uses all headers when columns omitted', () => {
+  const session = captureCreateSession({
+    clipName: 'New Clip',
+    headers: ['Song Title', 'Key', 'BPM'],
+    matchColumn: 'Song Title',
+  });
+
+  assert.deepEqual(session.row, {
+    'Song Title': 'New Clip',
+    Key: '',
+    BPM: '',
   });
 });
 

@@ -153,9 +153,20 @@ export function connectView({
   function startCreate() {
     const clipName = lastPayload?.clipName?.trim();
     if (!clipName || lastPayload?.match?.matched === true) return;
-    if (!sheetHeaders.length || !matchColumn) return;
+    if (!matchColumn) return;
 
-    editSession = captureCreateSession({ clipName, headers: sheetHeaders, matchColumn });
+    const columns = viewConfig.system
+      ? sheetHeaders.filter(Boolean)
+      : viewFieldColumns(viewConfig.fields);
+    if (!viewConfig.system && !columns.length) return;
+    if (viewConfig.system && !columns.length) return;
+
+    editSession = captureCreateSession({
+      clipName,
+      headers: sheetHeaders,
+      matchColumn,
+      columns: viewConfig.system ? undefined : columns,
+    });
     saveState = 'idle';
     saveError = null;
     render();
@@ -175,9 +186,13 @@ export function connectView({
     if (!form) return;
 
     const isCreate = editSession.mode === 'create';
-    const payloadBody = isCreate
+    let payloadBody = isCreate
       ? collectEditorValues(form)
       : collectEditorChanges(form, editSession.row);
+
+    if (isCreate && matchColumn && !(matchColumn in payloadBody)) {
+      payloadBody[matchColumn] = editSession.clipNameAtEdit?.trim() ?? '';
+    }
 
     if (!isCreate && Object.keys(payloadBody).length === 0) {
       cancelEdit();
@@ -246,6 +261,7 @@ export function connectView({
         saveState,
         saveError,
         onStartEdit: viewConfig.editable ? startEdit : undefined,
+        onStartCreate: viewConfig.editable ? startCreate : undefined,
         onCancelEdit: cancelEdit,
         onSaveEdit: saveEdit,
       });

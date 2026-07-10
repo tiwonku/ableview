@@ -43,11 +43,10 @@ export function captureEditSession(payload, { columns } = {}) {
   };
 }
 
-export function captureCreateSession({ clipName, headers, matchColumn }) {
+export function captureCreateSession({ clipName, headers, matchColumn, columns }) {
+  const cols = columns?.length ? columns : headers.filter(Boolean);
   const row = Object.fromEntries(
-    headers
-      .filter(Boolean)
-      .map((name) => [name, name === matchColumn ? (clipName?.trim() ?? '') : ''])
+    cols.map((name) => [name, name === matchColumn ? (clipName?.trim() ?? '') : ''])
   );
 
   return {
