@@ -6,6 +6,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "start:production": "node deploy/run-production.mjs",
     "sim": "node src/index.js --sim",
     "test": "node --test"
   },

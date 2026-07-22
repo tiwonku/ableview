@@ -118,7 +118,8 @@ service install below.
 | OS | Service manager | Reference |
 |---|---|---|
 | Linux / Raspberry Pi | systemd | [`deploy/ableview.service`](./deploy/ableview.service) |
-| Windows (headless NUC) | NSSM (recommended) or Task Scheduler | [`deploy/README.md`](./deploy/README.md) |
+| Windows (headless NUC) | NSSM (recommended) or Task Scheduler | [`deploy/install-windows.ps1`](./deploy/install-windows.ps1) |
+| macOS (MacBook backup) | launchd LaunchAgent | [`deploy/install-macos.sh`](./deploy/install-macos.sh) |
 
 #### Making a show box production-ready
 
@@ -131,26 +132,27 @@ Use the same codebase; follow the path for your OS. Full step-by-step instructio
    Set `sim.enabled` to `false`.
 3. **Smoke-test manually** before installing any service:
    ```bash
-   NODE_ENV=production npm start
+   npm run start:production
    curl http://localhost:8080/health
    ```
-   `NODE_ENV=production` (or `ABLEVIEW_PRODUCTION=1`) turns on stricter boot checks — sheet
-   credentials and admin view required when not simulating. Leave it unset on dev machines.
+   Production mode turns on stricter boot checks — sheet credentials and admin view
+   required when not simulating. Leave `NODE_ENV` unset on dev machines.
 4. **Install the OS service** and enable start on boot:
    - **Linux / Pi:** copy `deploy/ableview.service` to systemd, `enable --now`.
-   - **Windows NUC:** register with NSSM (rotation + restart) — commands in `deploy/README.md`.
-5. **Logs:** default is stdout (journald on Linux, NSSM capture on Windows). Optionally set
+   - **Windows NUC:** run `deploy/install-windows.ps1` (elevated) — see [`deploy/README.md`](./deploy/README.md).
+   - **macOS:** run `deploy/install-macos.sh` — see [`deploy/README.md`](./deploy/README.md).
+5. **Logs:** default is stdout (journald on Linux, NSSM capture on Windows, launchd log file on macOS). Optionally set
    `LOG_FILE=./logs/ableview.log` and install `deploy/logrotate.example` on Linux.
 6. **Verify after power-cycle:** `curl http://<box-ip>:8080/health` returns `200` with
    `"status":"ok"` once sheets have synced and a clip has played (brief `503`/`degraded` at
-   cold start is normal).
+   cold start is normal). Use [`deploy/RUNBOOK.md`](./deploy/RUNBOOK.md) for show-night checklists.
 
 Do **not** enable systemd, NSSM, or Task Scheduler on your day-to-day development machine
 unless you explicitly want that behavior.
 
 ### What differs per host (not per codebase)
 
-- **Service install** — manual `npm start` on dev; systemd/NSSM on the show box only
+- **Service install** — manual `npm start` on dev; systemd / NSSM / launchd on the show box only
 - **Config** — OSC host/ports, sheet ID, view URLs depend on where Ableton and operators sit on the LAN
 - **Logs** — stdout in dev; journald / NSSM / optional `LOG_FILE` on the show box
 - **Production validation** — `NODE_ENV=production` on the show box only; unset during local iteration

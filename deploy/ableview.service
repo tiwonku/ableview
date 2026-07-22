@@ -8,7 +8,7 @@ Type=simple
 WorkingDirectory=/opt/ableview
 Environment=NODE_ENV=production
 EnvironmentFile=-/opt/ableview/.env
-ExecStart=/usr/bin/node src/index.js
+ExecStart=/usr/bin/node deploy/run-production.mjs
 Restart=always
 RestartSec=3
 StandardOutput=journal

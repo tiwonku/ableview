@@ -6,12 +6,74 @@ enabled by the application** — you opt in by installing a service on the show 
 The checklist below assumes M6 is complete: `/health`, production config validation
 (`NODE_ENV=production`), optional file logging, and reconnect behavior are in the app.
 
+**Show-night cheat sheet:** [`RUNBOOK.md`](./RUNBOOK.md)
+
+---
+
+## Quick install (recommended)
+
+After the [production checklist](#production-checklist-all-platforms) (Node, `.env`,
+`config/config.json`, secrets on disk):
+
+### Windows (NSSM)
+
+Run **elevated** PowerShell from the install directory:
+
+```powershell
+cd C:\AbleView
+.\deploy\install-windows.ps1
+```
+
+Requires [NSSM](https://nssm.cc/download) on PATH. The script runs preflight checks, an
+optional `/health` smoke test, registers the service to run `deploy/run-production.mjs`,
+and prints operator URLs.
+
+Remove: `.\deploy\uninstall-windows.ps1`
+
+### macOS (LaunchAgent)
+
+Run in Terminal from the install directory (no sudo):
+
+```bash
+cd ~/AbleView
+chmod +x deploy/install-macos.sh deploy/uninstall-macos.sh
+./deploy/install-macos.sh
+```
+
+Default install dir: `~/AbleView` (override with `--install-dir`). Starts when you log in,
+restarts on crash. Good for MacBook backup Ableton on the same user session.
+
+Remove: `./deploy/uninstall-macos.sh`
+
+### Linux / Raspberry Pi (systemd)
+
+Copy and edit the unit, then enable:
+
+```bash
+sudo cp deploy/ableview.service /etc/systemd/system/ableview.service
+# Edit paths if not using /opt/ableview
+sudo systemctl daemon-reload
+sudo systemctl enable --now ableview
+```
+
+The unit runs `deploy/run-production.mjs` (sets production mode and repo-root cwd).
+
+### Smoke test before installing any service
+
+```bash
+npm run start:production
+# another terminal:
+curl http://localhost:8080/health
+```
+
+Stop with Ctrl+C, then run the install script for your OS.
+
 ---
 
 ## Production checklist (all platforms)
 
 1. **Install Node.js ≥ 20** on the show box.
-2. **Copy the repo** to a fixed path (examples below use `/opt/ableview` or `C:\AbleView`).
+2. **Copy the repo** to a fixed path (examples below use `/opt/ableview`, `~/AbleView`, or `C:\AbleView`).
 3. **Install dependencies:** `npm install --omit=dev` (there are no devDependencies today; safe either way).
 4. **Configure secrets** — copy `.env.example` to `.env` and set:
    - `GOOGLE_SERVICE_ACCOUNT_KEY_PATH`
@@ -24,17 +86,15 @@ The checklist below assumes M6 is complete: `/health`, production config validat
    cp config/config.example.json config/config.json
    ```
    Set `ingest.abletonHost`, cue track, sheet columns, and views for this network.
-8. **Set production mode** in the service environment (not in `.env` unless you prefer):
-   - `NODE_ENV=production` **or** `ABLEVIEW_PRODUCTION=1`
-   - Enables stricter boot validation (sheet credentials, admin view required when not simulating).
+8. **Production mode** — `deploy/run-production.mjs` sets `NODE_ENV=production` automatically when used as the service entrypoint. Enables stricter boot validation (sheet credentials, admin view required when not simulating).
 9. **Confirm `sim.enabled` is `false`** in `config/config.json` for show night.
 10. **Verify manually once** before installing the service:
-   ```bash
-   NODE_ENV=production npm start
-   curl http://localhost:8080/health
-   ```
-11. **Install the OS service** (Linux or Windows section below) and enable start on boot.
-12. **Open operator URLs** on the LAN, e.g. `http://<show-box-ip>:8080/views/band`.
+    ```bash
+    npm run start:production
+    curl http://localhost:8080/health
+    ```
+11. **Install the OS service** (Quick install above) and enable start on boot.
+12. **Open operator URLs** on the LAN, e.g. `http://<show-box-ip>:8080/views/band`. Fill in [`RUNBOOK.md`](./RUNBOOK.md).
 
 Nothing in steps 11–12 runs automatically on a development machine unless you explicitly
 install and enable a service there.
@@ -115,7 +175,12 @@ sudo systemctl daemon-reload
 
 **Paths:** `C:\AbleView` (example).
 
-### 1. Prepare the install
+Use [`install-windows.ps1`](./install-windows.ps1) (Quick install above) instead of manual
+steps when possible.
+
+### Advanced: manual NSSM registration
+
+#### 1. Prepare the install
 
 - Install [Node.js LTS](https://nodejs.org/) (≥ 20).
 - Clone or copy the repo to `C:\AbleView`.
@@ -123,18 +188,18 @@ sudo systemctl daemon-reload
 - Copy `.env.example` to `.env` and configure.
 - Copy `config\config.example.json` to `config\config.json` and tune for this network.
 
-### 2. Install NSSM
+#### 2. Install NSSM
 
 Download [NSSM](https://nssm.cc/download) and place `nssm.exe` on your PATH, or invoke it by full path.
 
-### 3. Register the service
+#### 3. Register the service
 
 Run **elevated** PowerShell or CMD:
 
 ```powershell
 cd C:\AbleView
 
-nssm install AbleView "C:\Program Files\nodejs\node.exe" "src\index.js"
+nssm install AbleView "C:\Program Files\nodejs\node.exe" "deploy\run-production.mjs"
 nssm set AbleView AppDirectory C:\AbleView
 nssm set AbleView AppEnvironmentExtra NODE_ENV=production
 nssm set AbleView AppStdout C:\AbleView\logs\stdout.log
@@ -152,13 +217,10 @@ nssm start AbleView
 
 Adjust the Node.exe path if installed elsewhere (`where.exe node`).
 
-**Environment variables from `.env`:** NSSM does not load `.env` automatically. Either:
-
-- Add each variable via `nssm set AbleView AppEnvironmentExtra KEY=value` (one per line in the NSSM GUI, or repeated `AppEnvironmentExtra` keys — prefer the GUI for many vars), **or**
-- Use a small wrapper script that loads `.env` and execs node (not shipped; keep it local if needed).
-
-Most teams set `GOOGLE_SERVICE_ACCOUNT_KEY_PATH`, `SHEET_ID`, and `HTTP_PORT` in NSSM
-`AppEnvironmentExtra` for the show box.
+**`.env` and secrets:** AbleView loads `.env` from the install directory when
+`AppDirectory` is set correctly (see `loadConfig()` in `src/config/index.js`). You do
+**not** need to duplicate `SHEET_ID` or key paths in NSSM unless `AppDirectory` is wrong.
+`deploy/run-production.mjs` also forces production mode and repo-root cwd.
 
 **Optional app-level log file** (in addition to NSSM stdout capture):
 
@@ -177,9 +239,24 @@ Invoke-RestMethod http://localhost:8080/health
 ### 5. Disable / remove
 
 ```powershell
-nssm stop AbleView
-nssm remove AbleView confirm
+.\deploy\uninstall-windows.ps1
 ```
+
+---
+
+## macOS (LaunchAgent)
+
+**Paths:** `~/AbleView` (default for `install-macos.sh`).
+
+Use [`install-macos.sh`](./install-macos.sh) (Quick install above). The LaunchAgent:
+
+- Runs when the show user **logs in** (good for MacBook + Ableton in the same session)
+- Uses `deploy/run-production.mjs` as the entrypoint
+- Writes logs to `{InstallDir}/logs/launchd.log`
+
+Disable sleep and enable auto-login for show Macs — see [`RUNBOOK.md`](./RUNBOOK.md).
+
+Remove: `./deploy/uninstall-macos.sh`
 
 ---
 
@@ -188,11 +265,9 @@ nssm remove AbleView confirm
 If you prefer not to use NSSM:
 
 1. Create a task: **Trigger** = At startup; **Action** = Start program  
-   `C:\Program Files\nodejs\node.exe` with argument `src\index.js`, start in `C:\AbleView`.
-2. Set **Environment** for the task (Task Scheduler → task properties → Environment) or use
-   a `.env` loader wrapper.
-3. Enable **Restart on failure** in task settings if available.
-4. Capture logs via `LOG_FILE` in environment or redirect output in a wrapper `.cmd` script.
+   `C:\Program Files\nodejs\node.exe` with argument `deploy\run-production.mjs`, start in `C:\AbleView`.
+2. Enable **Restart on failure** in task settings if available.
+3. Capture logs via `LOG_FILE` in environment or redirect output in a wrapper `.cmd` script.
 
 Task Scheduler is workable but NSSM or systemd gives simpler crash restart behavior.
 
@@ -200,7 +275,7 @@ Task Scheduler is workable but NSSM or systemd gives simpler crash restart behav
 
 ## Development machines
 
-Do **not** enable systemd, NSSM, or Task Scheduler startup tasks on the machine where you
+Do **not** enable systemd, NSSM, LaunchAgent, or Task Scheduler startup tasks on the machine where you
 iterate daily. Use:
 
 ```bash

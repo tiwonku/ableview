@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ableview.server</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>{NODE_PATH}</string>
+		<string>{INSTALL_DIR}/deploy/run-production.mjs</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>{INSTALL_DIR}</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>ThrottleInterval</key>
+	<integer>3</integer>
+	<key>StandardOutPath</key>
+	<string>{INSTALL_DIR}/logs/launchd.log</string>
+	<key>StandardErrorPath</key>
+	<string>{INSTALL_DIR}/logs/launchd.log</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>NODE_ENV</key>
+		<string>production</string>
+	</dict>
+</dict>
+</plist>
