@@ -16,6 +16,7 @@ Build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claud
 | M8 | Sheet row editor | ✅ done |
 | M9 | Waveform + playhead (offline cache + OSC playhead) | 📋 planned — [`docs/plans/M9-waveform-playhead.md`](./docs/plans/M9-waveform-playhead.md) |
 | M10 | Session cue log (JSONL clip/match audit trail + settings UI) | 📋 planned — [`docs/plans/M10-session-cue-log.md`](./docs/plans/M10-session-cue-log.md) |
+| M11 | Show-box launchers — Windows + macOS parity (optional Inno; extends M6) | 📋 planned — [`docs/plans/M11-show-box-launchers.md`](./docs/plans/M11-show-box-launchers.md) |
 
 v2026 core scope (spec §10, §13) is complete. Items below are deferred, partial, or
 post-v2026.
