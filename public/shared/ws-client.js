@@ -186,7 +186,7 @@ export function connectView({
   async function saveEdit(formSection) {
     if (!editSession || saveState === 'saving') return;
 
-    const form = formSection.querySelector('.row-editor');
+    const form = formSection.querySelector('.row-editor, .fields--edit');
     if (!form) return;
 
     const isCreate = editSession.mode === 'create';

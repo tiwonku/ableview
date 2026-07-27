@@ -128,6 +128,145 @@ export function renderRowEditorPanel(parent, {
   parent.appendChild(section);
 }
 
+/** Operator views: card grid + edit bar (matches read-mode layout). */
+export function renderOperatorRowEditorPanel(parent, {
+  session,
+  fields = [],
+  editorColumns = {},
+  fieldLabels = {},
+  panelId = 'view-row-panel',
+  livePayload,
+  onCancel,
+  onSave,
+  saveState = 'idle',
+  saveError = null,
+}) {
+  const section = document.createElement('section');
+  section.className = 'operator-editor';
+  section.id = panelId;
+
+  const editBar = document.createElement('div');
+  editBar.className = 'view-edit-bar view-edit-bar--actions';
+
+  const actions = document.createElement('div');
+  actions.className = 'admin-editor-actions';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'admin-editor-btn';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.disabled = saveState === 'saving';
+  cancelBtn.addEventListener('click', onCancel);
+  actions.appendChild(cancelBtn);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'admin-editor-btn admin-editor-btn--primary';
+  saveBtn.textContent = saveState === 'saving' ? 'Saving…' : 'Save';
+  saveBtn.disabled = saveState === 'saving';
+  saveBtn.addEventListener('click', () => onSave(section));
+  actions.appendChild(saveBtn);
+
+  editBar.appendChild(actions);
+  section.appendChild(editBar);
+
+  const context = document.createElement('p');
+  context.className = 'admin-editor-context operator-editor-context';
+  context.dataset.role = 'edit-context';
+  context.textContent = buildEditContext(session, livePayload);
+  section.appendChild(context);
+
+  if (saveError) {
+    const err = document.createElement('p');
+    err.className = 'admin-editor-error operator-editor-error';
+    err.textContent = saveError;
+    section.appendChild(err);
+  }
+
+  const fieldsWrap = document.createElement('div');
+  fieldsWrap.className = 'view-fields-wrap';
+
+  const form = document.createElement('div');
+  form.className = 'fields fields--edit';
+  if (session.rowId != null) form.dataset.rowId = session.rowId;
+
+  const fieldList = fields?.length
+    ? fields.filter((f) => f?.column && f.column in session.row)
+    : Object.keys(session.row).map((column) => ({ column, type: editorColumns[column]?.type }));
+
+  for (let i = 0; i < fieldList.length; i++) {
+    const field = fieldList[i];
+    if (field.type === 'color') {
+      const group = [];
+      while (i < fieldList.length && fieldList[i].type === 'color') {
+        if (fieldList[i].column in session.row) group.push(fieldList[i]);
+        i++;
+      }
+      i--;
+      if (group.length) {
+        form.appendChild(renderOperatorColorGroup(group, session, editorColumns, fieldLabels));
+      }
+    } else {
+      form.appendChild(
+        renderOperatorTextField(field, session, editorColumns, fieldLabels),
+      );
+    }
+  }
+
+  fieldsWrap.appendChild(form);
+  section.appendChild(fieldsWrap);
+  parent.appendChild(section);
+}
+
+function renderOperatorTextField(field, session, editorColumns, fieldLabels) {
+  const column = field.column;
+  const label = fieldLabels[column] ?? field.label ?? column;
+  const raw = session.row[column];
+
+  const card = document.createElement('div');
+  card.className = 'field field--edit';
+
+  const labelEl = document.createElement('p');
+  labelEl.className = 'field-label';
+  labelEl.textContent = label;
+  card.appendChild(labelEl);
+
+  const body = document.createElement('div');
+  body.className = 'field-value-body field-value-body--edit';
+  body.appendChild(
+    renderEditorField(column, raw, editorColumns[column], label, { layout: 'operator' }),
+  );
+  card.appendChild(body);
+
+  return card;
+}
+
+function renderOperatorColorGroup(fields, session, editorColumns, fieldLabels) {
+  const row = document.createElement('div');
+  row.className = 'colors-row colors-row--edit';
+
+  for (const field of fields) {
+    const column = field.column;
+    const label = fieldLabels[column] ?? field.label ?? column;
+    const raw = session.row[column];
+
+    const card = document.createElement('div');
+    card.className = 'field-color field-color--edit';
+
+    const labelEl = document.createElement('p');
+    labelEl.className = 'field-label';
+    labelEl.textContent = label;
+    card.appendChild(labelEl);
+
+    card.appendChild(
+      renderEditorField(column, raw, editorColumns[column], label, { layout: 'operator-color' }),
+    );
+    row.appendChild(card);
+  }
+
+  return row;
+}
+
 function buildEditContext(session, livePayload) {
   const liveClip = livePayload?.clipName?.trim() ?? '';
 
@@ -156,20 +295,27 @@ export function updateEditContextBanner(root, session, livePayload) {
   if (banner) banner.textContent = buildEditContext(session, livePayload);
 }
 
-function renderEditorField(column, raw, columnConfig, fieldLabel) {
+function renderEditorField(column, raw, columnConfig, fieldLabel, options = {}) {
+  const layout = options.layout ?? 'admin';
   const cfg = normalizeColumnConfig(columnConfig);
   const field = document.createElement('div');
   field.className = 'row-editor-field';
   field.dataset.column = column;
 
-  const label = document.createElement('label');
-  label.className = 'row-editor-label';
-  label.textContent = fieldLabel ?? column;
-  label.htmlFor = `edit-${cssEscape(column)}`;
-  field.appendChild(label);
+  const inputId = `edit-${cssEscape(column)}`;
+
+  if (layout === 'admin') {
+    const label = document.createElement('label');
+    label.className = 'row-editor-label';
+    label.textContent = fieldLabel ?? column;
+    label.htmlFor = inputId;
+    field.appendChild(label);
+  }
 
   const control = document.createElement('div');
   control.className = 'row-editor-control';
+  if (layout === 'operator') control.classList.add('row-editor-control--operator');
+  if (layout === 'operator-color') control.classList.add('row-editor-control--operator-color');
 
   const state = parseCellForEditor(raw, cfg);
 
@@ -177,8 +323,8 @@ function renderEditorField(column, raw, columnConfig, fieldLabel) {
     case 'number': {
       const input = document.createElement('input');
       input.type = 'number';
-      input.id = `edit-${cssEscape(column)}`;
-      input.className = 'row-editor-input';
+      input.id = inputId;
+      input.className = 'row-editor-input' + (layout === 'operator' ? ' row-editor-input--operator' : '');
       input.value = state;
       input.step = String(cfg.step ?? 1);
       input.min = String(cfg.min ?? 0);
@@ -187,8 +333,9 @@ function renderEditorField(column, raw, columnConfig, fieldLabel) {
       break;
     }
     case 'color': {
+      const operatorColor = layout === 'operator-color';
       const wrap = document.createElement('div');
-      wrap.className = 'row-editor-color';
+      wrap.className = 'row-editor-color' + (operatorColor ? ' row-editor-color--operator' : '');
       wrap.dataset.editorType = 'color';
 
       const parsed = parseRgbCell(raw);
@@ -197,24 +344,84 @@ function renderEditorField(column, raw, columnConfig, fieldLabel) {
 
       const picker = document.createElement('input');
       picker.type = 'color';
-      picker.id = `edit-${cssEscape(column)}`;
-      picker.className = 'row-editor-color-input';
-      picker.value = state ?? '#000000';
-      wrap.appendChild(picker);
+      picker.id = inputId;
+      picker.className =
+        'row-editor-color-input' + (operatorColor ? ' row-editor-color-picker-overlay' : '');
+      picker.value = normalizeHexForPicker(isEmpty ? null : state);
+
+      if (operatorColor) {
+        const swatchHost = document.createElement('div');
+        swatchHost.className = 'color-swatch-edit';
+
+        const preview = document.createElement('div');
+        preview.className = 'color-swatch color-swatch--edit';
+        preview.dataset.role = 'color-preview';
+        preview.setAttribute('aria-hidden', 'true');
+        swatchHost.appendChild(preview);
+
+        picker.title = `Pick ${fieldLabel ?? column} color`;
+        swatchHost.appendChild(picker);
+        wrap.appendChild(swatchHost);
+      } else {
+        wrap.appendChild(picker);
+      }
+
+      const valuesRow = operatorColor ? document.createElement('div') : null;
+      if (valuesRow) valuesRow.className = 'color-values color-values--edit';
 
       const meta = document.createElement('span');
-      meta.className = 'row-editor-color-meta';
+      meta.className = operatorColor ? 'row-editor-color-meta color-copy-value' : 'row-editor-color-meta';
       meta.textContent = isEmpty ? '—' : (parsed?.rgbText ?? '—');
       meta.dataset.role = 'color-meta';
-      wrap.appendChild(meta);
 
       const clearBtn = document.createElement('button');
       clearBtn.type = 'button';
-      clearBtn.className = 'row-editor-color-clear';
+      clearBtn.className = operatorColor ? 'row-editor-color-clear color-copy' : 'row-editor-color-clear';
       clearBtn.textContent = 'Clear';
       clearBtn.title = 'Clear color';
       clearBtn.addEventListener('click', () => setColorCleared(wrap, true));
-      wrap.appendChild(clearBtn);
+
+      if (operatorColor) {
+        const rgbRow = document.createElement('div');
+        rgbRow.className = 'color-copy color-copy--meta';
+        const rgbKind = document.createElement('span');
+        rgbKind.className = 'color-copy-kind';
+        rgbKind.textContent = 'RGB';
+        rgbRow.appendChild(rgbKind);
+        rgbRow.appendChild(meta);
+        valuesRow.appendChild(rgbRow);
+
+        const hexInput = document.createElement('input');
+        hexInput.type = 'text';
+        hexInput.className = 'row-editor-color-hex';
+        hexInput.dataset.role = 'color-hex';
+        hexInput.autocomplete = 'off';
+        hexInput.spellcheck = false;
+        hexInput.placeholder = '#RRGGBB';
+        hexInput.setAttribute('aria-label', `${fieldLabel ?? column} hex color`);
+        hexInput.addEventListener('change', () => commitColorHexInput(wrap));
+        hexInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commitColorHexInput(wrap);
+          }
+        });
+
+        const hexRow = document.createElement('div');
+        hexRow.className = 'color-copy color-copy--hex';
+        const hexKind = document.createElement('span');
+        hexKind.className = 'color-copy-kind';
+        hexKind.textContent = 'Hex';
+        hexRow.appendChild(hexKind);
+        hexRow.appendChild(hexInput);
+        valuesRow.appendChild(hexRow);
+
+        valuesRow.appendChild(clearBtn);
+        wrap.appendChild(valuesRow);
+      } else {
+        wrap.appendChild(meta);
+        wrap.appendChild(clearBtn);
+      }
 
       picker.addEventListener('input', () => {
         setColorCleared(wrap, false, picker.value);
@@ -254,8 +461,8 @@ function renderEditorField(column, raw, columnConfig, fieldLabel) {
     default: {
       const input = document.createElement('input');
       input.type = 'text';
-      input.id = `edit-${cssEscape(column)}`;
-      input.className = 'row-editor-input';
+      input.id = inputId;
+      input.className = 'row-editor-input' + (layout === 'operator' ? ' row-editor-input--operator' : '');
       input.value = state;
       input.dataset.editorType = 'text';
       control.appendChild(input);
@@ -267,12 +474,41 @@ function renderEditorField(column, raw, columnConfig, fieldLabel) {
   return field;
 }
 
+function normalizeHexForPicker(hex) {
+  if (hex == null || String(hex).trim() === '') return '#000000';
+  let h = String(hex).trim();
+  if (!h.startsWith('#')) h = `#${h}`;
+  if (!/^#[0-9a-fA-F]{6}$/.test(h)) return '#000000';
+  return h.toLowerCase();
+}
+
+function parseHexInput(raw) {
+  const trimmed = String(raw ?? '').trim();
+  if (!trimmed) return null;
+  const withHash = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  if (!/^#[0-9a-fA-F]{6}$/.test(withHash)) return null;
+  return withHash.toLowerCase();
+}
+
+function commitColorHexInput(wrap) {
+  const hexInput = wrap.querySelector('[data-role="color-hex"]');
+  if (!hexInput || hexInput.disabled) return;
+  const parsed = parseHexInput(hexInput.value);
+  if (!parsed) {
+    syncColorClearedUi(wrap);
+    return;
+  }
+  setColorCleared(wrap, false, parsed);
+}
+
 function setColorCleared(wrap, cleared, hex = null) {
   if (cleared) {
     wrap.dataset.cleared = 'true';
   } else {
     delete wrap.dataset.cleared;
-    if (hex) wrap.querySelector('.row-editor-color-input').value = hex;
+    if (hex) {
+      wrap.querySelector('.row-editor-color-input').value = normalizeHexForPicker(hex);
+    }
   }
   syncColorClearedUi(wrap);
 }
@@ -281,17 +517,35 @@ function syncColorClearedUi(wrap) {
   const cleared = wrap.dataset.cleared === 'true';
   const picker = wrap.querySelector('.row-editor-color-input');
   const meta = wrap.querySelector('[data-role="color-meta"]');
+  const hexInput = wrap.querySelector('[data-role="color-hex"]');
+  const preview = wrap.querySelector('[data-role="color-preview"]');
   const clearBtn = wrap.querySelector('.row-editor-color-clear');
 
   wrap.classList.toggle('is-cleared', cleared);
   if (cleared) {
-    meta.textContent = '—';
+    if (meta) meta.textContent = '—';
+    if (hexInput) {
+      hexInput.value = '';
+      hexInput.disabled = true;
+    }
+    if (preview) {
+      preview.style.backgroundColor = '';
+      preview.classList.add('color-swatch--empty');
+    }
     if (clearBtn) clearBtn.disabled = true;
     return;
   }
 
   const parsed = parseRgbCell(formatRgbFromHex(picker?.value ?? ''));
-  meta.textContent = parsed?.rgbText ?? '—';
+  if (meta) meta.textContent = parsed?.rgbText ?? '—';
+  if (hexInput) {
+    hexInput.disabled = false;
+    hexInput.value = parsed?.hex ?? normalizeHexForPicker(picker?.value);
+  }
+  if (preview) {
+    preview.classList.remove('color-swatch--empty');
+    preview.style.backgroundColor = parsed?.css ?? '';
+  }
   if (clearBtn) clearBtn.disabled = false;
 }
 

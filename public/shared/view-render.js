@@ -4,6 +4,7 @@ import { parseRgbCell } from './color-parse.js';
 import {
   captureEditSession,
   renderRowEditorPanel,
+  renderOperatorRowEditorPanel,
   renderReadOnlyRowPanel,
   updateEditContextBanner,
   buildViewEditorColumns,
@@ -172,8 +173,9 @@ export function renderView(root, {
   const fieldLabels = buildFieldLabels(fields);
 
   if (editSession) {
-    renderRowEditorPanel(root, {
+    renderOperatorRowEditorPanel(root, {
       session: editSession,
+      fields,
       editorColumns: viewEditorColumns,
       fieldLabels,
       panelId: 'view-row-panel',
