@@ -68,10 +68,6 @@
           "column": "Video World"
         },
         {
-          "column": "Color_Desc_Derek",
-          "label": "Color Description"
-        },
-        {
           "column": "RGB_1",
           "label": "Color 1",
           "type": "color"

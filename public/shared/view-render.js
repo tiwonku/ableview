@@ -10,6 +10,81 @@ import {
   buildFieldLabels,
 } from './admin-row-editor.js';
 
+/** @type {HTMLElement | null} */
+let fieldExpandOverlay = null;
+
+function ensureFieldExpandOverlay() {
+  if (fieldExpandOverlay) return fieldExpandOverlay;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'field-expand-overlay';
+  overlay.hidden = true;
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+
+  const backdrop = document.createElement('button');
+  backdrop.type = 'button';
+  backdrop.className = 'field-expand-backdrop';
+  backdrop.setAttribute('aria-label', 'Close');
+  backdrop.addEventListener('click', closeFieldExpand);
+  overlay.appendChild(backdrop);
+
+  const panel = document.createElement('div');
+  panel.className = 'field-expand-panel';
+
+  const header = document.createElement('div');
+  header.className = 'field-expand-header';
+
+  const titleEl = document.createElement('h2');
+  titleEl.className = 'field-expand-title';
+  titleEl.id = 'field-expand-title';
+  header.appendChild(titleEl);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'field-expand-close';
+  closeBtn.textContent = 'Close';
+  closeBtn.addEventListener('click', closeFieldExpand);
+  header.appendChild(closeBtn);
+
+  panel.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'field-expand-body';
+  body.id = 'field-expand-body';
+  panel.appendChild(body);
+
+  overlay.appendChild(panel);
+  overlay.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeFieldExpand();
+  });
+
+  document.body.appendChild(overlay);
+  fieldExpandOverlay = overlay;
+  return overlay;
+}
+
+function openFieldExpand(label, text) {
+  const overlay = ensureFieldExpandOverlay();
+  const titleEl = overlay.querySelector('#field-expand-title');
+  const bodyEl = overlay.querySelector('#field-expand-body');
+  if (!titleEl || !bodyEl) return;
+
+  titleEl.textContent = label;
+  bodyEl.textContent = text;
+  overlay.hidden = false;
+  document.body.classList.add('field-expand-open');
+
+  const closeBtn = overlay.querySelector('.field-expand-close');
+  closeBtn?.focus();
+}
+
+function closeFieldExpand() {
+  if (!fieldExpandOverlay || fieldExpandOverlay.hidden) return;
+  fieldExpandOverlay.hidden = true;
+  document.body.classList.remove('field-expand-open');
+}
+
 function isLaunching(payload) {
   return Boolean(payload?.pendingLaunch) && !payload?.simulated;
 }
@@ -123,6 +198,9 @@ export function renderView(root, {
       root.appendChild(editBar);
     }
 
+    const fieldsWrap = document.createElement('div');
+    fieldsWrap.className = 'view-fields-wrap';
+
     const grid = document.createElement('div');
     grid.className = 'fields';
 
@@ -141,7 +219,8 @@ export function renderView(root, {
       }
     }
 
-    root.appendChild(grid);
+    fieldsWrap.appendChild(grid);
+    root.appendChild(fieldsWrap);
   }
 
   updateStatusBar({ connected, lastUpdate, payload });
@@ -176,10 +255,29 @@ function renderTextField(field, payload) {
   labelEl.textContent = label;
   card.appendChild(labelEl);
 
-  const valueEl = document.createElement('p');
-  valueEl.className = 'field-value' + (value ? '' : ' empty');
-  valueEl.textContent = value ?? '—';
-  card.appendChild(valueEl);
+  if (value) {
+    const valueWrap = document.createElement('div');
+    valueWrap.className = 'field-value-body';
+
+    const valueBtn = document.createElement('button');
+    valueBtn.type = 'button';
+    valueBtn.className = 'field-value field-value--clamp';
+    valueBtn.textContent = value;
+    valueBtn.setAttribute('aria-expanded', 'false');
+    valueBtn.title = 'Tap to read full text';
+    valueBtn.addEventListener('click', () => openFieldExpand(label, value));
+    valueWrap.appendChild(valueBtn);
+    card.appendChild(valueWrap);
+  } else {
+    const valueWrap = document.createElement('div');
+    valueWrap.className = 'field-value-body';
+
+    const valueEl = document.createElement('p');
+    valueEl.className = 'field-value empty';
+    valueEl.textContent = '—';
+    valueWrap.appendChild(valueEl);
+    card.appendChild(valueWrap);
+  }
 
   return card;
 }
@@ -202,7 +300,7 @@ function renderColorField(field, payload) {
   const color = parseRgbCell(raw);
 
   const card = document.createElement('div');
-  card.className = 'field field-color';
+  card.className = 'field-color';
 
   const labelEl = document.createElement('p');
   labelEl.className = 'field-label';

@@ -287,6 +287,10 @@ main {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  padding: 1rem 1.15rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
 }
 
 .color-swatch {
@@ -1047,4 +1051,332 @@ main {
 .sim-controls-status.err {
   background: rgba(224, 82, 82, 0.12);
   color: var(--danger);
+}
+
+/* --- Operator views: fluid viewport fill (admin/settings unchanged) --- */
+
+html:has(body.layout-operator) {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.layout-operator {
+  --op-gap: clamp(0.35rem, 1.1dvh, 1.25rem);
+  --op-pad: clamp(0.45rem, 1.4dvh, 1.35rem);
+  --op-text-min: 1rem;
+  --op-title-min: 1.5rem;
+  --op-label-min: 0.65rem;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body.layout-operator > main#app {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+body.layout-operator #app {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  padding: clamp(0.45rem, 1.2dvh, 0.85rem) clamp(0.65rem, 2vw, 1.15rem)
+    clamp(0.4rem, 1dvh, 0.75rem);
+  overflow: hidden;
+}
+
+body.layout-operator .status-bar {
+  flex-wrap: nowrap;
+  gap: clamp(0.3rem, 0.8dvh, 0.5rem) clamp(0.4rem, 1vw, 0.65rem);
+  padding: clamp(0.3rem, 1dvh, 0.55rem) clamp(0.65rem, 2vw, 1.25rem);
+  font-size: clamp(0.72rem, 1.4dvh, 0.85rem);
+}
+
+body.layout-operator .status-bar .view-nav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: min(62vw, 32rem);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+body.layout-operator .view-nav a,
+body.layout-operator .view-nav-settings {
+  flex-shrink: 0;
+  min-height: clamp(2rem, 4dvh, 2.5rem);
+  display: inline-flex;
+  align-items: center;
+}
+
+body.layout-operator .view-title {
+  flex-shrink: 0;
+  margin-bottom: clamp(0.1rem, 0.4dvh, 0.35rem);
+  font-size: clamp(0.72rem, 1.2dvh, 0.95rem);
+}
+
+body.layout-operator #view-clip-head,
+body.layout-operator .no-match,
+body.layout-operator .no-match-panel,
+body.layout-operator .view-edit-bar {
+  flex-shrink: 0;
+}
+
+body.layout-operator .clip-head {
+  margin-bottom: clamp(0.35rem, 1.2dvh, 1rem);
+}
+
+body.layout-operator .clip-name {
+  font-size: clamp(var(--op-title-min), 4dvh + 3vmin, 5rem);
+  line-height: 1.06;
+}
+
+body.layout-operator .no-match-panel {
+  padding: var(--op-pad);
+  margin-bottom: var(--op-gap);
+}
+
+body.layout-operator .view-edit-bar {
+  margin: clamp(0.1rem, 0.4dvh, 0.25rem) 0 var(--op-gap);
+}
+
+/* The fields area is the only scroll region, and it only scrolls when the
+   cards genuinely cannot fit. Rows are content-sized so nothing is ever
+   clipped; spare vertical space is shared out by the grid's default
+   align-content: stretch. */
+body.layout-operator .view-fields-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+body.layout-operator .fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: stretch;
+  gap: var(--op-gap);
+  flex: 1 0 auto;
+  width: 100%;
+}
+
+body.layout-operator .fields > .field {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 min(100%, 26rem);
+  min-width: 0;
+  padding: var(--op-pad);
+}
+
+body.layout-operator .fields > .colors-row {
+  flex: 1 1 100%;
+}
+
+body.layout-operator .field-label {
+  flex-shrink: 0;
+  font-size: clamp(var(--op-label-min), 0.3vw + 0.6dvh, 1.05rem);
+  margin-bottom: clamp(0.15rem, 0.5dvh, 0.45rem);
+}
+
+body.layout-operator .field-value-body {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+}
+
+body.layout-operator .field-value-body .field-value,
+body.layout-operator .field-value-body .field-value--clamp {
+  font-size: clamp(var(--op-text-min), 0.7vw + 1.8dvh, 3.5rem);
+  line-height: 1.15;
+  max-width: 100%;
+}
+
+body.layout-operator .field-value--clamp {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  font-family: inherit;
+  font-weight: 600;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+body.layout-operator .field-value--clamp:hover {
+  color: var(--accent);
+}
+
+body.layout-operator .field-value--clamp:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+body.layout-operator .field-value.empty {
+  margin: 0;
+  font-weight: 400;
+}
+
+body.layout-operator .colors-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--op-gap);
+}
+
+body.layout-operator .colors-row .field-color {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--op-pad);
+}
+
+body.layout-operator .colors-row .color-swatch {
+  flex: 1 1 auto;
+  width: 100%;
+  aspect-ratio: unset;
+  min-height: clamp(3.5rem, 20dvh, 14rem);
+  margin: 0 0 clamp(0.35rem, 0.8dvh, 0.6rem);
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+body.layout-operator .colors-row .color-values {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+body.layout-operator .colors-row .color-copy {
+  min-height: clamp(2rem, 3.8dvh, 3rem);
+  padding: clamp(0.3rem, 0.7dvh, 0.5rem) clamp(0.4rem, 1vw, 0.6rem);
+  font-size: clamp(0.72rem, 1.4dvh, 0.92rem);
+  max-width: 100%;
+}
+
+body.layout-operator .colors-row .color-copy-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 36rem) {
+  body.layout-operator .colors-row {
+    gap: 0.4rem;
+  }
+
+  body.layout-operator .colors-row .field-color {
+    padding: 0.55rem 0.45rem;
+  }
+
+  body.layout-operator .colors-row .color-swatch {
+    min-height: 3rem;
+  }
+
+  body.layout-operator .clip-name {
+    font-size: clamp(var(--op-title-min), 3dvh + 4vw, 2.5rem);
+  }
+}
+
+/* Full-text overlay for clamped operator fields */
+.field-expand-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.field-expand-overlay[hidden] {
+  display: none !important;
+}
+
+body.field-expand-open {
+  overflow: hidden;
+}
+
+.field-expand-backdrop {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.72);
+  cursor: pointer;
+}
+
+.field-expand-panel {
+  position: relative;
+  z-index: 1;
+  width: min(42rem, 100%);
+  max-height: min(85dvh, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.field-expand-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.field-expand-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field-expand-close {
+  flex-shrink: 0;
+  min-height: 2.5rem;
+  padding: 0.45rem 1rem;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.field-expand-close:hover {
+  border-color: var(--accent);
+}
+
+.field-expand-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.field-expand-body {
+  padding: 1rem 1.15rem 1.25rem;
+  overflow-y: auto;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

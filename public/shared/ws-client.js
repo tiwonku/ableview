@@ -99,6 +99,10 @@ export function connectView({
       matchColumn = msg.matchColumn ?? null;
       viewsList = msg.views ?? null;
       mountViewNav(viewId, viewsList, { settingsActive });
+      document.body.classList.toggle(
+        'layout-operator',
+        !viewConfig.system && !statusOnly,
+      );
       if (msg.status) lastStatus = msg.status;
       applySimState(msg.simulated === true);
       if (msg.payload) {
