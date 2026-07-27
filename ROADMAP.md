@@ -15,6 +15,7 @@ Build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claud
 | M7 | Admin settings GUI | ✅ done |
 | M8 | Sheet row editor | ✅ done |
 | M9 | Waveform + playhead (offline cache + OSC playhead) | 📋 planned — [`docs/plans/M9-waveform-playhead.md`](./docs/plans/M9-waveform-playhead.md) |
+| M10 | Session cue log (JSONL clip/match audit trail + settings UI) | 📋 planned — [`docs/plans/M10-session-cue-log.md`](./docs/plans/M10-session-cue-log.md) |
 
 v2026 core scope (spec §10, §13) is complete. Items below are deferred, partial, or
 post-v2026.
@@ -30,6 +31,7 @@ post-v2026.
 | **View-scoped row editor** | Operator views edit their configured fields by default; set `editable: false` to hide the button. Same widgets and edit-session locking as admin. | ✅ done |
 | **Sheet row append** | Add cue rows on no-match from admin (full sheet) or operator views (view fields only; match column injected from clip); `POST /api/sheets/rows`; appends to Google Sheet, updates cache, rematches. | ✅ done |
 | **Responsive operator views** | Viewport-fitted Band/Lighting/Visuals for ultrawide and short displays (e.g. Xeneon Edge 2560×720); multi-column fields, line-clamp + expand for long text. | ✅ done |
+| **Session cue log** | Append-only JSONL of clip changes and resolved rows; admin settings toggle, session name → rotate file; sim auto-start optional. | 📋 planned — [`docs/plans/M10-session-cue-log.md`](./docs/plans/M10-session-cue-log.md) |
 
 ---
 
