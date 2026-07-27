@@ -14,6 +14,7 @@ Build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claud
 | M6 | Hardening | ✅ done |
 | M7 | Admin settings GUI | ✅ done |
 | M8 | Sheet row editor | ✅ done |
+| M9 | Waveform + playhead (offline cache + OSC playhead) | 📋 planned — [`docs/plans/M9-waveform-playhead.md`](./docs/plans/M9-waveform-playhead.md) |
 
 v2026 core scope (spec §10, §13) is complete. Items below are deferred, partial, or
 post-v2026.
@@ -51,8 +52,9 @@ From spec §11 — design leaves extension points; no code ships for these yet:
 
 - **OSC rebroadcast** — emit clip/cue triggers to lighting consoles (GrandMA3, etc.) from the
   internal event bus.
-- **Waveform + playhead** — audio waveform with playhead for the playing clip (would need
-  `playing_position` from AbletonOSC and a new view panel).
+- **Waveform + playhead** — planned as **M9**: offline PNG/manifest from `.als` + project
+  audio; realtime playhead via read-only `playing_position`. Build plan:
+  [`docs/plans/M9-waveform-playhead.md`](./docs/plans/M9-waveform-playhead.md).
 - **Write-back to Ableton** — will not be built; NFR-1 is permanent.
 
 ---
