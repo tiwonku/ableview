@@ -5,13 +5,15 @@ URLs — copy them here.
 
 **Power-cycle test passed:** _______________ (date)  
 **Show box hostname / location:** _______________  
-**Show box LAN IP:** _______________
+**Show box LAN IP (operator VLAN):** _______________  
+**Show box Link VLAN IP (if dual-homed):** _______________  
+**Ableton master IP (Link VLAN):** _______________
 
 ---
 
 ## Operator URLs
 
-Replace `__SHOW_BOX_IP__` with the show box IP (or `localhost` if the browser runs on the same machine).
+Replace `__SHOW_BOX_IP__` with the show box IP **on the VLAN where operator browsers live** (or `localhost` if the browser runs on the same machine). Do not use a Link-VLAN-only address unless every operator device can route there.
 
 | Role | URL |
 |---|---|
@@ -22,6 +24,37 @@ Replace `__SHOW_BOX_IP__` with the show box IP (or `localhost` if the browser ru
 | Health (JSON) | `http://__SHOW_BOX_IP__:8080/health` |
 
 **Backup MacBook IP (if used):** _______________
+
+---
+
+## Ableton Link VLAN vs operator VLAN
+
+Many tours put **Ableton machines on a dedicated Link VLAN** (Layer-2 for Ableton Link discovery). **Operator laptops and touch panels are often on a different VLAN.** That split is normal and works with AbleView.
+
+AbleView does **not** use Ableton Link. It uses **unicast UDP** to AbletonOSC (ports **11000** / **11001**) and **TCP** for operator browsers (`HTTP_PORT`, default **8080**, WebSocket on `/ws`). Unicast and HTTP cross routed VLANs as long as firewalls and routing allow it.
+
+The show box must reach **both** sides:
+
+| Direction | Traffic | Notes |
+|---|---|---|
+| Show box → Ableton | UDP to `ingest.oscSendPort` (11000) | Set `ingest.abletonHost` to the master’s **Link VLAN IP** |
+| Ableton → show box | UDP replies to `ingest.oscListenPort` (11001) | Return path; stateful firewalls usually pinhole automatically |
+| Operators → show box | TCP 8080 (HTTP + WebSocket) | Use the show box IP on the **operator VLAN** in the URL table above |
+| Show box → Google | TCP 443 | Sheet sync and admin row edits; needs internet on **some** NIC, not necessarily the Link VLAN |
+
+**Recommended:** dual-homed show box — NIC 1 on Link VLAN (static IP, **no default gateway**); NIC 2 on operator/production VLAN (default gateway + internet). Single-NIC on the operator VLAN is OK if routing/ACLs allow UDP to the Link VLAN.
+
+**Before show week, confirm:**
+
+- [ ] `ingest.abletonHost` is the master’s reachable IP (admin settings or `config.json`)
+- [ ] Operator URLs use an IP/DNS name that **operator devices** can reach (not `.local` across VLANs)
+- [ ] Windows Firewall (or equivalent): allow **inbound TCP 8080** and **UDP 11001** on the show box
+- [ ] AbletonOSC on the master listens on the network (not `127.0.0.1` only) and replies to the show box’s IP
+- [ ] Dual-homed: only **one** default gateway (operator/internet NIC)
+
+If clips never update but `/health` is fine, suspect OSC path (host IP, firewall, AbletonOSC bind). If browsers cannot connect, suspect operator VLAN → show box TCP 8080. If sheet stays stale, suspect show box → internet (wrong default route on dual-homed boxes is a common cause).
+
+Full install notes: [`deploy/README.md`](./README.md#network-link-vlan-and-operator-vlan).
 
 ---
 
@@ -36,7 +69,8 @@ Replace `__SHOW_BOX_IP__` with the show box IP (or `localhost` if the browser ru
 - [ ] `.env` secrets present; service account key file on disk
 - [ ] Google Sheet shared with service account (Editor for row edits)
 - [ ] AbletonOSC loaded on master (and backup MacBook if applicable)
-- [ ] `ingest.abletonHost` correct — LAN IP for remote Ableton, `127.0.0.1` if Ableton on same Mac
+- [ ] `ingest.abletonHost` correct — master’s IP on the **Link VLAN** (or `127.0.0.1` if Ableton on same machine as AbleView)
+- [ ] If Link and operator VLANs differ: routing/firewall tested; operator URLs use **operator-reachable** show box IP (see [Ableton Link VLAN vs operator VLAN](#ableton-link-vlan-vs-operator-vlan))
 
 ### T-1 hour
 
@@ -108,6 +142,17 @@ Wait ~30 seconds. AbleView re-registers OSC listeners automatically. No restart 
 
 - **No match shown** — add/fix sheet row or alias; use admin **Sync sheet** if needed.
 - **Wrong row shown** — should not happen below match threshold; check sheet match column and aliases immediately.
+
+### Clips not updating (VLAN / network)
+
+Symptoms: operator views load, WebSocket **Connected**, but **last update** does not move when firing cue clips.
+
+1. From the show box, confirm `ingest.abletonHost` matches the live master IP (admin settings).
+2. Verify UDP **11000/11001** between show box and Ableton (firewall on both ends; Link VLAN ACLs).
+3. Confirm AbletonOSC is running and bound for remote clients (not localhost-only).
+4. Check AbleView logs for OSC errors or “no OSC traffic; re-registering listeners”.
+
+Symptoms: **Disconnected** in the browser while the service is up — operators cannot reach TCP **8080** on the show box IP they use; fix routing or firewall on the **operator VLAN**, or fix the URL (wrong subnet).
 
 ---
 

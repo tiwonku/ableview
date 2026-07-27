@@ -52,8 +52,8 @@ AbleView reads clip names from a live Ableton session via [AbletonOSC](https://g
 
 1. **Install AbletonOSC** on the Ableton machine — add it as a **Control Surface / MIDI Remote Script** in Live's preferences (follow the AbletonOSC README for your Live version).
 2. **Open the show set** and confirm a dedicated **cue track** exists (default name `"Cue"` in config) with **named session clips** that match your Google Sheet's match column.
-3. **Network** — the AbleView box must reach the Ableton machine on UDP. AbletonOSC listens on port **11000** and sends replies to the requesting host on **11001** (unicast, not multicast).
-4. **Point AbleView at Ableton** — set `ingest.abletonHost` in `config/config.json` (or from `/views/admin`) to the Ableton machine's LAN IP. Ports default to 11000/11001.
+3. **Network** — the AbleView box must reach the Ableton machine on UDP. AbletonOSC listens on port **11000** and sends replies to the requesting host on **11001** (unicast, not multicast). This is **not** Ableton Link traffic; a dedicated **Link VLAN** for Ableton machines is fine even when operator laptops sit on another VLAN — the show box needs a route (often dual-homed) to the master and operators need TCP to the show box on `HTTP_PORT`. See [`deploy/RUNBOOK.md`](./deploy/RUNBOOK.md#ableton-link-vlan-vs-operator-vlan).
+4. **Point AbleView at Ableton** — set `ingest.abletonHost` in `config/config.json` (or from `/views/admin`) to the Ableton machine's reachable IP (Link VLAN IP when VLANs are split). Ports default to 11000/11001.
 5. **Disable simulation** — ensure `sim.enabled` is `false` for a live session (`npm start`, not `npm run sim`).
 6. **Smoke test** — launch a clip on the cue track; the admin view should show the clip name and a sheet match within a second or two.
 
@@ -145,7 +145,8 @@ Use the same codebase; follow the path for your OS. Full step-by-step instructio
    `LOG_FILE=./logs/ableview.log` and install `deploy/logrotate.example` on Linux.
 6. **Verify after power-cycle:** `curl http://<box-ip>:8080/health` returns `200` with
    `"status":"ok"` once sheets have synced and a clip has played (brief `503`/`degraded` at
-   cold start is normal). Use [`deploy/RUNBOOK.md`](./deploy/RUNBOOK.md) for show-night checklists.
+   cold start is normal). Use [`deploy/RUNBOOK.md`](./deploy/RUNBOOK.md) for show-night checklists
+   (including **Link VLAN vs operator VLAN** networking).
 
 Do **not** enable systemd, NSSM, or Task Scheduler on your day-to-day development machine
 unless you explicitly want that behavior.

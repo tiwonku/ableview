@@ -101,6 +101,31 @@ install and enable a service there.
 
 ---
 
+## Network: Link VLAN and operator VLAN
+
+Ableton machines are often on a **dedicated Ableton Link VLAN**; operator browsers are often
+**not** on that VLAN. AbleView does not use Link — only **unicast OSC** (11000/11001) and
+**HTTP/WebSocket** (default 8080). That design works across VLANs if the **show box** can reach
+the master Ableton IP and operators can reach the show box on TCP 8080, and the show box can
+reach Google (443) for sheet sync.
+
+During install:
+
+- Set `ingest.abletonHost` to the master’s IP on the network path the show box uses (usually
+  the Link VLAN address).
+- Give operators URLs using the show box IP on the **operator VLAN** (what `install-windows.ps1`
+  prints may be the primary interface — verify against your routing plan).
+- **Dual-homed show box (recommended when VLANs are isolated):** Link VLAN NIC = static IP, no
+  default gateway; operator/internet NIC = default gateway. Only one default gateway.
+- Open host firewall: inbound **TCP 8080**, **UDP 11001** (and ensure outbound UDP 11000 to
+  Ableton is allowed).
+- Confirm AbletonOSC accepts remote OSC (not bound to localhost only).
+
+Show-night checklists, fill-in fields, and failure steps:
+[`RUNBOOK.md`](./RUNBOOK.md#ableton-link-vlan-vs-operator-vlan).
+
+---
+
 ## Linux / Raspberry Pi (systemd)
 
 **Paths:** `/opt/ableview` (adjust if you use another directory).
