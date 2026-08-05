@@ -38,6 +38,7 @@ test('buildHealthReport returns ok when sheet data is fresh', () => {
     simulated: false,
     getSheetSnapshot: () => sheetSnapshot(),
     getConnectedViewCount: () => 2,
+    getIngestStatus: () => ({ live: true, lastSeenAt: Date.now() }),
     lastCuePayload: makeCuePayload({
       clipName: 'Song A',
       match: makeMatchResult({ matched: true, confidence: 0.9 }),
@@ -51,11 +52,26 @@ test('buildHealthReport returns ok when sheet data is fresh', () => {
   assert.equal(report.checks.length, 0);
 });
 
+test('buildHealthReport is degraded when ingest is offline', () => {
+  const report = buildHealthReport({
+    simulated: false,
+    getSheetSnapshot: () => sheetSnapshot(),
+    getConnectedViewCount: () => 1,
+    getIngestStatus: () => ({ live: false, lastSeenAt: null }),
+    lastCuePayload: makeCuePayload({ clipName: 'Song A' }),
+  });
+
+  assert.equal(report.status, 'degraded');
+  assert.ok(report.checks.includes('ingest_offline'));
+  assert.equal(report.ingest.live, false);
+});
+
 test('buildHealthReport is degraded when sheet cache is stale', () => {
   const report = buildHealthReport({
     simulated: false,
     getSheetSnapshot: () => sheetSnapshot({ stale: true }),
     getConnectedViewCount: () => 0,
+    getIngestStatus: () => ({ live: true, lastSeenAt: Date.now() }),
     lastCuePayload: makeCuePayload({ clipName: 'Song A' }),
   });
 
@@ -99,6 +115,7 @@ test('GET /health returns 200 when healthy', async () => {
     getHealthContext: () => ({
       simulated: false,
       getSheetSnapshot: () => sheetSnapshot(),
+      getIngestStatus: () => ({ live: true, lastSeenAt: Date.now() }),
     }),
   });
 

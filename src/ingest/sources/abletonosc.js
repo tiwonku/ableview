@@ -14,7 +14,8 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
 
   let udp = null;
   let lastInboundAt = 0;
-  let silenceTimer = null;
+  let ingestLive = false;
+  let pollTimer = null;
 
   // trackIndex -> { trackName, playingSlotIndex, playingClipName, firedSlotIndex,
   //   firedClipName, latchedClipName?, latchedSlotIndex? }
@@ -105,6 +106,28 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     bus.emit(EVENTS.NOW_PLAYING, event);
   }
 
+  function emitIngestStatus() {
+    bus.emit(EVENTS.INGEST_STATUS, {
+      live: ingestLive,
+      lastSeenAt: lastInboundAt || null,
+    });
+  }
+
+  function setIngestLive(live) {
+    if (ingestLive === live) return;
+    ingestLive = live;
+    log.info({ live }, 'ingest status');
+    emitIngestStatus();
+  }
+
+  function probeAbleton() {
+    registerListeners();
+    for (const index of trackState.keys()) {
+      send('/live/track/get/playing_slot_index', [index]);
+      send('/live/track/get/fired_slot_index', [index]);
+    }
+  }
+
   function registerListeners() {
     const { abletonHost, oscSendPort } = getIngest();
     log.info({ host: abletonHost, sendPort: oscSendPort, listenPort: oscListenPort }, 'registering AbletonOSC listeners');
@@ -178,6 +201,10 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
 
   function onMessage(msg) {
     lastInboundAt = Date.now();
+    if (!ingestLive) {
+      setIngestLive(true);
+      probeAbleton();
+    }
     switch (msg.address) {
       case '/live/song/get/track_names': return onTrackNames(msg.args);
       case '/live/track/get/playing_slot_index': return onPlayingSlotIndex(msg.args);
@@ -195,16 +222,26 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   }
 
   // NFR-2: if Ableton restarts, listener registrations are lost silently.
-  // Re-register whenever we have heard nothing for a while.
-  function startSilenceWatchdog() {
-    const silenceMs = 30_000;
-    silenceTimer = setInterval(() => {
-      if (Date.now() - lastInboundAt > silenceMs) {
-        log.warn({ silenceMs }, 'no OSC traffic; re-registering listeners');
-        registerListeners();
+  // Poll on a short interval, mark ingest stale when OSC goes quiet, and
+  // probe aggressively while stale so clip changes are picked up quickly.
+  function startLivenessWatch() {
+    const { staleAfterMs, pollIntervalMs } = getIngest();
+    pollTimer = setInterval(() => {
+      const silentMs = lastInboundAt > 0 ? Date.now() - lastInboundAt : Infinity;
+
+      if (ingestLive && silentMs > staleAfterMs) {
+        setIngestLive(false);
       }
-    }, silenceMs);
-    silenceTimer.unref?.();
+
+      if (!ingestLive || silentMs > pollIntervalMs / 2) {
+        probeAbleton();
+      }
+    }, pollIntervalMs);
+    pollTimer.unref?.();
+  }
+
+  function getIngestStatus() {
+    return { live: ingestLive, lastSeenAt: lastInboundAt || null };
   }
 
   function start() {
@@ -215,8 +252,9 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
         metadata: false,
       });
       udp.on('ready', () => {
+        emitIngestStatus();
         registerListeners();
-        startSilenceWatchdog();
+        startLivenessWatch();
         resolvePromise();
       });
       udp.on('message', onMessage);
@@ -229,7 +267,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   }
 
   function stop() {
-    if (silenceTimer) clearInterval(silenceTimer);
+    if (pollTimer) clearInterval(pollTimer);
     if (udp) {
       try {
         send('/live/song/stop_listen/tempo');
@@ -244,5 +282,5 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     }
   }
 
-  return { name: SOURCES.ABLETONOSC, start, stop };
+  return { name: SOURCES.ABLETONOSC, start, stop, getIngestStatus };
 }

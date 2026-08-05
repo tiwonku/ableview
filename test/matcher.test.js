@@ -196,6 +196,7 @@ test('CuePayload contract keys', () => {
   assert.deepEqual(Object.keys(payload).sort(), [
     'beat',
     'clipName',
+    'ingestLive',
     'match',
     'pendingLaunch',
     'row',

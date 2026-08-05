@@ -8,6 +8,7 @@ export function makeCuePayload({
   beat = null,
   syncedAt = null,
   stale = false,
+  ingestLive = true,
   simulated = false,
   pendingLaunch = false,
 }) {
@@ -18,6 +19,7 @@ export function makeCuePayload({
     beat,
     syncedAt,
     stale,
+    ingestLive,
     simulated,
     pendingLaunch,
   };

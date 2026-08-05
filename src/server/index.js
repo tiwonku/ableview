@@ -80,6 +80,7 @@ export async function createViewServer({
       simulated: ctx.simulated ?? false,
       getSheetSnapshot: ctx.getSheetSnapshot ?? (() => ({ syncedAt: null, stale: true, rows: [] })),
       getConnectedViewCount,
+      getIngestStatus: ctx.getIngestStatus,
       lastCuePayload: lastPayload,
     });
     const code = report.status === 'ok' ? 200 : 503;
