@@ -171,6 +171,13 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
   let lastClipKey = null;
   let lastEvent = null;
   let lastPayload = null;
+  let ingestLive = true;
+
+  function rebroadcastIngestLive() {
+    if (!lastPayload || lastPayload.ingestLive === ingestLive) return;
+    lastPayload = { ...lastPayload, ingestLive };
+    bus.emit(EVENTS.CUE_PAYLOAD, lastPayload);
+  }
 
   function handleNowPlaying(event, { force = false } = {}) {
     const key = nowPlayingKey(event);
@@ -191,6 +198,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
         beat: event.beat,
         pendingLaunch: event.pendingLaunch ?? false,
         simulated,
+        ingestLive: simulated ? true : ingestLive,
       };
     } else {
       const snapshot = getSnapshot();
@@ -199,6 +207,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
       payload.beat = event.beat;
       payload.simulated = simulated;
       payload.pendingLaunch = event.pendingLaunch ?? false;
+      payload.ingestLive = simulated ? true : ingestLive;
     }
     lastClipKey = ck;
     lastPayload = payload;
@@ -218,6 +227,11 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
   }
 
   bus.on(EVENTS.NOW_PLAYING, handleNowPlaying);
+
+  bus.on(EVENTS.INGEST_STATUS, ({ live }) => {
+    ingestLive = live;
+    rebroadcastIngestLive();
+  });
 
   return {
     matchClip: (clipName) => matchClip(clipName, getSnapshot(), resolveConfig()),

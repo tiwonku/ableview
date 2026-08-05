@@ -9,6 +9,8 @@ export const DEFAULTS = Object.freeze({
     abletonHost: '127.0.0.1',
     watchedTracks: [],
     authoritative: { strategy: 'track', track: null },
+    staleAfterMs: 5000,
+    pollIntervalMs: 2000,
   },
   sim: {
     enabled: false,

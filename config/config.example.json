@@ -51,13 +51,16 @@
       "title": "Band",
       "fields": [
         {
-          "column": "Key"
+          "column": "Key",
+          "display": "token"
         },
         {
-          "column": "Relative Key"
+          "column": "Relative Key",
+          "display": "token"
         },
         {
-          "column": "BPM"
+          "column": "BPM",
+          "display": "token"
         }
       ]
     },
@@ -89,10 +92,12 @@
           "column": "Ghost Cloud"
         },
         {
-          "column": "Viz Notes"
+          "column": "Viz Notes",
+          "display": "note"
         },
         {
-          "column": "CS Panels"
+          "column": "CS Panels",
+          "display": "note"
         }
       ]
     },
@@ -100,13 +105,15 @@
       "title": "Lighting",
       "fields": [
         {
-          "column": "BPM"
+          "column": "BPM",
+          "display": "token"
         },
         {
           "column": "Lasers"
         },
         {
-          "column": "Lighting Notes"
+          "column": "Lighting Notes",
+          "display": "note"
         },
         {
           "column": "Notch"

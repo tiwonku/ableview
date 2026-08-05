@@ -2,6 +2,12 @@
 
 import { parseRgbCell } from './color-parse.js';
 import {
+  getFieldValue,
+  resolveFieldDisplay,
+  groupFieldsForLayout,
+  resolveFieldsLayoutMode,
+} from './field-display.js';
+import {
   captureEditSession,
   renderRowEditorPanel,
   renderOperatorRowEditorPanel,
@@ -203,21 +209,33 @@ export function renderView(root, {
     const fieldsWrap = document.createElement('div');
     fieldsWrap.className = 'view-fields-wrap';
 
+    const layoutMode = resolveFieldsLayoutMode(fields);
     const grid = document.createElement('div');
-    grid.className = 'fields';
+    grid.className = `fields fields-${layoutMode}` + (fields.length > 4 ? ' fields-many' : '');
 
-    for (let i = 0; i < fields.length; i++) {
-      const field = fields[i];
-      if (field.type === 'color') {
-        const group = [];
-        while (i < fields.length && fields[i].type === 'color') {
-          group.push(fields[i]);
-          i++;
+    if (layoutMode === 'strip') {
+      grid.style.setProperty('--strip-cols', String(fields.length));
+      for (const field of fields) {
+        if (field.type === 'color') {
+          grid.appendChild(renderColorField(field, payload));
+        } else {
+          grid.appendChild(renderTextField(field, payload, null, layoutMode));
         }
-        i--;
-        grid.appendChild(renderColorGroup(group, payload));
-      } else {
-        grid.appendChild(renderTextField(field, payload));
+      }
+    } else {
+      for (const row of groupFieldsForLayout(fields, payload)) {
+        if (row.type === 'colors') {
+          grid.appendChild(renderColorGroup(row.fields, payload));
+        } else if (row.type === 'note') {
+          grid.appendChild(renderTextField(row.field, payload, 'note'));
+        } else {
+          const rowEl = document.createElement('div');
+          rowEl.className = 'fields-row';
+          for (const item of row.items) {
+            rowEl.appendChild(renderTextField(item.field, payload, item.display));
+          }
+          grid.appendChild(rowEl);
+        }
       }
     }
 
@@ -243,44 +261,50 @@ function renderViewClipHead(parent, payload) {
   renderClipNameRow(parent, clipName, payload);
 }
 
-function renderTextField(field, payload) {
+function renderTextField(field, payload, displayHint, layoutMode = 'hero') {
   const column = field.column;
   const label = field.label ?? column;
-  const raw = payload.row?.[column];
-  const value = raw == null || String(raw).trim() === '' ? null : String(raw);
+  const value = getFieldValue(field, payload);
+  const display = displayHint ?? resolveFieldDisplay(field, value, { layout: layoutMode });
 
   const card = document.createElement('div');
-  card.className = 'field';
+  card.className = `field field--${display}`;
+  if (layoutMode === 'strip' && display === 'token' && value) {
+    card.style.setProperty('--token-chars', String([...value.trim()].length));
+  }
 
   const labelEl = document.createElement('p');
   labelEl.className = 'field-label';
   labelEl.textContent = label;
   card.appendChild(labelEl);
 
+  const valueWrap = document.createElement('div');
+  valueWrap.className = 'field-value-body';
+
   if (value) {
-    const valueWrap = document.createElement('div');
-    valueWrap.className = 'field-value-body';
-
-    const valueBtn = document.createElement('button');
-    valueBtn.type = 'button';
-    valueBtn.className = 'field-value field-value--clamp';
-    valueBtn.textContent = value;
-    valueBtn.setAttribute('aria-expanded', 'false');
-    valueBtn.title = 'Tap to read full text';
-    valueBtn.addEventListener('click', () => openFieldExpand(label, value));
-    valueWrap.appendChild(valueBtn);
-    card.appendChild(valueWrap);
+    if (display === 'token') {
+      const valueEl = document.createElement('p');
+      valueEl.className = 'field-value';
+      valueEl.textContent = value;
+      valueWrap.appendChild(valueEl);
+    } else {
+      const valueBtn = document.createElement('button');
+      valueBtn.type = 'button';
+      valueBtn.className = 'field-value field-value--clamp';
+      valueBtn.textContent = value;
+      valueBtn.setAttribute('aria-expanded', 'false');
+      valueBtn.title = 'Tap to read full text';
+      valueBtn.addEventListener('click', () => openFieldExpand(label, value));
+      valueWrap.appendChild(valueBtn);
+    }
   } else {
-    const valueWrap = document.createElement('div');
-    valueWrap.className = 'field-value-body';
-
     const valueEl = document.createElement('p');
     valueEl.className = 'field-value empty';
     valueEl.textContent = '—';
     valueWrap.appendChild(valueEl);
-    card.appendChild(valueWrap);
   }
 
+  card.appendChild(valueWrap);
   return card;
 }
 
@@ -302,7 +326,7 @@ function renderColorField(field, payload) {
   const color = parseRgbCell(raw);
 
   const card = document.createElement('div');
-  card.className = 'field-color';
+  card.className = 'field field-color field--color';
 
   const labelEl = document.createElement('p');
   labelEl.className = 'field-label';
@@ -317,19 +341,53 @@ function renderColorField(field, payload) {
     return card;
   }
 
+  const body = document.createElement('div');
+  body.className = 'color-body';
+
   const swatch = document.createElement('div');
   swatch.className = 'color-swatch';
   swatch.style.backgroundColor = color.css;
   swatch.setAttribute('aria-label', `${label}: ${color.rgbText}`);
-  card.appendChild(swatch);
+  body.appendChild(swatch);
 
   const values = document.createElement('div');
   values.className = 'color-values';
   values.appendChild(makeCopyButton('RGB', color.rgbText));
   values.appendChild(makeCopyButton('Hex', color.hex));
-  card.appendChild(values);
+  body.appendChild(values);
+
+  card.appendChild(body);
 
   return card;
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // HTTP / permission failures — fall through to execCommand.
+    }
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.top = '0';
+  textarea.style.left = '0';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    if (!document.execCommand('copy')) {
+      throw new Error('copy failed');
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
 }
 
 function makeCopyButton(kind, text) {
@@ -350,7 +408,7 @@ function makeCopyButton(kind, text) {
 
   btn.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyTextToClipboard(text);
       btn.classList.add('copied');
       window.setTimeout(() => btn.classList.remove('copied'), 1200);
     } catch {
@@ -362,14 +420,29 @@ function makeCopyButton(kind, text) {
   return btn;
 }
 
+function resolveConnectionState(connected, payload, simulated) {
+  if (!connected) {
+    return { text: 'Reconnecting…', mode: 'ws-down' };
+  }
+  if (!simulated && payload?.ingestLive === false) {
+    return { text: 'Stale', mode: 'ingest-stale' };
+  }
+  return { text: 'Connected', mode: 'connected' };
+}
+
 function updateStatusBar({ connected, lastUpdate, payload, simulated = null }) {
   const bar = document.getElementById('status-bar');
   if (!bar) return;
 
-  bar.classList.toggle('connected', connected);
+  const simOn = simulated != null ? Boolean(simulated) : Boolean(payload?.simulated);
+  const { text, mode } = resolveConnectionState(connected, payload, simOn);
+
+  bar.classList.toggle('connected', mode === 'connected');
+  bar.classList.toggle('ingest-stale', mode === 'ingest-stale');
+  bar.classList.toggle('ws-down', mode === 'ws-down');
 
   const connText = bar.querySelector('[data-role="connection"]');
-  if (connText) connText.textContent = connected ? 'Connected' : 'Reconnecting…';
+  if (connText) connText.textContent = text;
 
   const updateText = bar.querySelector('[data-role="last-update"]');
   if (updateText) {
@@ -384,11 +457,10 @@ function updateStatusBar({ connected, lastUpdate, payload, simulated = null }) {
 
   const simPill = document.getElementById('sim-pill');
   const stalePill = document.getElementById('stale-pill');
-  const simOn = simulated != null ? Boolean(simulated) : Boolean(payload?.simulated);
   const staleOn = Boolean(payload?.stale);
   if (simPill) simPill.hidden = !simOn;
   if (stalePill) stalePill.hidden = !staleOn;
-  bar.classList.toggle('status-bar--alert', simOn || staleOn);
+  bar.classList.toggle('status-bar--alert', simOn || staleOn || mode === 'ingest-stale');
 }
 
 export function setConnectionState(connected, lastUpdate, payload, simulated = null) {
@@ -540,6 +612,14 @@ function renderAdminStats(parent, payload, status) {
   addStat(parent, 'Beat', formatBeat(payload?.beat));
   addStat(parent, 'Last sync', formatTimestamp(payload?.syncedAt));
   addStat(parent, 'Cache', payload?.stale ? 'Stale (offline)' : 'Fresh', { warn: payload?.stale });
+  if (payload?.simulated !== true) {
+    addStat(
+      parent,
+      'Ableton',
+      payload?.ingestLive === false ? 'No signal' : 'Live',
+      { warn: payload?.ingestLive === false },
+    );
+  }
   addStat(parent, 'Connected views', String(status?.connectedViews ?? 0));
 }
 

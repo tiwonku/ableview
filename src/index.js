@@ -66,6 +66,7 @@ async function main() {
     getHealthContext: () => ({
       simulated: ingest.simulated,
       getSheetSnapshot: sheets.getSnapshot,
+      getIngestStatus: () => ingest.getIngestStatus(),
     }),
   });
 

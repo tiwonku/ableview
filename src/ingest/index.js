@@ -111,6 +111,10 @@ export function createIngest({ config, getConfig, bus, log, getClipNames = null 
       }
       return active.source.getStatus();
     },
+    getIngestStatus() {
+      if (active?.simulated) return { live: true, lastSeenAt: Date.now() };
+      return active?.source.getIngestStatus?.() ?? { live: false, lastSeenAt: null };
+    },
     pauseSim() {
       if (!this.canSimControl()) {
         throw new Error('Manual sim controls require sim.enabled with sim.mode "internal"');
