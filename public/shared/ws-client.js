@@ -18,6 +18,16 @@ import { mountViewNav } from './view-nav.js';
 
 const RECONNECT_MS = 1500;
 
+function cueContentChanged(prev, next) {
+  if (!prev) return true;
+  return prev.clipName !== next.clipName
+    || prev.match?.rowId !== next.match?.rowId
+    || prev.match?.matched !== next.match?.matched
+    || prev.tempo !== next.tempo
+    || prev.beat !== next.beat
+    || prev.pendingLaunch !== next.pendingLaunch;
+}
+
 export function connectView({
   viewId,
   rootSelector = '#app',
@@ -107,7 +117,7 @@ export function connectView({
       applySimState(msg.simulated === true);
       if (msg.payload) {
         lastPayload = msg.payload;
-        lastUpdate = new Date();
+        if (cueContentChanged(null, msg.payload)) lastUpdate = new Date();
         onPayload?.(lastPayload);
       }
       render();
@@ -131,8 +141,9 @@ export function connectView({
     }
 
     if (msg.type === 'cue' && msg.payload) {
+      const prevPayload = lastPayload;
       lastPayload = msg.payload;
-      lastUpdate = new Date();
+      if (cueContentChanged(prevPayload, msg.payload)) lastUpdate = new Date();
       applySimState(msg.payload.simulated === true);
       onPayload?.(lastPayload);
       if (editSession) {

@@ -68,6 +68,14 @@ body {
   background: var(--ok);
 }
 
+.status-bar.ingest-stale .dot {
+  background: var(--warn);
+}
+
+.status-bar.ws-down .dot {
+  background: var(--danger);
+}
+
 .status-pill {
   padding: 0.12rem 0.45rem;
   font-size: 0.68rem;
@@ -197,7 +205,7 @@ main {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.65rem 0.85rem;
-  font-size: clamp(1.75rem, 5vw, 2.75rem);
+  font-size: clamp(2.25rem, 6vw + 1.25rem, 4.25rem);
   font-weight: 700;
   line-height: 1.15;
   word-break: break-word;
@@ -1064,7 +1072,7 @@ body.layout-operator {
   --op-gap: clamp(0.35rem, 1.1dvh, 1.25rem);
   --op-pad: clamp(0.45rem, 1.4dvh, 1.35rem);
   --op-text-min: 1rem;
-  --op-title-min: 1.5rem;
+  --op-title-min: 2.5rem;
   --op-label-min: 0.65rem;
   height: 100dvh;
   overflow: hidden;
@@ -1127,8 +1135,21 @@ body.layout-operator .clip-head {
 }
 
 body.layout-operator .clip-name {
-  font-size: clamp(var(--op-title-min), 4dvh + 3vmin, 5rem);
+  font-size: clamp(var(--op-title-min), 6.5dvh + 5vmin, 8rem);
   line-height: 1.06;
+}
+
+body.layout-operator #app:has(.fields-strip) .clip-name {
+  font-size: clamp(1.15rem, 3dvh + 1.5vw, 2.25rem);
+  line-height: 1.12;
+}
+
+body.layout-operator #app:has(.fields-many) .clip-name {
+  font-size: clamp(1.1rem, 2.8dvh + 1.2vw, 2rem);
+}
+
+body.layout-operator #app:has(.fields-many) .clip-head {
+  margin-bottom: clamp(0.25rem, 0.8dvh, 0.65rem);
 }
 
 body.layout-operator .no-match-panel {
@@ -1140,42 +1161,259 @@ body.layout-operator .view-edit-bar {
   margin: clamp(0.1rem, 0.4dvh, 0.25rem) 0 var(--op-gap);
 }
 
-/* The fields area is the only scroll region, and it only scrolls when the
-   cards genuinely cannot fit. Rows are content-sized so nothing is ever
-   clipped; spare vertical space is shared out by the grid's default
-   align-content: stretch. */
+/* The fields area is the only scroll region — scroll is fallback when the
+   viewport is too small; color rows stay compact so short fields stay visible. */
 body.layout-operator .view-fields-wrap {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-inline-end: 0.2rem;
+  padding-bottom: var(--op-gap);
+  scrollbar-width: thin;
 }
 
 body.layout-operator .fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-content: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: var(--op-gap);
-  flex: 1 0 auto;
   width: 100%;
 }
 
-body.layout-operator .fields > .field {
+/* Band-style: few token fields, vertical fill in one row */
+body.layout-operator .fields-hero {
   display: flex;
   flex-direction: column;
-  flex: 1 1 min(100%, 26rem);
+}
+
+body.layout-operator .fields-hero .fields-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--op-gap);
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+body.layout-operator .fields-hero .fields-row > .field {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 min(100%, 16rem);
   min-width: 0;
+  min-height: 0;
+  padding: var(--op-pad);
+  container-type: size;
+}
+
+body.layout-operator .fields-hero > .field {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  padding: var(--op-pad);
+  container-type: size;
+}
+
+body.layout-operator .fields-hero > .colors-row {
+  flex: 0 0 auto;
+}
+
+/* Visuals/Lighting-style: equal columns, fill viewport height */
+body.layout-operator .fields-strip {
+  display: grid;
+  grid-template-columns: repeat(var(--strip-cols, 1), minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--op-gap);
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-content: stretch;
+  align-items: stretch;
+}
+
+body.layout-operator .fields-strip > .field,
+body.layout-operator .fields-strip > .field-color {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
   padding: var(--op-pad);
 }
 
-body.layout-operator .fields > .colors-row {
-  flex: 1 1 100%;
+body.layout-operator .fields-strip .field-label {
+  flex-shrink: 0;
+  font-size: clamp(0.7rem, 1.2dvh, 0.95rem);
+  margin-bottom: clamp(0.2rem, 0.4dvh, 0.35rem);
+}
+
+body.layout-operator .fields-strip .field-value-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-width: 0;
+  min-height: 0;
+}
+
+body.layout-operator .fields-strip .field--text,
+body.layout-operator .fields-strip .field--note {
+  text-align: left;
+}
+
+body.layout-operator .fields-strip .field--token {
+  text-align: center;
+}
+
+body.layout-operator .fields-strip .field--token .field-value-body {
+  container-type: inline-size;
+  justify-content: center;
+  align-items: center;
+}
+
+body.layout-operator .fields-strip .field-value,
+body.layout-operator .fields-strip .field-value--clamp {
+  font-size: clamp(0.85rem, 1.5dvh, 1.3rem);
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+body.layout-operator .fields-strip .field--note .field-value--clamp {
+  -webkit-line-clamp: 6;
+}
+
+body.layout-operator .fields-strip .field--text .field-value--clamp {
+  -webkit-line-clamp: 4;
+}
+
+/* Color cards in strip */
+body.layout-operator .fields-strip > .field-color {
+  container-type: size;
+  container-name: strip-color;
+}
+
+body.layout-operator .fields-strip .color-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: clamp(0.25rem, 0.5dvh, 0.35rem);
+  min-width: 0;
+  min-height: 0;
+}
+
+body.layout-operator .fields-strip .color-swatch {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: clamp(2rem, 6dvh, 2.5rem);
+  height: auto;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+body.layout-operator .fields-strip .color-values {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.2rem, 0.35dvh, 0.28rem);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+body.layout-operator .fields-strip .color-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  width: 100%;
+  padding: clamp(0.2rem, 0.4dvh, 0.32rem) clamp(0.25rem, 0.5vw, 0.38rem);
+  font-size: inherit;
+}
+
+body.layout-operator .fields-strip .color-copy-kind {
+  font-size: clamp(0.58rem, 1dvh, 0.68rem);
+  line-height: 1.1;
+}
+
+body.layout-operator .fields-strip .color-copy-value {
+  font-size: clamp(0.58rem, 1.05dvh, 0.72rem);
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Wide *and* squat color cards: swatch left, values right.
+   Strip columns are tall — width alone is not enough to switch layout. */
+@container strip-color (min-width: 10rem) and (min-aspect-ratio: 1) {
+  body.layout-operator .fields-strip .color-body {
+    flex-direction: row;
+    align-items: stretch;
+    gap: clamp(0.25rem, 0.5dvh, 0.35rem);
+  }
+
+  body.layout-operator .fields-strip .color-swatch {
+    flex: 1 1 55%;
+    min-width: 0;
+    width: auto;
+    min-height: clamp(2.5rem, 8dvh, 3rem);
+    height: auto;
+    align-self: stretch;
+  }
+
+  body.layout-operator .fields-strip .color-values {
+    flex: 0 0 42%;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 48rem) {
+  body.layout-operator .fields-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: minmax(0, 1fr);
+    align-content: stretch;
+  }
+}
+
+body.layout-operator .fields-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--op-gap);
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+body.layout-operator .fields-row > .field {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 min(100%, 16rem);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--op-pad);
+  container-type: size;
+}
+
+body.layout-operator .fields-hero > .field {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  padding: var(--op-pad);
+  container-type: size;
+}
+
+body.layout-operator .fields-hero > .field--note {
+  flex: 1 1 0;
 }
 
 body.layout-operator .field-label {
   flex-shrink: 0;
-  font-size: clamp(var(--op-label-min), 0.3vw + 0.6dvh, 1.05rem);
+  font-size: clamp(0.75rem, 7cqmin, 1.35rem);
   margin-bottom: clamp(0.15rem, 0.5dvh, 0.45rem);
 }
 
@@ -1184,25 +1422,65 @@ body.layout-operator .field-value-body {
   flex: 1 1 auto;
   align-items: center;
   min-width: 0;
+  min-height: 0;
 }
 
-body.layout-operator .field-value-body .field-value,
-body.layout-operator .field-value-body .field-value--clamp {
-  font-size: clamp(var(--op-text-min), 0.7vw + 1.8dvh, 3.5rem);
-  line-height: 1.15;
+body.layout-operator .field-value-body .field-value {
   max-width: 100%;
+  margin: 0;
+}
+
+body.layout-operator .field--token {
+  text-align: center;
+}
+
+body.layout-operator .field--token .field-value-body {
+  justify-content: center;
+  align-items: center;
+}
+
+body.layout-operator .field--token .field-value {
+  font-size: clamp(1.5rem, 38cqmin, 10rem);
+  line-height: 1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+body.layout-operator .fields-strip .field--token .field-value {
+  width: 100%;
+  max-width: 100%;
+  font-size: clamp(
+    0.875rem,
+    calc(100cqw / var(--token-chars, 4) / 0.58),
+    6rem
+  );
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+body.layout-operator .field--text .field-value-body .field-value,
+body.layout-operator .field--text .field-value-body .field-value--clamp {
+  font-size: clamp(1rem, 10cqmin, 2.25rem);
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+body.layout-operator .field--note .field-value-body .field-value,
+body.layout-operator .field--note .field-value-body .field-value--clamp {
+  font-size: clamp(0.95rem, 7cqmin, 1.65rem);
+  line-height: 1.35;
+  font-weight: 600;
 }
 
 body.layout-operator .field-value--clamp {
   width: 100%;
-  margin: 0;
   padding: 0;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
   font-family: inherit;
-  font-weight: 600;
   text-align: left;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1211,6 +1489,14 @@ body.layout-operator .field-value--clamp {
   border: none;
   border-radius: 0.25rem;
   cursor: pointer;
+}
+
+body.layout-operator .field--text .field-value--clamp {
+  -webkit-line-clamp: 3;
+}
+
+body.layout-operator .field--note .field-value--clamp {
+  -webkit-line-clamp: 6;
 }
 
 body.layout-operator .field-value--clamp:hover {
@@ -1241,11 +1527,12 @@ body.layout-operator .colors-row .field-color {
 }
 
 body.layout-operator .colors-row .color-swatch {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   width: 100%;
-  aspect-ratio: unset;
-  min-height: clamp(3.5rem, 20dvh, 14rem);
-  margin: 0 0 clamp(0.35rem, 0.8dvh, 0.6rem);
+  height: clamp(3rem, 9dvh, 5.5rem);
+  min-height: unset;
+  max-height: 5.5rem;
+  margin: 0 0 clamp(0.3rem, 0.6dvh, 0.45rem);
   border-radius: 0.45rem;
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
@@ -1254,12 +1541,15 @@ body.layout-operator .colors-row .color-swatch {
 body.layout-operator .colors-row .color-values {
   flex-shrink: 0;
   min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(0.25rem, 0.5dvh, 0.4rem);
 }
 
 body.layout-operator .colors-row .color-copy {
-  min-height: clamp(2rem, 3.8dvh, 3rem);
-  padding: clamp(0.3rem, 0.7dvh, 0.5rem) clamp(0.4rem, 1vw, 0.6rem);
-  font-size: clamp(0.72rem, 1.4dvh, 0.92rem);
+  min-height: clamp(1.75rem, 3dvh, 2.35rem);
+  padding: clamp(0.25rem, 0.5dvh, 0.4rem) clamp(0.35rem, 0.8vw, 0.5rem);
+  font-size: clamp(0.68rem, 1.2dvh, 0.82rem);
   max-width: 100%;
 }
 
@@ -1279,11 +1569,12 @@ body.layout-operator .colors-row .color-copy-value {
   }
 
   body.layout-operator .colors-row .color-swatch {
-    min-height: 3rem;
+    height: clamp(2.75rem, 8dvh, 4rem);
+    max-height: 4rem;
   }
 
   body.layout-operator .clip-name {
-    font-size: clamp(var(--op-title-min), 3dvh + 4vw, 2.5rem);
+    font-size: clamp(var(--op-title-min), 4dvh + 5vw, 4rem);
   }
 }
 
