@@ -490,9 +490,51 @@ function formatBeat(beat) {
   return String(beat);
 }
 
-function addStat(parent, label, value, { warn = false } = {}) {
+function formatLastSeen(lastSeenAt) {
+  if (!lastSeenAt) return null;
+  const date = new Date(lastSeenAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString();
+}
+
+function cueTrackStat(ableton) {
+  if (!ableton) return { value: '—', warn: false };
+  const configured = ableton.cueTrackConfigured;
+  if (configured == null || configured === '') {
+    return { value: 'Not configured', warn: true };
+  }
+  if (ableton.cueTrackFound == null) {
+    return { value: `Waiting… (${configured})`, warn: false };
+  }
+  if (ableton.cueTrackFound) {
+    return { value: `Found (${configured})`, warn: false };
+  }
+  return { value: `Missing (${configured})`, warn: true };
+}
+
+function sessionTracksStat(ableton) {
+  if (!ableton) return { value: '—', warn: false };
+  if (!ableton.live && ableton.trackNames == null) {
+    return { value: 'No session yet', warn: true };
+  }
+  if (ableton.trackNames == null) {
+    return { value: 'Waiting for tracks…', warn: false };
+  }
+  if (ableton.trackNames.length === 0) {
+    return { value: '(empty set)', warn: true };
+  }
+  const list = ableton.trackNames.join(', ');
+  return {
+    value: list.length > 80 ? `${ableton.trackNames.length} tracks` : list,
+    warn: false,
+    title: list,
+  };
+}
+
+function addStat(parent, label, value, { warn = false, title = null } = {}) {
   const card = document.createElement('div');
   card.className = 'stat' + (warn ? ' warn' : '');
+  if (title) card.title = title;
 
   const labelEl = document.createElement('p');
   labelEl.className = 'stat-label';
@@ -613,12 +655,19 @@ function renderAdminStats(parent, payload, status) {
   addStat(parent, 'Last sync', formatTimestamp(payload?.syncedAt));
   addStat(parent, 'Cache', payload?.stale ? 'Stale (offline)' : 'Fresh', { warn: payload?.stale });
   if (payload?.simulated !== true) {
+    const ableton = payload?.ableton ?? status?.ingest ?? null;
+    const live = ableton?.live ?? payload?.ingestLive !== false;
+    const seen = formatLastSeen(ableton?.lastSeenAt);
     addStat(
       parent,
-      'Ableton',
-      payload?.ingestLive === false ? 'No signal' : 'Live',
-      { warn: payload?.ingestLive === false },
+      'Ableton OSC',
+      live ? (seen ? `Live · ${seen}` : 'Live') : 'No signal',
+      { warn: !live },
     );
+    const cue = cueTrackStat(ableton);
+    addStat(parent, 'Cue track', cue.value, { warn: cue.warn });
+    const tracks = sessionTracksStat(ableton);
+    addStat(parent, 'Tracks in set', tracks.value, { warn: tracks.warn, title: tracks.title });
   }
   addStat(parent, 'Connected views', String(status?.connectedViews ?? 0));
 }

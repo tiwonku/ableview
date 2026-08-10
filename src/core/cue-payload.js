@@ -9,6 +9,7 @@ export function makeCuePayload({
   syncedAt = null,
   stale = false,
   ingestLive = true,
+  ableton = null,
   simulated = false,
   pendingLaunch = false,
 }) {
@@ -24,6 +25,7 @@ export function makeCuePayload({
     pendingLaunch,
   };
   if (row != null) payload.row = row;
+  if (ableton != null) payload.ableton = ableton;
   return payload;
 }
 

@@ -33,7 +33,19 @@ export async function createViewServer({
   }
 
   function buildStatus() {
-    return { connectedViews: getConnectedViewCount() };
+    const ingest = getHealthContext?.()?.getIngestStatus?.() ?? null;
+    return {
+      connectedViews: getConnectedViewCount(),
+      ingest: ingest
+        ? {
+            live: ingest.live,
+            lastSeenAt: ingest.lastSeenAt ?? null,
+            trackNames: ingest.trackNames ?? null,
+            cueTrackConfigured: ingest.cueTrackConfigured ?? null,
+            cueTrackFound: ingest.cueTrackFound ?? null,
+          }
+        : null,
+    };
   }
 
   function isSimulated() {
@@ -68,6 +80,10 @@ export async function createViewServer({
     lastPayload = clientPayload(payload);
     broadcast({ type: 'cue', payload: lastPayload });
     log.debug({ clipName: payload.clipName, clients: clients.size }, 'broadcast cue');
+  });
+
+  bus.on(EVENTS.INGEST_STATUS, () => {
+    broadcastStatus();
   });
 
   const app = Fastify({ logger: false });

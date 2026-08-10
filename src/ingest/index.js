@@ -112,8 +112,22 @@ export function createIngest({ config, getConfig, bus, log, getClipNames = null 
       return active.source.getStatus();
     },
     getIngestStatus() {
-      if (active?.simulated) return { live: true, lastSeenAt: Date.now() };
-      return active?.source.getIngestStatus?.() ?? { live: false, lastSeenAt: null };
+      if (active?.simulated) {
+        return {
+          live: true,
+          lastSeenAt: Date.now(),
+          trackNames: null,
+          cueTrackConfigured: resolveConfig().ingest?.authoritative?.track ?? null,
+          cueTrackFound: null,
+        };
+      }
+      return active?.source.getIngestStatus?.() ?? {
+        live: false,
+        lastSeenAt: null,
+        trackNames: null,
+        cueTrackConfigured: null,
+        cueTrackFound: null,
+      };
     },
     pauseSim() {
       if (!this.canSimControl()) {

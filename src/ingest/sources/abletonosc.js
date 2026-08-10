@@ -3,6 +3,7 @@ import { EVENTS } from '../../core/bus.js';
 import { makeNowPlaying, SOURCES } from '../../core/now-playing.js';
 import { assertReadOnlyAddress } from '../osc-addresses.js';
 import { isValidSlot, isPendingLaunch, resolveAuthoritativeClipWithLatch } from '../authoritative-clip.js';
+import { makeIngestStatus } from '../ableton-session.js';
 
 // Read-only AbletonOSC listener (spec §6). Registers listeners for playing
 // and fired slots on each watched track, resolves clip names on change, and
@@ -16,6 +17,8 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   let lastInboundAt = 0;
   let ingestLive = false;
   let pollTimer = null;
+  /** @type {string[]|null} null until /live/song/get/track_names replies */
+  let sessionTrackNames = null;
 
   // trackIndex -> { trackName, playingSlotIndex, playingClipName, firedSlotIndex,
   //   firedClipName, latchedClipName?, latchedSlotIndex? }
@@ -106,11 +109,18 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     bus.emit(EVENTS.NOW_PLAYING, event);
   }
 
-  function emitIngestStatus() {
-    bus.emit(EVENTS.INGEST_STATUS, {
+  function currentIngestStatus() {
+    const { authoritative } = getIngest();
+    return makeIngestStatus({
       live: ingestLive,
       lastSeenAt: lastInboundAt || null,
+      trackNames: sessionTrackNames,
+      authoritativeTrack: authoritative?.track,
     });
+  }
+
+  function emitIngestStatus() {
+    bus.emit(EVENTS.INGEST_STATUS, currentIngestStatus());
   }
 
   function setIngestLive(live) {
@@ -139,7 +149,11 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   }
 
   function onTrackNames(args) {
-    args.forEach((name, index) => {
+    const names = args.map((name) => String(name));
+    const prevKey = JSON.stringify(sessionTrackNames);
+    sessionTrackNames = names;
+
+    names.forEach((name, index) => {
       if (!isWatched(name, index)) return;
       if (!trackState.has(index)) {
         trackState.set(index, {
@@ -157,7 +171,20 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       send('/live/track/start_listen/fired_slot_index', [index]);
       send('/live/track/get/fired_slot_index', [index]);
     });
-    log.info({ watched: [...trackState.keys()] }, 'watching tracks');
+
+    const status = currentIngestStatus();
+    log.info(
+      {
+        tracks: names.length,
+        watched: [...trackState.keys()],
+        cueTrackConfigured: status.cueTrackConfigured,
+        cueTrackFound: status.cueTrackFound,
+      },
+      'session track names'
+    );
+    if (JSON.stringify(sessionTrackNames) !== prevKey) {
+      emitIngestStatus();
+    }
   }
 
   function onPlayingSlotIndex(args) {
@@ -241,7 +268,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   }
 
   function getIngestStatus() {
-    return { live: ingestLive, lastSeenAt: lastInboundAt || null };
+    return currentIngestStatus();
   }
 
   function start() {

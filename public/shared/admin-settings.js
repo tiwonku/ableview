@@ -50,6 +50,80 @@ function sheetStatusLine(sheetStatus) {
   return `Last sync: ${when} · ${rows} rows · ${fresh}`;
 }
 
+function formatIngestSeen(lastSeenAt) {
+  if (!lastSeenAt) return null;
+  const date = new Date(lastSeenAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString();
+}
+
+function renderAbletonSessionBox(ingestStatus, simulated) {
+  const box = el('div', 'ableton-session');
+  box.dataset.role = 'ableton-session';
+  box.appendChild(el('p', 'ableton-session-title', 'Ableton session'));
+
+  if (simulated) {
+    box.classList.add('ableton-session--sim');
+    box.appendChild(el(
+      'p',
+      'ableton-session-line',
+      'Simulation mode — not checking the live Ableton session.'
+    ));
+    return box;
+  }
+
+  if (!ingestStatus) {
+    box.appendChild(el('p', 'ableton-session-line', 'Loading connection status…'));
+    return box;
+  }
+
+  const live = ingestStatus.live === true;
+  const oscLine = el('p', `ableton-session-line${live ? '' : ' warn'}`);
+  const seen = formatIngestSeen(ingestStatus.lastSeenAt);
+  oscLine.textContent = live
+    ? `OSC link: Live${seen ? ` (last reply ${seen})` : ''}`
+    : 'OSC link: No signal — AbletonOSC not answering (check host, ports, remote script)';
+  box.appendChild(oscLine);
+
+  const tracks = ingestStatus.trackNames;
+  const tracksLine = el('p', 'ableton-session-line');
+  if (tracks == null) {
+    tracksLine.textContent = live
+      ? 'Session: waiting for track list…'
+      : 'Session: not seen yet';
+    if (!live) tracksLine.classList.add('warn');
+  } else if (tracks.length === 0) {
+    tracksLine.textContent = 'Session: connected (no tracks reported)';
+    tracksLine.classList.add('warn');
+  } else {
+    tracksLine.textContent = `Session: found (${tracks.length} tracks) — ${tracks.join(', ')}`;
+  }
+  box.appendChild(tracksLine);
+
+  const configured = ingestStatus.cueTrackConfigured;
+  const cueLine = el('p', 'ableton-session-line');
+  if (configured == null || configured === '') {
+    cueLine.textContent = 'Cue track: not configured';
+    cueLine.classList.add('warn');
+  } else if (ingestStatus.cueTrackFound == null) {
+    cueLine.textContent = `Cue track: waiting to verify "${configured}"…`;
+  } else if (ingestStatus.cueTrackFound) {
+    cueLine.textContent = `Cue track: found "${configured}"`;
+  } else {
+    cueLine.textContent = `Cue track: missing "${configured}" — rename in Live or change the field below to a track from the list above`;
+    cueLine.classList.add('warn');
+  }
+  box.appendChild(cueLine);
+
+  if (!live || ingestStatus.cueTrackFound === false) {
+    box.classList.add('ableton-session--warn');
+  } else if (tracks != null) {
+    box.classList.add('ableton-session--ok');
+  }
+
+  return box;
+}
+
 function settingsFromForm(form, current) {
   const fd = new FormData(form);
   const watchedRaw = fd.get('watchedTracks')?.trim() ?? '';
@@ -87,7 +161,7 @@ function settingsFromForm(form, current) {
   };
 }
 
-function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus }) {
+function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus }) {
   root.innerHTML = '';
 
   const heading = el('h2', 'section-title', 'Settings');
@@ -113,6 +187,7 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
 
   const ingestGroup = el('fieldset', 'settings-group');
   ingestGroup.appendChild(el('legend', null, 'Ableton / OSC'));
+  ingestGroup.appendChild(renderAbletonSessionBox(ingestStatus, settings.sim?.enabled === true));
   ingestGroup.appendChild(fieldRow('Ableton host (IP)', textInput('abletonHost', settings.ingest.abletonHost)));
   ingestGroup.appendChild(fieldRow('OSC listen port', numberInput('oscListenPort', settings.ingest.oscListenPort, { min: 1, max: 65535 })));
   ingestGroup.appendChild(fieldRow('OSC send port', numberInput('oscSendPort', settings.ingest.oscSendPort, { min: 1, max: 65535 })));
@@ -224,9 +299,25 @@ export function mountSettingsPanel(rootSelector) {
   let status = null;
   let sheetStatus = null;
   let syncStatus = null;
+  let ingestStatus = null;
+  let pollTimer = null;
 
   function render() {
-    renderForm(root, settings, { onSave: save, onSync: syncSheet, status, sheetStatus, syncStatus });
+    renderForm(root, settings, {
+      onSave: save,
+      onSync: syncSheet,
+      status,
+      sheetStatus,
+      syncStatus,
+      ingestStatus,
+    });
+  }
+
+  function refreshAbletonSessionBox() {
+    const existing = root.querySelector('[data-role="ableton-session"]');
+    if (!existing || !settings) return;
+    const next = renderAbletonSessionBox(ingestStatus, settings.sim?.enabled === true);
+    existing.replaceWith(next);
   }
 
   async function loadSheetStatus() {
@@ -234,12 +325,18 @@ export function mountSettingsPanel(rootSelector) {
     if (res.ok) sheetStatus = await res.json();
   }
 
+  async function loadIngestStatus() {
+    const res = await fetch('/health');
+    const data = await res.json().catch(() => null);
+    if (data?.ingest) ingestStatus = data.ingest;
+  }
+
   async function load() {
     const res = await fetch('/api/config/settings');
     if (!res.ok) throw new Error(`Failed to load settings (${res.status})`);
     const data = await res.json();
     settings = data.settings;
-    await loadSheetStatus();
+    await Promise.all([loadSheetStatus(), loadIngestStatus()]);
     render();
   }
 
@@ -259,8 +356,13 @@ export function mountSettingsPanel(rootSelector) {
     settings = data.settings;
     const reloaded = data.reloaded?.length ? ` Reloaded: ${data.reloaded.join(', ')}.` : '';
     status = { ok: true, message: `Settings saved.${reloaded}` };
-    await loadSheetStatus();
+    // Give ingest a moment to reconnect before reading status.
+    await Promise.all([loadSheetStatus(), wait(400).then(() => loadIngestStatus())]);
     render();
+  }
+
+  function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async function syncSheet() {
@@ -290,4 +392,15 @@ export function mountSettingsPanel(rootSelector) {
     const errEl = el('div', 'settings-status err', err.message);
     root.appendChild(errEl);
   });
+
+  pollTimer = setInterval(() => {
+    if (!settings) return;
+    const prev = JSON.stringify(ingestStatus);
+    loadIngestStatus()
+      .then(() => {
+        if (JSON.stringify(ingestStatus) !== prev) refreshAbletonSessionBox();
+      })
+      .catch(() => {});
+  }, 3000);
+  pollTimer.unref?.();
 }

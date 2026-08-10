@@ -172,10 +172,16 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
   let lastEvent = null;
   let lastPayload = null;
   let ingestLive = true;
+  let ableton = null;
 
   function rebroadcastIngestLive() {
-    if (!lastPayload || lastPayload.ingestLive === ingestLive) return;
-    lastPayload = { ...lastPayload, ingestLive };
+    if (!lastPayload) return;
+    const nextLive = ingestLive;
+    const nextAbleton = ableton;
+    const liveSame = lastPayload.ingestLive === nextLive;
+    const abletonSame = JSON.stringify(lastPayload.ableton ?? null) === JSON.stringify(nextAbleton);
+    if (liveSame && abletonSame) return;
+    lastPayload = { ...lastPayload, ingestLive: nextLive, ableton: nextAbleton };
     bus.emit(EVENTS.CUE_PAYLOAD, lastPayload);
   }
 
@@ -199,6 +205,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
         pendingLaunch: event.pendingLaunch ?? false,
         simulated,
         ingestLive: simulated ? true : ingestLive,
+        ableton: simulated ? null : ableton,
       };
     } else {
       const snapshot = getSnapshot();
@@ -208,6 +215,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
       payload.simulated = simulated;
       payload.pendingLaunch = event.pendingLaunch ?? false;
       payload.ingestLive = simulated ? true : ingestLive;
+      payload.ableton = simulated ? null : ableton;
     }
     lastClipKey = ck;
     lastPayload = payload;
@@ -228,8 +236,15 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
 
   bus.on(EVENTS.NOW_PLAYING, handleNowPlaying);
 
-  bus.on(EVENTS.INGEST_STATUS, ({ live }) => {
-    ingestLive = live;
+  bus.on(EVENTS.INGEST_STATUS, (status) => {
+    ingestLive = status.live;
+    ableton = {
+      live: status.live,
+      lastSeenAt: status.lastSeenAt ?? null,
+      trackNames: status.trackNames ?? null,
+      cueTrackConfigured: status.cueTrackConfigured ?? null,
+      cueTrackFound: status.cueTrackFound ?? null,
+    };
     rebroadcastIngestLive();
   });
 
