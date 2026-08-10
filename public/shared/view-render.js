@@ -16,9 +16,37 @@ import {
   buildViewEditorColumns,
   buildFieldLabels,
 } from './admin-row-editor.js';
+import { renderAliasPanel } from './alias-panel.js';
 
 /** @type {HTMLElement | null} */
 let fieldExpandOverlay = null;
+
+function renderNoMatchActions(parent, { onStartCreate, onStartAlias }) {
+  if (!onStartCreate && !onStartAlias) return;
+
+  const actions = document.createElement('div');
+  actions.className = 'no-match-actions';
+
+  if (onStartCreate) {
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'admin-editor-btn admin-editor-btn--primary';
+    addBtn.textContent = 'Add cue row';
+    addBtn.addEventListener('click', onStartCreate);
+    actions.appendChild(addBtn);
+  }
+
+  if (onStartAlias) {
+    const aliasBtn = document.createElement('button');
+    aliasBtn.type = 'button';
+    aliasBtn.className = 'admin-editor-btn';
+    aliasBtn.textContent = 'Add as alias';
+    aliasBtn.addEventListener('click', onStartAlias);
+    actions.appendChild(aliasBtn);
+  }
+
+  parent.appendChild(actions);
+}
 
 function ensureFieldExpandOverlay() {
   if (fieldExpandOverlay) return fieldExpandOverlay;
@@ -133,11 +161,14 @@ export function renderView(root, {
   lastUpdate,
   editable = false,
   editSession = null,
+  aliasSession = null,
+  aliasPanel = null,
   editorColumns = {},
   saveState = 'idle',
   saveError = null,
   onStartEdit,
   onStartCreate,
+  onStartAlias,
   onCancelEdit,
   onSaveEdit,
 }) {
@@ -154,22 +185,22 @@ export function renderView(root, {
   renderViewClipHead(clipHead, payload);
 
   const matched = payload?.match?.matched === true;
-  if (payload && payload.clipName?.trim() && !matched && !editSession) {
+  const busy = Boolean(editSession || aliasSession);
+  if (payload && payload.clipName?.trim() && !matched && !busy) {
+    const canAct = editable && (onStartCreate || onStartAlias);
     const noMatch = document.createElement('div');
-    noMatch.className = editable && onStartCreate ? 'no-match-panel' : 'no-match';
+    noMatch.className = canAct ? 'no-match-panel' : 'no-match';
 
     const message = document.createElement('p');
     message.className = 'no-match';
     message.textContent = 'No confident match — check the cue sheet or clip name.';
     noMatch.appendChild(message);
 
-    if (editable && onStartCreate) {
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'admin-editor-btn admin-editor-btn--primary';
-      addBtn.textContent = 'Add cue row';
-      addBtn.addEventListener('click', onStartCreate);
-      noMatch.appendChild(addBtn);
+    if (canAct) {
+      renderNoMatchActions(noMatch, {
+        onStartCreate: editable ? onStartCreate : undefined,
+        onStartAlias: editable ? onStartAlias : undefined,
+      });
     }
 
     root.appendChild(noMatch);
@@ -178,7 +209,9 @@ export function renderView(root, {
   const viewEditorColumns = buildViewEditorColumns(fields, editorColumns);
   const fieldLabels = buildFieldLabels(fields);
 
-  if (editSession) {
+  if (aliasSession && aliasPanel) {
+    renderAliasPanel(root, aliasPanel);
+  } else if (editSession) {
     renderOperatorRowEditorPanel(root, {
       session: editSession,
       fields,
@@ -572,11 +605,14 @@ export function renderAdmin(root, {
   connected,
   lastUpdate,
   editSession = null,
+  aliasSession = null,
+  aliasPanel = null,
   editorColumns = {},
   saveState = 'idle',
   saveError = null,
   onStartEdit,
   onStartCreate,
+  onStartAlias,
   onCancelEdit,
   onSaveEdit,
 }) {
@@ -598,7 +634,8 @@ export function renderAdmin(root, {
   root.appendChild(stats);
   renderAdminStats(stats, payload, status);
 
-  if (payload && payload.clipName?.trim() && payload.match?.matched !== true && !editSession) {
+  const busy = Boolean(editSession || aliasSession);
+  if (payload && payload.clipName?.trim() && payload.match?.matched !== true && !busy) {
     const noMatch = document.createElement('div');
     noMatch.className = 'no-match-panel';
 
@@ -607,19 +644,13 @@ export function renderAdmin(root, {
     message.textContent = 'No confident match — check the cue sheet or clip name.';
     noMatch.appendChild(message);
 
-    if (onStartCreate) {
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'admin-editor-btn admin-editor-btn--primary';
-      addBtn.textContent = 'Add cue row';
-      addBtn.addEventListener('click', onStartCreate);
-      noMatch.appendChild(addBtn);
-    }
-
+    renderNoMatchActions(noMatch, { onStartCreate, onStartAlias });
     root.appendChild(noMatch);
   }
 
-  if (editSession) {
+  if (aliasSession && aliasPanel) {
+    renderAliasPanel(root, aliasPanel);
+  } else if (editSession) {
     renderRowEditorPanel(root, {
       session: editSession,
       editorColumns,

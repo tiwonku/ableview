@@ -290,3 +290,132 @@ test('PATCH /api/sheets/rows/:rowId returns 400 when updateRow rejects', async (
 
   await server.stop();
 });
+
+test('GET /api/sheets/rows/search returns ranked results', async () => {
+  const bus = createBus();
+  const server = await createViewServer({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    sheetsActions: {
+      sync: async () => {},
+      getSnapshot: () => ({
+        syncedAt: '2026-07-09T12:00:00.000Z',
+        stale: false,
+        rows: [],
+        worksheet: 'Cues',
+        headers: ['Song Title', 'Aliases', 'ALS Folder'],
+        matchColumn: 'Song Title',
+        aliasColumn: 'Aliases',
+      }),
+      searchRows: (query) => {
+        assert.equal(query, 'HotRox');
+        return [
+          {
+            rowId: '70',
+            title: 'Hot Like Rox',
+            aliases: '',
+            secondary: [{ column: 'ALS Folder', value: 'Ebm_80bpm_HotRox_24' }],
+          },
+        ];
+      },
+    },
+  });
+
+  const res = await fetch(
+    `http://127.0.0.1:${server.port}/api/sheets/rows/search?q=${encodeURIComponent('HotRox')}`
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.aliasColumnPresent, true);
+  assert.equal(body.results[0].title, 'Hot Like Rox');
+
+  await server.stop();
+});
+
+test('POST /api/sheets/rows/:rowId/aliases appends and rematches', async () => {
+  const bus = createBus();
+  let rematched = false;
+  let appended = null;
+
+  const server = await createViewServer({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    sheetsActions: {
+      sync: async () => {},
+      appendAlias: async (rowId, alias) => {
+        appended = { rowId, alias };
+        return {
+          rowId: String(rowId),
+          row: { 'Song Title': 'Hot Like Rox', Aliases: alias },
+          alias,
+          aliases: [alias],
+          added: true,
+        };
+      },
+      getSnapshot: () => ({
+        syncedAt: '2026-07-09T12:00:00.000Z',
+        stale: false,
+        rows: [{ rowId: '70', data: { 'Song Title': 'Hot Like Rox', Aliases: 'HotRox' } }],
+        worksheet: 'Cues',
+        headers: ['Song Title', 'Aliases'],
+        aliasColumn: 'Aliases',
+      }),
+      onSynced: () => {
+        rematched = true;
+      },
+    },
+  });
+
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/sheets/rows/70/aliases`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alias: 'HotRox' }),
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.added, true);
+  assert.deepEqual(appended, { rowId: '70', alias: 'HotRox' });
+  assert.equal(rematched, true);
+
+  await server.stop();
+});
+
+test('POST /api/sheets/rows/:rowId/aliases returns 400 when column missing', async () => {
+  const bus = createBus();
+  const server = await createViewServer({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    sheetsActions: {
+      sync: async () => {},
+      appendAlias: async () => {
+        throw new Error(
+          'Aliases column "Aliases" not found on the sheet. Add that header, sync, then try again.'
+        );
+      },
+      getSnapshot: () => ({
+        syncedAt: null,
+        stale: true,
+        rows: [],
+        worksheet: 'Cues',
+        headers: ['Song Title'],
+        aliasColumn: 'Aliases',
+      }),
+    },
+  });
+
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/sheets/rows/70/aliases`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alias: 'HotRox' }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.match(body.error, /Aliases column/);
+
+  await server.stop();
+});

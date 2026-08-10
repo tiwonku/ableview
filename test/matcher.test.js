@@ -75,6 +75,7 @@ test('normalizeClipName lowercases, strips punctuation, and version tags', () =>
   assert.equal(normalizeClipName('Totally Unknown Clip v3', opts), 'totally unknown clip');
   assert.equal(normalizeClipName('Track - alt', opts), 'track');
   assert.equal(normalizeClipName('Track 128bpm', opts), 'track');
+  assert.equal(normalizeClipName('HotRox_ DRUMS', opts), 'hotrox drums');
 });
 
 test('parseAliases splits on pipe and comma', () => {
@@ -104,6 +105,23 @@ test('alias column match sets viaAlias', () => {
   assert.equal(payload.match.rowId, '5');
   assert.equal(payload.match.viaAlias, true);
   assert.equal(payload.match.matchedValue, 'SA Intro');
+});
+
+test('underscore role suffix matches alias stem via prefix', () => {
+  const rows = [
+    {
+      rowId: '70',
+      data: {
+        'Clip Name': 'Hot Like Rox',
+        Aliases: 'HotRox',
+      },
+    },
+  ];
+  const payload = matchClip('HotRox_ DRUMS', snapshot({ rows }), testConfig());
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '70');
+  assert.equal(payload.match.viaAlias, true);
+  assert.equal(payload.match.matchedValue, 'HotRox');
 });
 
 test('clip with arrangement suffix matches sheet title via prefix pass', () => {

@@ -21,6 +21,7 @@ export function normalizeClipName(name, options = {}) {
   }
 
   if (options.stripPunctuation) {
+    s = s.replace(/_/g, ' ');
     s = s.replace(/[^\w\s]/g, ' ');
     s = s.replace(/\s+/g, ' ').trim();
   }

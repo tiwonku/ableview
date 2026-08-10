@@ -15,9 +15,11 @@ import {
   captureCreateSession,
   viewFieldColumns,
 } from './admin-row-editor.js';
+import { createAliasSession } from './alias-panel.js';
 import { mountViewNav } from './view-nav.js';
 
 const RECONNECT_MS = 1500;
+const ALIAS_SEARCH_DEBOUNCE_MS = 180;
 
 function tracksKey(tracks) {
   return JSON.stringify(tracks ?? []);
@@ -55,12 +57,15 @@ export function connectView({
   let connected = false;
   let stopped = false;
   let editSession = null;
+  let aliasSession = null;
   let editorColumns = {};
   let sheetHeaders = [];
   let matchColumn = null;
   let saveState = 'idle';
   let saveError = null;
   let serverSimulated = false;
+  let aliasSearchTimer = null;
+  let aliasSearchSeq = 0;
 
   function applySimState(simulated) {
     serverSimulated = simulated === true;
@@ -80,7 +85,7 @@ export function connectView({
   }
 
   function updateLiveChromeDuringEdit() {
-    if (!editSession || !root) return;
+    if ((!editSession && !aliasSession) || !root) return;
     const chrome = {
       payload: lastPayload,
       connected,
@@ -140,7 +145,7 @@ export function connectView({
 
     if (msg.type === 'status' && msg.status) {
       lastStatus = msg.status;
-      if (editSession) {
+      if (editSession || aliasSession) {
         updateLiveChromeDuringEdit();
         return;
       }
@@ -154,7 +159,7 @@ export function connectView({
       if (cueContentChanged(prevPayload, msg.payload)) lastUpdate = new Date();
       applySimState(msg.payload.simulated === true);
       onPayload?.(lastPayload);
-      if (editSession) {
+      if (editSession || aliasSession) {
         updateLiveChromeDuringEdit();
         return;
       }
@@ -177,6 +182,7 @@ export function connectView({
     const clipName = lastPayload?.clipName?.trim();
     if (!clipName || lastPayload?.match?.matched === true) return;
     if (!matchColumn) return;
+    if (aliasSession) cancelAlias();
 
     const columns = viewConfig.system
       ? sheetHeaders.filter(Boolean)
@@ -195,11 +201,118 @@ export function connectView({
     render();
   }
 
+  function startAlias() {
+    const clipName = lastPayload?.clipName?.trim();
+    if (!clipName || lastPayload?.match?.matched === true) return;
+    if (editSession) cancelEdit();
+
+    aliasSession = createAliasSession(clipName);
+    saveState = 'idle';
+    saveError = null;
+    render();
+    runAliasSearch(aliasSession.query);
+  }
+
   function cancelEdit() {
     editSession = null;
     saveState = 'idle';
     saveError = null;
     render();
+  }
+
+  function cancelAlias() {
+    if (aliasSearchTimer) {
+      clearTimeout(aliasSearchTimer);
+      aliasSearchTimer = null;
+    }
+    aliasSession = null;
+    saveState = 'idle';
+    saveError = null;
+    render();
+  }
+
+  function scheduleAliasSearch(query) {
+    if (!aliasSession) return;
+    aliasSession = { ...aliasSession, query, searching: true };
+    render();
+    if (aliasSearchTimer) clearTimeout(aliasSearchTimer);
+    aliasSearchTimer = setTimeout(() => {
+      aliasSearchTimer = null;
+      runAliasSearch(query);
+    }, ALIAS_SEARCH_DEBOUNCE_MS);
+  }
+
+  async function runAliasSearch(query) {
+    if (!aliasSession) return;
+    const seq = ++aliasSearchSeq;
+    aliasSession = { ...aliasSession, query, searching: true };
+    render();
+
+    try {
+      const url = `/api/sheets/rows/search?q=${encodeURIComponent(query ?? '')}&limit=15`;
+      const res = await fetch(url);
+      const body = await res.json().catch(() => ({}));
+      if (seq !== aliasSearchSeq || !aliasSession) return;
+      if (!res.ok) throw new Error(body.error ?? `Search failed (${res.status})`);
+
+      aliasSession = {
+        ...aliasSession,
+        results: body.results ?? [],
+        aliasColumnPresent: body.aliasColumnPresent ?? null,
+        aliasColumn: body.aliasColumn ?? aliasSession.aliasColumn,
+        searching: false,
+      };
+      saveError = null;
+      render();
+    } catch (err) {
+      if (seq !== aliasSearchSeq || !aliasSession) return;
+      aliasSession = { ...aliasSession, results: [], searching: false };
+      saveError = err.message ?? 'Search failed';
+      render();
+    }
+  }
+
+  function selectAliasRow(row) {
+    if (!aliasSession) return;
+    aliasSession = { ...aliasSession, selectedRow: row };
+    saveError = null;
+    render();
+  }
+
+  function changeAliasText(aliasText) {
+    if (!aliasSession) return;
+    aliasSession = { ...aliasSession, aliasText };
+    saveError = null;
+    render();
+  }
+
+  async function saveAlias() {
+    if (!aliasSession || saveState === 'saving') return;
+    const rowId = aliasSession.selectedRow?.rowId;
+    const alias = String(aliasSession.aliasText ?? '').trim();
+    if (!rowId || !alias) return;
+
+    saveState = 'saving';
+    saveError = null;
+    render();
+
+    try {
+      const res = await fetch(`/api/sheets/rows/${encodeURIComponent(rowId)}/aliases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alias }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `Save failed (${res.status})`);
+      aliasSession = null;
+      saveState = 'idle';
+      saveError = null;
+      render();
+    } catch (err) {
+      saveState = 'idle';
+      saveError = err.message ?? 'Save failed';
+      render();
+    }
   }
 
   async function saveEdit(formSection) {
@@ -250,6 +363,27 @@ export function connectView({
     }
   }
 
+  function buildAliasPanelProps() {
+    if (!aliasSession) return null;
+    return {
+      clipName: aliasSession.clipName,
+      aliasText: aliasSession.aliasText,
+      query: aliasSession.query,
+      results: aliasSession.results,
+      selectedRow: aliasSession.selectedRow,
+      aliasColumnPresent: aliasSession.aliasColumnPresent,
+      aliasColumn: aliasSession.aliasColumn,
+      searching: aliasSession.searching,
+      saveState,
+      saveError,
+      onQueryChange: scheduleAliasSearch,
+      onSelectRow: selectAliasRow,
+      onAliasChange: changeAliasText,
+      onCancel: cancelAlias,
+      onSave: saveAlias,
+    };
+  }
+
   function render() {
     if (!viewConfig) return;
     const ctx = {
@@ -267,15 +401,19 @@ export function connectView({
       renderSession(root, ctx);
       return;
     }
+    const aliasPanel = buildAliasPanelProps();
     if (viewConfig.system) {
       renderAdmin(root, {
         ...ctx,
         editSession,
+        aliasSession,
+        aliasPanel,
         editorColumns,
         saveState,
         saveError,
         onStartEdit: startEdit,
         onStartCreate: startCreate,
+        onStartAlias: startAlias,
         onCancelEdit: cancelEdit,
         onSaveEdit: saveEdit,
       });
@@ -284,11 +422,14 @@ export function connectView({
         ...ctx,
         editable: viewConfig.editable,
         editSession,
+        aliasSession,
+        aliasPanel,
         editorColumns,
         saveState,
         saveError,
         onStartEdit: viewConfig.editable ? startEdit : undefined,
         onStartCreate: viewConfig.editable ? startCreate : undefined,
+        onStartAlias: viewConfig.editable ? startAlias : undefined,
         onCancelEdit: cancelEdit,
         onSaveEdit: saveEdit,
       });

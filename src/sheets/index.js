@@ -10,6 +10,8 @@ import {
   snapshotRowData,
 } from './append-row.js';
 import { buildRowUpdateRanges, formatChangesForSheet, patchSnapshotRow } from './update-row.js';
+import { assertAliasColumnPresent, mergeAliasValue } from './aliases.js';
+import { searchSheetRows } from './search-rows.js';
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
@@ -187,6 +189,46 @@ export function createSheetsStore({ config, getConfig, log }) {
     return { rowId, row: data };
   }
 
+  function searchRows(query, { limit = 15 } = {}) {
+    const { matchColumn, aliasColumn } = sheetSettings();
+    const secondaryColumns = snapshot.headers.includes('ALS Folder') ? ['ALS Folder'] : [];
+    return searchSheetRows(snapshot, {
+      query,
+      matchColumn,
+      aliasColumn,
+      secondaryColumns,
+      limit,
+    });
+  }
+
+  async function appendAlias(rowId, alias) {
+    const aliasColumn = assertAliasColumnPresent(snapshot, sheetSettings().aliasColumn);
+    const row = snapshot.rows.find((r) => r.rowId === String(rowId));
+    if (!row) throw new Error(`row not found: ${rowId}`);
+
+    const merged = mergeAliasValue(row.data[aliasColumn], alias);
+    if (!merged.added) {
+      return {
+        rowId: String(rowId),
+        row: row.data,
+        alias: String(alias).trim(),
+        aliases: merged.aliases,
+        added: false,
+      };
+    }
+
+    await updateRow(rowId, { [aliasColumn]: merged.value });
+    const updated = snapshot.rows.find((r) => r.rowId === String(rowId));
+    log.info({ rowId, alias: String(alias).trim(), aliasColumn }, 'alias appended to sheet row');
+    return {
+      rowId: String(rowId),
+      row: updated?.data ?? row.data,
+      alias: String(alias).trim(),
+      aliases: merged.aliases,
+      added: true,
+    };
+  }
+
   async function sync() {
     try {
       await fetchFromGoogle();
@@ -249,5 +291,16 @@ export function createSheetsStore({ config, getConfig, log }) {
     sync().catch(() => {});
   }
 
-  return { start, stop, sync, updateRow, appendRow, getClipNames, getSnapshot, applySettings };
+  return {
+    start,
+    stop,
+    sync,
+    updateRow,
+    appendRow,
+    appendAlias,
+    searchRows,
+    getClipNames,
+    getSnapshot,
+    applySettings,
+  };
 }

@@ -57,6 +57,8 @@ async function main() {
       sync: () => sheets.sync(),
       updateRow: (rowId, changes) => sheets.updateRow(rowId, changes),
       appendRow: (changes) => sheets.appendRow(changes),
+      appendAlias: (rowId, alias) => sheets.appendAlias(rowId, alias),
+      searchRows: (query, opts) => sheets.searchRows(query, opts),
       getSnapshot: sheets.getSnapshot,
       onSynced: () => matcher.rematch(),
     },
