@@ -1,5 +1,20 @@
 // Admin settings panel (M7). Fetches/patches /api/config/settings.
 
+const TIMECODE_DEFAULTS = Object.freeze({
+  enabled: false,
+  port: 6454,
+  bindAddress: '0.0.0.0',
+  staleMs: 500,
+});
+
+function normalizeSettings(raw) {
+  if (!raw) return raw;
+  return {
+    ...raw,
+    timecode: { ...TIMECODE_DEFAULTS, ...raw.timecode },
+  };
+}
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -55,6 +70,59 @@ function formatIngestSeen(lastSeenAt) {
   const date = new Date(lastSeenAt);
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleTimeString();
+}
+
+function renderTimecodeStatusBox(timecodeStatus, settings) {
+  const box = el('div', 'ableton-session timecode-session');
+  box.dataset.role = 'timecode-session';
+  box.appendChild(el('p', 'ableton-session-title', 'Art-Net timecode'));
+
+  const enabled = settings?.timecode?.enabled === true;
+  if (!enabled) {
+    box.classList.add('ableton-session--sim');
+    box.appendChild(el(
+      'p',
+      'ableton-session-line',
+      'Timecode listener is off. Enable below and save to receive SMPTE over Art-Net.',
+    ));
+    return box;
+  }
+
+  if (!timecodeStatus) {
+    box.appendChild(el('p', 'ableton-session-line', 'Loading timecode status…'));
+    return box;
+  }
+
+  const live = timecodeStatus.live === true;
+  const tc = timecodeStatus.timecode;
+  const signalLine = el('p', `ableton-session-line${live ? '' : ' warn'}`);
+  const seen = formatIngestSeen(timecodeStatus.lastSeenAt);
+  if (!tc?.display) {
+    signalLine.textContent = live
+      ? 'Listening — no packets yet'
+      : 'No signal — check port, bind address, and Art-Net timecode source';
+  } else if (live) {
+    const rate = tc.typeLabel && tc.fps != null ? ` · ${tc.typeLabel} ${tc.fps} fps` : '';
+    signalLine.textContent = `Live: ${tc.display}${rate}${seen ? ` (last packet ${seen})` : ''}`;
+  } else {
+    const rate = tc.typeLabel && tc.fps != null ? ` · ${tc.typeLabel} ${tc.fps} fps` : '';
+    signalLine.textContent = `Stale: ${tc.display}${rate} — no recent packets`;
+  }
+  box.appendChild(signalLine);
+
+  const port = settings.timecode?.port ?? 6454;
+  const bind = settings.timecode?.bindAddress ?? '0.0.0.0';
+  const listenLine = el('p', 'ableton-session-line');
+  listenLine.textContent = `Listening on UDP ${bind}:${port}`;
+  box.appendChild(listenLine);
+
+  if (live && tc?.display) {
+    box.classList.add('ableton-session--ok');
+  } else if (enabled) {
+    box.classList.add('ableton-session--warn');
+  }
+
+  return box;
 }
 
 function renderAbletonSessionBox(ingestStatus, simulated) {
@@ -158,10 +226,16 @@ function settingsFromForm(form, current) {
     match: {
       threshold: Number(fd.get('threshold')),
     },
+    timecode: {
+      enabled: fd.get('timecodeEnabled') === 'on',
+      port: Number(fd.get('timecodePort')),
+      bindAddress: fd.get('timecodeBindAddress')?.trim() ?? current.timecode?.bindAddress ?? '0.0.0.0',
+      staleMs: Number(fd.get('timecodeStaleMs')),
+    },
   };
 }
 
-function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus }) {
+function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus }) {
   root.innerHTML = '';
 
   const heading = el('h2', 'section-title', 'Settings');
@@ -257,6 +331,44 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   }
   bottomRow.appendChild(simGroup);
 
+  const timecodeGroup = el('fieldset', 'settings-group');
+  timecodeGroup.appendChild(el('legend', null, 'Timecode (Art-Net)'));
+  timecodeGroup.appendChild(renderTimecodeStatusBox(timecodeStatus, settings));
+
+  const tcEnabled = settings.timecode?.enabled === true;
+  const tcCheck = el('input');
+  tcCheck.type = 'checkbox';
+  tcCheck.name = 'timecodeEnabled';
+  tcCheck.id = 'timecodeEnabled';
+  tcCheck.checked = tcEnabled;
+  tcCheck.className = 'settings-checkbox';
+  const tcRow = el('div', 'settings-field settings-field-checkbox');
+  tcRow.appendChild(tcCheck);
+  const tcLabel = el('label', 'settings-checkbox-label');
+  tcLabel.htmlFor = 'timecodeEnabled';
+  tcLabel.textContent = 'Receive SMPTE timecode over Art-Net (UDP)';
+  tcRow.appendChild(tcLabel);
+  timecodeGroup.appendChild(tcRow);
+
+  timecodeGroup.appendChild(fieldRow(
+    'UDP port',
+    numberInput('timecodePort', settings.timecode?.port ?? 6454, { min: 1, max: 65535 }),
+  ));
+  timecodeGroup.appendChild(fieldRow(
+    'Listen on (local IP)',
+    textInput('timecodeBindAddress', settings.timecode?.bindAddress ?? '0.0.0.0'),
+  ));
+  timecodeGroup.appendChild(fieldRow(
+    'Stale after (ms)',
+    numberInput('timecodeStaleMs', settings.timecode?.staleMs ?? 500, { min: 0, step: 50 }),
+  ));
+
+  const tcHint = el('p', 'settings-sim-hint');
+  tcHint.textContent = 'Use 0.0.0.0 to listen on all network interfaces — you will receive Art-Net from Timecode Expert and other senders on the LAN. This is not the sender\'s IP (e.g. the address shown in Timecode Expert). Only set a specific IP if this PC has multiple NICs. Supports drop-frame 29.97 (DF) and other SMPTE types automatically.';
+  timecodeGroup.appendChild(tcHint);
+
+  bottomRow.appendChild(timecodeGroup);
+
   const matchGroup = el('fieldset', 'settings-group');
   matchGroup.appendChild(el('legend', null, 'Matching'));
   matchGroup.appendChild(fieldRow(
@@ -297,9 +409,11 @@ export function mountSettingsPanel(rootSelector) {
 
   let settings = null;
   let status = null;
+  let serverSupportsTimecode = true;
   let sheetStatus = null;
   let syncStatus = null;
   let ingestStatus = null;
+  let timecodeStatus = null;
   let pollTimer = null;
 
   function render() {
@@ -310,6 +424,7 @@ export function mountSettingsPanel(rootSelector) {
       sheetStatus,
       syncStatus,
       ingestStatus,
+      timecodeStatus,
     });
   }
 
@@ -320,23 +435,38 @@ export function mountSettingsPanel(rootSelector) {
     existing.replaceWith(next);
   }
 
+  function refreshTimecodeSessionBox() {
+    const existing = root.querySelector('[data-role="timecode-session"]');
+    if (!existing || !settings) return;
+    const next = renderTimecodeStatusBox(timecodeStatus, settings);
+    existing.replaceWith(next);
+  }
+
   async function loadSheetStatus() {
     const res = await fetch('/api/sheets/status');
     if (res.ok) sheetStatus = await res.json();
   }
 
-  async function loadIngestStatus() {
+  async function loadHealthStatus() {
     const res = await fetch('/health');
     const data = await res.json().catch(() => null);
     if (data?.ingest) ingestStatus = data.ingest;
+    if (data?.timecode) timecodeStatus = data.timecode;
   }
 
   async function load() {
     const res = await fetch('/api/config/settings');
     if (!res.ok) throw new Error(`Failed to load settings (${res.status})`);
     const data = await res.json();
-    settings = data.settings;
-    await Promise.all([loadSheetStatus(), loadIngestStatus()]);
+    serverSupportsTimecode = data.settings?.timecode !== undefined;
+    settings = normalizeSettings(data.settings);
+    await Promise.all([loadSheetStatus(), loadHealthStatus()]);
+    if (!serverSupportsTimecode) {
+      status = {
+        ok: false,
+        message: 'This AbleView process does not expose timecode settings yet — restart the server (npm start or your service), then reload this page.',
+      };
+    }
     render();
   }
 
@@ -353,11 +483,20 @@ export function mountSettingsPanel(rootSelector) {
       render();
       return;
     }
-    settings = data.settings;
+    serverSupportsTimecode = data.settings?.timecode !== undefined;
+    settings = normalizeSettings(data.settings);
     const reloaded = data.reloaded?.length ? ` Reloaded: ${data.reloaded.join(', ')}.` : '';
+    if (patch.timecode && !data.reloaded?.includes('timecode')) {
+      status = {
+        ok: false,
+        message: `Other settings saved, but timecode was not applied (reload list: ${data.reloaded?.join(', ') || 'none'}). Restart AbleView, reload this page, and save again.`,
+      };
+      await Promise.all([loadSheetStatus(), wait(400).then(() => loadHealthStatus())]);
+      render();
+      return;
+    }
     status = { ok: true, message: `Settings saved.${reloaded}` };
-    // Give ingest a moment to reconnect before reading status.
-    await Promise.all([loadSheetStatus(), wait(400).then(() => loadIngestStatus())]);
+    await Promise.all([loadSheetStatus(), wait(400).then(() => loadHealthStatus())]);
     render();
   }
 
@@ -395,10 +534,12 @@ export function mountSettingsPanel(rootSelector) {
 
   pollTimer = setInterval(() => {
     if (!settings) return;
-    const prev = JSON.stringify(ingestStatus);
-    loadIngestStatus()
+    const prevIngest = JSON.stringify(ingestStatus);
+    const prevTimecode = JSON.stringify(timecodeStatus);
+    loadHealthStatus()
       .then(() => {
-        if (JSON.stringify(ingestStatus) !== prev) refreshAbletonSessionBox();
+        if (JSON.stringify(ingestStatus) !== prevIngest) refreshAbletonSessionBox();
+        if (JSON.stringify(timecodeStatus) !== prevTimecode) refreshTimecodeSessionBox();
       })
       .catch(() => {});
   }, 3000);

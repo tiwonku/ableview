@@ -6,6 +6,7 @@ import { createIngest } from './ingest/index.js';
 import { createSheetsStore } from './sheets/index.js';
 import { createMatcher } from './match/index.js';
 import { createViewServer } from './server/index.js';
+import { createTimecodeListener } from './timecode/index.js';
 
 const log = createLogger({ app: 'ableview' });
 
@@ -41,6 +42,12 @@ async function main() {
     getClipNames: sheets.getClipNames,
   });
 
+  const timecode = createTimecodeListener({
+    getConfig,
+    bus,
+    log: log.child({ module: 'timecode' }),
+  });
+
   const viewServer = await createViewServer({
     config,
     bus,
@@ -67,6 +74,7 @@ async function main() {
       simulated: ingest.simulated,
       getSheetSnapshot: sheets.getSnapshot,
       getIngestStatus: () => ingest.getIngestStatus(),
+      getTimecodeStatus: () => timecode.getStatus(),
     }),
   });
 
@@ -84,6 +92,16 @@ async function main() {
       matcher.rematch();
     }
     if (sections.includes('match') || sections.includes('sim')) matcher.rematch();
+    if (sections.includes('timecode')) {
+      try {
+        await timecode.start();
+      } catch (err) {
+        log.error(
+          { err: err.message, bindAddress: getConfig().timecode?.bindAddress, port: getConfig().timecode?.port },
+          'timecode listener failed to restart — check listen IP/port (use 0.0.0.0 unless this PC has multiple NICs)',
+        );
+      }
+    }
     if (sections.includes('sim')) viewServer.rebroadcastSimState();
   });
 
@@ -92,10 +110,19 @@ async function main() {
   }
 
   await ingest.start();
+  try {
+    await timecode.start();
+  } catch (err) {
+    log.error(
+      { err: err.message, bindAddress: getConfig().timecode?.bindAddress, port: getConfig().timecode?.port },
+      'timecode listener failed to start — check listen IP/port (use 0.0.0.0 unless this PC has multiple NICs)',
+    );
+  }
   log.info({ source: ingest.source.name, simulated: ingest.simulated, httpPort: viewServer.port }, 'AbleView started');
 
   const shutdown = async (signal) => {
     log.info({ signal }, 'shutting down');
+    timecode.stop();
     ingest.stop();
     sheets.stop();
     await viewServer.stop();

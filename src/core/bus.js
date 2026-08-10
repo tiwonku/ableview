@@ -6,6 +6,7 @@ export const EVENTS = Object.freeze({
   NOW_PLAYING: 'nowPlaying',
   CUE_PAYLOAD: 'cuePayload',
   INGEST_STATUS: 'ingestStatus',
+  TIMECODE: 'timecode',
 });
 
 export function createBus() {

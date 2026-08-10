@@ -41,6 +41,12 @@ export const DEFAULTS = Object.freeze({
     normalize: { lowercase: true, stripPunctuation: true, stripVersionTags: true },
   },
   server: { wsHeartbeatSeconds: 5 },
+  timecode: {
+    enabled: false,
+    port: 6454,
+    bindAddress: '0.0.0.0',
+    staleMs: 500,
+  },
   views: {},
 });
 
@@ -102,6 +108,13 @@ export function validateConfig(config) {
   }
   if (!(config.server.wsHeartbeatSeconds >= 0)) {
     errors.push('server.wsHeartbeatSeconds must be >= 0');
+  }
+
+  const tc = config.timecode ?? {};
+  if (!port(tc.port ?? 6454)) errors.push('timecode.port must be a valid port');
+  if (tc.staleMs != null && !(tc.staleMs >= 0)) errors.push('timecode.staleMs must be >= 0');
+  if (tc.bindAddress != null && typeof tc.bindAddress !== 'string') {
+    errors.push('timecode.bindAddress must be a string');
   }
 
   const views = config.views ?? {};

@@ -257,6 +257,68 @@ test('admin WebSocket init includes system flag and status', async () => {
   await server.stop();
 });
 
+test('admin init and status include timecode when provided', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    timecode: { enabled: true, port: 6454, bindAddress: '0.0.0.0', staleMs: 500 },
+    views: {
+      band: { title: 'Band', fields: [{ column: 'Key' }] },
+      admin: { title: 'Admin', system: true },
+    },
+  });
+  let tcStatus = {
+    enabled: true,
+    live: true,
+    lastSeenAt: Date.now(),
+    timecode: {
+      hours: 1,
+      minutes: 0,
+      seconds: 0,
+      frames: 0,
+      type: 1,
+      fps: 25,
+      typeLabel: 'EBU',
+      display: '01:00:00:00',
+    },
+  };
+  const server = await createViewServer({
+    config,
+    bus,
+    log: silentLog,
+    getHealthContext: () => ({
+      getTimecodeStatus: () => tcStatus,
+    }),
+  });
+
+  const { ws, messages } = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=admin`);
+  try {
+    const init = await waitForMessage(messages, ws);
+    assert.equal(init.status?.timecode?.enabled, true);
+    assert.equal(init.status?.timecode?.timecode?.display, '01:00:00:00');
+
+    tcStatus = {
+      ...tcStatus,
+      timecode: {
+        ...tcStatus.timecode,
+        minutes: 2,
+        seconds: 3,
+        frames: 4,
+        display: '01:02:03:04',
+      },
+    };
+    bus.emit(EVENTS.TIMECODE, tcStatus);
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const status = messages.find(
+      (m) => m.type === 'status' && m.status?.timecode?.timecode?.display === '01:02:03:04',
+    );
+    assert.ok(status, 'expected throttled admin status with updated timecode');
+  } finally {
+    ws.close();
+    await server.stop();
+  }
+});
+
 test('session WebSocket accepts system view and receives tracks on cue', async () => {
   const bus = createBus();
   const config = testConfig({

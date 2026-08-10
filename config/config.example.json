@@ -46,6 +46,12 @@
   "server": {
     "wsHeartbeatSeconds": 5
   },
+  "timecode": {
+    "enabled": false,
+    "port": 6454,
+    "bindAddress": "0.0.0.0",
+    "staleMs": 500
+  },
   "views": {
     "band": {
       "title": "Band",

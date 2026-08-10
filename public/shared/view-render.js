@@ -497,6 +497,22 @@ function formatLastSeen(lastSeenAt) {
   return date.toLocaleTimeString();
 }
 
+function formatTimecodeStat(timecodeStatus) {
+  if (!timecodeStatus?.enabled) {
+    return { value: 'Disabled', warn: false };
+  }
+  const tc = timecodeStatus.timecode;
+  if (!tc?.display) {
+    return { value: 'No signal', warn: true };
+  }
+  const rate = tc.typeLabel && tc.fps != null ? `${tc.typeLabel} ${tc.fps} fps` : tc.typeLabel ?? '';
+  const suffix = rate ? ` (${rate})` : '';
+  if (timecodeStatus.live) {
+    return { value: `${tc.display}${suffix}`, warn: false };
+  }
+  return { value: `${tc.display}${suffix} · stale`, warn: true };
+}
+
 function cueTrackStat(ableton) {
   if (!ableton) return { value: '—', warn: false };
   const configured = ableton.cueTrackConfigured;
@@ -654,6 +670,10 @@ function renderAdminStats(parent, payload, status) {
   addStat(parent, 'Beat', formatBeat(payload?.beat));
   addStat(parent, 'Last sync', formatTimestamp(payload?.syncedAt));
   addStat(parent, 'Cache', payload?.stale ? 'Stale (offline)' : 'Fresh', { warn: payload?.stale });
+  {
+    const tc = formatTimecodeStat(status?.timecode);
+    addStat(parent, 'Timecode', tc.value, { warn: tc.warn });
+  }
   if (payload?.simulated !== true) {
     const ableton = payload?.ableton ?? status?.ingest ?? null;
     const live = ableton?.live ?? payload?.ingestLive !== false;

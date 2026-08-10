@@ -79,6 +79,25 @@ test('buildHealthReport is degraded when sheet cache is stale', () => {
   assert.ok(report.checks.includes('sheet_stale'));
 });
 
+test('buildHealthReport includes timecode status when provided', () => {
+  const report = buildHealthReport({
+    simulated: false,
+    getSheetSnapshot: () => sheetSnapshot(),
+    getConnectedViewCount: () => 0,
+    getIngestStatus: () => ({ live: true, lastSeenAt: Date.now() }),
+    getTimecodeStatus: () => ({
+      enabled: true,
+      live: true,
+      lastSeenAt: Date.now(),
+      timecode: { display: '01:00:00:00', typeLabel: 'EBU', fps: 25 },
+    }),
+    lastCuePayload: makeCuePayload({ clipName: 'Song A' }),
+  });
+
+  assert.equal(report.timecode.enabled, true);
+  assert.equal(report.timecode.timecode.display, '01:00:00:00');
+});
+
 test('GET /health returns JSON and 503 when degraded', async () => {
   const bus = createBus();
   const server = await createViewServer({

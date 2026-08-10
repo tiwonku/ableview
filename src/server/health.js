@@ -5,6 +5,7 @@ export function buildHealthReport({
   getSheetSnapshot,
   getConnectedViewCount,
   getIngestStatus,
+  getTimecodeStatus,
   lastCuePayload = null,
 }) {
   const sheets = getSheetSnapshot();
@@ -25,6 +26,8 @@ export function buildHealthReport({
     checks.push('cue_track_missing');
   }
 
+  const timecode = getTimecodeStatus?.() ?? null;
+
   return {
     status: checks.length === 0 ? 'ok' : 'degraded',
     uptime: process.uptime(),
@@ -36,6 +39,14 @@ export function buildHealthReport({
       cueTrackConfigured: ingest.cueTrackConfigured ?? null,
       cueTrackFound: ingest.cueTrackFound ?? null,
     },
+    timecode: timecode
+      ? {
+          enabled: timecode.enabled === true,
+          live: timecode.live === true,
+          lastSeenAt: timecode.lastSeenAt ?? null,
+          timecode: timecode.timecode ?? null,
+        }
+      : null,
     sheets: {
       syncedAt: sheets.syncedAt,
       stale: sheets.stale,

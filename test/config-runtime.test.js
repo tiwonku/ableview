@@ -30,12 +30,13 @@ function baseConfig(overrides = {}) {
   return { ...config, ...overrides };
 }
 
-test('pickEditableSettings returns ingest, sim, sheets, and match', () => {
+test('pickEditableSettings returns ingest, sim, sheets, match, and timecode', () => {
   const config = baseConfig();
   const settings = pickEditableSettings(config);
-  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'sheets', 'sim']);
+  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'sheets', 'sim', 'timecode']);
   assert.equal(settings.ingest.abletonHost, '127.0.0.1');
   assert.equal(settings.sim.enabled, false);
+  assert.equal(settings.timecode.enabled, false);
 });
 
 test('serializeFileConfig excludes secrets and env-only httpPort', () => {
@@ -142,6 +143,18 @@ test('GET and PATCH /api/config/settings', async () => {
   const simBody = await simRes.json();
   assert.equal(simBody.settings.sim.enabled, true);
   assert.deepEqual(simBody.reloaded, ['sim']);
+
+  const tcRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      timecode: { enabled: true, port: 6454, bindAddress: '0.0.0.0', staleMs: 500 },
+    }),
+  });
+  assert.equal(tcRes.status, 200);
+  const tcBody = await tcRes.json();
+  assert.equal(tcBody.settings.timecode.enabled, true);
+  assert.deepEqual(tcBody.reloaded, ['timecode']);
 
   const badRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
     method: 'PATCH',

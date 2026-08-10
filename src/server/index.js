@@ -34,6 +34,7 @@ export async function createViewServer({
 
   function buildStatus() {
     const ingest = getHealthContext?.()?.getIngestStatus?.() ?? null;
+    const timecode = getHealthContext?.()?.getTimecodeStatus?.() ?? null;
     return {
       connectedViews: getConnectedViewCount(),
       ingest: ingest
@@ -43,6 +44,14 @@ export async function createViewServer({
             trackNames: ingest.trackNames ?? null,
             cueTrackConfigured: ingest.cueTrackConfigured ?? null,
             cueTrackFound: ingest.cueTrackFound ?? null,
+          }
+        : null,
+      timecode: timecode
+        ? {
+            enabled: timecode.enabled === true,
+            live: timecode.live === true,
+            lastSeenAt: timecode.lastSeenAt ?? null,
+            timecode: timecode.timecode ?? null,
           }
         : null,
     };
@@ -86,6 +95,16 @@ export async function createViewServer({
     broadcastStatus();
   });
 
+  let timecodeBroadcastTimer = null;
+  bus.on(EVENTS.TIMECODE, () => {
+    if (timecodeBroadcastTimer) return;
+    timecodeBroadcastTimer = setTimeout(() => {
+      timecodeBroadcastTimer = null;
+      broadcastStatus();
+    }, 250);
+    timecodeBroadcastTimer.unref?.();
+  });
+
   const app = Fastify({ logger: false });
 
   app.get('/', async (_req, reply) => reply.redirect('/views/band'));
@@ -97,6 +116,7 @@ export async function createViewServer({
       getSheetSnapshot: ctx.getSheetSnapshot ?? (() => ({ syncedAt: null, stale: true, rows: [] })),
       getConnectedViewCount,
       getIngestStatus: ctx.getIngestStatus,
+      getTimecodeStatus: ctx.getTimecodeStatus,
       lastCuePayload: lastPayload,
     });
     const code = report.status === 'ok' ? 200 : 503;
@@ -230,6 +250,7 @@ export async function createViewServer({
     getConnectedViewCount,
     rebroadcastSimState,
     async stop() {
+      if (timecodeBroadcastTimer) clearTimeout(timecodeBroadcastTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       for (const ws of clients.keys()) ws.close();
       await new Promise((resolve) => wss.close(resolve));
