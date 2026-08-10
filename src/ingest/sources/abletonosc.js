@@ -74,13 +74,15 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   }
 
   function emitNowPlaying() {
+    // All watched tracks (including stopped) so Session / ops can see the full
+    // candidate set; clipName/slotIndex are null when nothing is playing.
     const tracks = [...trackState.entries()]
-      .filter(([, s]) => s.playingClipName != null)
+      .sort(([a], [b]) => a - b)
       .map(([trackIndex, s]) => ({
         trackIndex,
         trackName: s.trackName,
-        clipName: s.playingClipName,
-        slotIndex: s.playingSlotIndex,
+        clipName: s.playingClipName ?? null,
+        slotIndex: isValidSlot(s.playingSlotIndex) ? s.playingSlotIndex : null,
       }));
 
     const pendingLaunch = pendingLaunchOf();

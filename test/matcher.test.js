@@ -204,7 +204,9 @@ test('CuePayload contract keys', () => {
     'stale',
     'syncedAt',
     'tempo',
+    'tracks',
   ]);
+  assert.deepEqual(payload.tracks, []);
   assert.deepEqual(Object.keys(payload.match).sort(), [
     'confidence',
     'matched',
@@ -232,6 +234,10 @@ test('createMatcher emits CuePayload on NowPlaying change', () => {
       source: SOURCES.SIMULATOR,
       authoritativeClip: 'Song B - Verse',
       tempo: 100,
+      tracks: [
+        { trackIndex: 0, trackName: 'Cue', clipName: 'Song B - Verse', slotIndex: 2 },
+        { trackIndex: 3, trackName: 'Vocals', clipName: null, slotIndex: null },
+      ],
     })
   );
 
@@ -241,6 +247,10 @@ test('createMatcher emits CuePayload on NowPlaying change', () => {
   assert.equal(payloads[0].match.rowId, '7');
   assert.equal(payloads[0].simulated, true);
   assert.equal(payloads[0].tempo, 100);
+  assert.deepEqual(payloads[0].tracks, [
+    { trackIndex: 0, trackName: 'Cue', clipName: 'Song B - Verse', slotIndex: 2 },
+    { trackIndex: 3, trackName: 'Vocals', clipName: null, slotIndex: null },
+  ]);
 });
 
 test('createMatcher rematch clears simulated when sim.enabled is false', () => {
@@ -357,4 +367,47 @@ test('createMatcher re-emits when beat changes for same clip without re-matching
   assert.equal(payloads[0].match.rowId, '5');
   assert.equal(payloads[1].match.rowId, '5');
   assert.equal(payloads[1].match.matchedValue, payloads[0].match.matchedValue);
+});
+
+test('createMatcher forwards watched-track clip changes without rematching', () => {
+  const bus = createBus();
+  const payloads = [];
+  bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
+
+  createMatcher({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    getSnapshot: () => snapshot(),
+  });
+
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'Song A - Intro',
+      tempo: 128,
+      tracks: [
+        { trackIndex: 0, trackName: 'Cue', clipName: 'Song A - Intro', slotIndex: 0 },
+        { trackIndex: 3, trackName: 'Vocals', clipName: null, slotIndex: null },
+      ],
+    })
+  );
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'Song A - Intro',
+      tempo: 128,
+      tracks: [
+        { trackIndex: 0, trackName: 'Cue', clipName: 'Song A - Intro', slotIndex: 0 },
+        { trackIndex: 3, trackName: 'Vocals', clipName: 'Sample Hit', slotIndex: 4 },
+      ],
+    })
+  );
+
+  assert.equal(payloads.length, 2);
+  assert.equal(payloads[0].match.rowId, '5');
+  assert.equal(payloads[1].match.rowId, '5');
+  assert.equal(payloads[1].tracks[1].clipName, 'Sample Hit');
 });

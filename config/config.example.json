@@ -138,6 +138,10 @@
         }
       ]
     },
+    "session": {
+      "title": "Session",
+      "system": true
+    },
     "admin": {
       "title": "Admin",
       "system": true

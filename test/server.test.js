@@ -67,13 +67,14 @@ test('serves band view HTML', async () => {
   await server.stop();
 });
 
-test('serves visuals, lighting, and admin view HTML', async () => {
+test('serves visuals, lighting, session, and admin view HTML', async () => {
   const bus = createBus();
   const config = testConfig({
     views: {
       band: { title: 'Band', fields: [{ column: 'Key' }] },
       visuals: { title: 'Visuals', fields: [{ column: 'Video World' }] },
       lighting: { title: 'Lighting', fields: [{ column: 'Lasers' }] },
+      session: { title: 'Session', system: true },
       admin: { title: 'Admin', system: true },
     },
   });
@@ -82,6 +83,7 @@ test('serves visuals, lighting, and admin view HTML', async () => {
   for (const [name, title] of [
     ['visuals', 'Visuals'],
     ['lighting', 'Lighting'],
+    ['session', 'Session'],
     ['admin', 'Admin'],
   ]) {
     const res = await fetch(`http://127.0.0.1:${server.port}/views/${name}`);
@@ -250,6 +252,45 @@ test('admin WebSocket init includes system flag and status', async () => {
   assert.equal(init.viewId, 'admin');
   assert.equal(init.system, true);
   assert.equal(typeof init.status?.connectedViews, 'number');
+
+  ws.close();
+  await server.stop();
+});
+
+test('session WebSocket accepts system view and receives tracks on cue', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    views: {
+      band: { title: 'Band', fields: [{ column: 'Key' }] },
+      session: { title: 'Session', system: true },
+    },
+  });
+  const server = await createViewServer({ config, bus, log: silentLog });
+
+  const { ws, messages } = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=session`);
+  const init = await waitForMessage(messages, ws);
+  assert.equal(init.type, 'init');
+  assert.equal(init.viewId, 'session');
+  assert.equal(init.title, 'Session');
+  assert.equal(init.system, true);
+  assert.ok(init.views.some((v) => v.id === 'session'));
+
+  const tracks = [
+    { trackIndex: 0, trackName: 'Cue', clipName: 'Song A - Intro', slotIndex: 0 },
+    { trackIndex: 3, trackName: 'Vocals', clipName: null, slotIndex: null },
+  ];
+  bus.emit(
+    EVENTS.CUE_PAYLOAD,
+    makeCuePayload({
+      clipName: 'Song A - Intro',
+      match: makeMatchResult({ matched: true, confidence: 1, rowId: '5', matchedValue: 'Song A - Intro' }),
+      tracks,
+    })
+  );
+
+  const cue = await waitForMessage(messages, ws);
+  assert.equal(cue.type, 'cue');
+  assert.deepEqual(cue.payload.tracks, tracks);
 
   ws.close();
   await server.stop();

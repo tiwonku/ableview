@@ -8,6 +8,7 @@ import {
   captureEditSession,
   setConnectionState,
 } from './view-render.js';
+import { renderSession } from './session-render.js';
 import {
   collectEditorChanges,
   collectEditorValues,
@@ -18,6 +19,10 @@ import { mountViewNav } from './view-nav.js';
 
 const RECONNECT_MS = 1500;
 
+function tracksKey(tracks) {
+  return JSON.stringify(tracks ?? []);
+}
+
 function cueContentChanged(prev, next) {
   if (!prev) return true;
   return prev.clipName !== next.clipName
@@ -25,7 +30,8 @@ function cueContentChanged(prev, next) {
     || prev.match?.matched !== next.match?.matched
     || prev.tempo !== next.tempo
     || prev.beat !== next.beat
-    || prev.pendingLaunch !== next.pendingLaunch;
+    || prev.pendingLaunch !== next.pendingLaunch
+    || tracksKey(prev.tracks) !== tracksKey(next.tracks);
 }
 
 export function connectView({
@@ -109,10 +115,12 @@ export function connectView({
       matchColumn = msg.matchColumn ?? null;
       viewsList = msg.views ?? null;
       mountViewNav(viewId, viewsList, { settingsActive });
+      const isSession = viewId === 'session';
       document.body.classList.toggle(
         'layout-operator',
-        !viewConfig.system && !statusOnly,
+        !viewConfig.system && !statusOnly && !isSession,
       );
+      document.body.classList.toggle('layout-session', isSession);
       if (msg.status) lastStatus = msg.status;
       applySimState(msg.simulated === true);
       if (msg.payload) {
@@ -253,6 +261,10 @@ export function connectView({
     };
     if (statusOnly) {
       setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);
+      return;
+    }
+    if (viewId === 'session') {
+      renderSession(root, ctx);
       return;
     }
     if (viewConfig.system) {

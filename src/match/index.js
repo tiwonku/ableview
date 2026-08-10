@@ -155,6 +155,7 @@ function nowPlayingKey(event) {
     beat: event.beat,
     source: event.source,
     pendingLaunch: event.pendingLaunch ?? false,
+    tracks: event.tracks ?? [],
   });
 }
 
@@ -203,6 +204,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
         tempo: event.tempo,
         beat: event.beat,
         pendingLaunch: event.pendingLaunch ?? false,
+        tracks: event.tracks ?? [],
         simulated,
         ingestLive: simulated ? true : ingestLive,
         ableton: simulated ? null : ableton,
@@ -212,6 +214,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
       payload = matchClip(event.authoritativeClip, snapshot, resolveConfig());
       payload.tempo = event.tempo;
       payload.beat = event.beat;
+      payload.tracks = event.tracks ?? [];
       payload.simulated = simulated;
       payload.pendingLaunch = event.pendingLaunch ?? false;
       payload.ingestLive = simulated ? true : ingestLive;
