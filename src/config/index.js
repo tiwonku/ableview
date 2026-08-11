@@ -8,7 +8,7 @@ export const DEFAULTS = Object.freeze({
     oscSendPort: 11000,
     abletonHost: '127.0.0.1',
     watchedTracks: [],
-    authoritative: { strategy: 'track', track: null },
+    authoritative: { strategy: 'bestMatch', track: null },
     staleAfterMs: 5000,
     pollIntervalMs: 2000,
   },
@@ -25,6 +25,7 @@ export const DEFAULTS = Object.freeze({
     headerRow: 1,
     matchColumn: 'Clip Name',
     aliasColumn: 'Aliases',
+    alsFolderColumn: 'ALS Folder',
     refreshSeconds: 30,
     cacheFile: './data/sheet-cache.json',
     editorColumns: {
@@ -38,6 +39,7 @@ export const DEFAULTS = Object.freeze({
   },
   match: {
     threshold: 0.4,
+    minConfidenceGap: 0.08,
     normalize: { lowercase: true, stripPunctuation: true, stripVersionTags: true },
   },
   server: { wsHeartbeatSeconds: 5 },
@@ -74,7 +76,7 @@ function deepMerge(base, override) {
 
 const VALID_SIM_MODES = ['internal', 'osc'];
 const VALID_SIM_DRIVERS = ['sheetClipNames', 'scenario', 'manual'];
-const VALID_STRATEGIES = ['track', 'scene', 'mostRecent'];
+const VALID_STRATEGIES = ['bestMatch', 'track', 'scene', 'mostRecent'];
 
 export function validateConfig(config) {
   const errors = [];
@@ -87,6 +89,12 @@ export function validateConfig(config) {
   }
   if (config.ingest.authoritative.strategy === 'track' && !config.ingest.authoritative.track && config.ingest.authoritative.track !== 0) {
     errors.push('ingest.authoritative.track is required when strategy is "track"');
+  }
+  if (config.match.minConfidenceGap != null) {
+    const gap = config.match.minConfidenceGap;
+    if (!(typeof gap === 'number' && gap >= 0 && gap <= 1)) {
+      errors.push('match.minConfidenceGap must be between 0 and 1');
+    }
   }
   if (!VALID_SIM_MODES.includes(config.sim.mode)) {
     errors.push(`sim.mode must be one of: ${VALID_SIM_MODES.join(', ')}`);

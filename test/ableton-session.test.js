@@ -44,6 +44,10 @@ test('findCueTrack reports missing independently of OSC liveness', () => {
     cueTrackConfigured: 'Cue',
     cueTrackFound: null,
   });
+  assert.deepEqual(findCueTrack(['Drums'], null), {
+    cueTrackConfigured: null,
+    cueTrackFound: null,
+  });
 });
 
 test('makeIngestStatus copies track names and cue diagnostics', () => {
@@ -89,6 +93,27 @@ test('buildHealthReport flags cue_track_missing when session is live', () => {
   assert.ok(report.checks.includes('cue_track_missing'));
   assert.equal(report.ingest.cueTrackFound, false);
   assert.deepEqual(report.ingest.trackNames, ['Drums', 'Vocals']);
+});
+
+test('buildHealthReport does not flag cue track when none is configured', () => {
+  const report = buildHealthReport({
+    simulated: false,
+    getSheetSnapshot: () => sheetSnapshot(),
+    getConnectedViewCount: () => 0,
+    getIngestStatus: () => ({
+      live: true,
+      lastSeenAt: Date.now(),
+      trackNames: ['DECK A', 'DECK C'],
+      cueTrackConfigured: null,
+      cueTrackFound: null,
+    }),
+    lastCuePayload: makeCuePayload({
+      clipName: 'x',
+      match: makeMatchResult({ matched: true, confidence: 1, rowId: '1' }),
+    }),
+  });
+
+  assert.ok(!report.checks.includes('cue_track_missing'));
 });
 
 test('buildHealthReport does not flag cue track before track list arrives', () => {

@@ -22,7 +22,12 @@ export function buildHealthReport({
   if (sheets.stale) checks.push('sheet_stale');
   if (!simulated && !ingest.live) checks.push('ingest_offline');
   if (!simulated && !lastCuePayload) checks.push('no_cue_payload_yet');
-  if (!simulated && ingest.live && ingest.cueTrackFound === false) {
+  if (
+    !simulated
+    && ingest.live
+    && ingest.cueTrackConfigured != null
+    && ingest.cueTrackFound === false
+  ) {
     checks.push('cue_track_missing');
   }
 

@@ -968,23 +968,51 @@ main {
 
 .settings-field {
   display: grid;
-  grid-template-columns: minmax(8rem, 14rem) 1fr;
+  grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr);
   gap: 0.5rem 1rem;
-  align-items: center;
+  align-items: start;
   margin-bottom: 0.65rem;
 }
 
-.settings-field:last-child {
-  margin-bottom: 0;
+.settings-field > .settings-input,
+.settings-field > select.settings-input {
+  min-width: 0;
+  width: 100%;
+}
+
+.settings-field-stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  grid-template-columns: unset;
+}
+
+.settings-field-stacked .settings-label {
+  line-height: 1.35;
+}
+
+.settings-field-hint {
+  margin: -0.35rem 0 0.65rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .settings-label {
   font-size: 0.85rem;
   color: var(--muted);
+  line-height: 1.35;
+  padding-top: 0.45rem;
+}
+
+.settings-field-stacked .settings-label {
+  padding-top: 0;
 }
 
 .settings-input {
   width: 100%;
+  min-width: 0;
   padding: 0.45rem 0.6rem;
   font: inherit;
   font-size: 0.95rem;
@@ -992,6 +1020,39 @@ main {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 0.35rem;
+}
+
+select.settings-input {
+  appearance: none;
+  padding-right: 1.75rem;
+  background-color: var(--bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%239aa0a6' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  cursor: pointer;
+}
+
+select.settings-input option {
+  color: var(--text, #e8eaed);
+  background: var(--surface, #1e1e1e);
+}
+
+.settings-field:last-child {
+  margin-bottom: 0;
+}
+
+.settings-page-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 650;
+}
+
+.settings-lead {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.45;
+  max-width: 42rem;
 }
 
 .settings-input:focus {
@@ -1087,10 +1148,14 @@ main {
 
 .ableton-session {
   margin: 0 0 1rem;
-  padding: 0.75rem 0.85rem;
+  padding: 0.85rem 1rem;
   border: 1px solid var(--border);
   border-radius: 0.4rem;
   background: rgba(255, 255, 255, 0.03);
+}
+
+.ableton-session .ableton-session-line:first-of-type {
+  margin-top: 0;
 }
 
 .ableton-session--ok {
@@ -1950,9 +2015,17 @@ body.layout-session > main#app {
   border-color: rgba(91, 141, 239, 0.35);
 }
 
-.session-track--cue {
+.session-track--winner {
   border-color: rgba(62, 207, 142, 0.45);
   box-shadow: inset 3px 0 0 var(--ok);
+}
+
+.session-track--matched {
+  border-color: rgba(91, 141, 239, 0.45);
+}
+
+.session-track--nomatch {
+  border-color: rgba(232, 160, 72, 0.35);
 }
 
 .session-track-meta {
@@ -1969,6 +2042,30 @@ body.layout-session > main#app {
   margin-top: 0.15rem;
   font-size: 0.75rem;
   color: var(--muted);
+}
+
+.session-track-match {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.session-track-match--empty {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.session-track-match--none {
+  color: var(--warn, #e8a048);
+}
+
+.session-track-match--ok {
+  color: rgba(91, 141, 239, 0.95);
+}
+
+.session-track-match--winner {
+  color: var(--ok);
 }
 
 .session-track-clip {
@@ -2010,12 +2107,20 @@ body.layout-session > main#app {
   border-top: 1px solid var(--border);
 }
 
+.session-log-group .settings-field-checkbox {
+  margin-top: 0.25rem;
+}
+
+.session-log-name-field {
+  margin-bottom: 0.5rem;
+}
+
 .session-log-name-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  align-items: center;
-  margin-top: 0.35rem;
+  align-items: stretch;
+  width: 100%;
 }
 
 .session-log-name-row .settings-input {
@@ -2023,6 +2128,17 @@ body.layout-session > main#app {
   min-width: 0;
 }
 
+.session-log-name-row .settings-sync {
+  flex: 0 0 auto;
+  align-self: stretch;
+  white-space: nowrap;
+}
+
 .session-log-status {
   margin-bottom: 0.75rem;
+}
+
+.session-log-hint {
+  margin-top: 0.75rem;
+  margin-bottom: 0;
 }

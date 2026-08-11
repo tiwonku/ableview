@@ -9,7 +9,7 @@ export function findCueTrack(trackNames, configured) {
   }
 
   if (cueTrackConfigured == null) {
-    return { cueTrackConfigured: null, cueTrackFound: false };
+    return { cueTrackConfigured: null, cueTrackFound: null };
   }
 
   const found = trackNames.some(

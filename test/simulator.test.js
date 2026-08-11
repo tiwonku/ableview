@@ -221,9 +221,14 @@ test('config validation rejects bad values', () => {
   assert.throws(() => validateConfig(bad), /oscListenPort[\s\S]*driver/);
 });
 
-test('default config requires an authoritative track for the track strategy', () => {
-  const cfg = structuredClone(DEFAULTS);
-  assert.throws(() => validateConfig(cfg), /authoritative\.track/);
-  cfg.ingest.authoritative.track = 'Cue';
-  assert.equal(validateConfig(cfg), cfg);
+test('track strategy requires an authoritative track; bestMatch does not', () => {
+  const best = structuredClone(DEFAULTS);
+  best.ingest.authoritative = { strategy: 'bestMatch', track: null };
+  assert.equal(validateConfig(best), best);
+
+  const track = structuredClone(DEFAULTS);
+  track.ingest.authoritative = { strategy: 'track', track: null };
+  assert.throws(() => validateConfig(track), /authoritative\.track/);
+  track.ingest.authoritative.track = 'Cue';
+  assert.equal(validateConfig(track), track);
 });

@@ -58,8 +58,8 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       const state = authoritativeTrackState();
       return state ? resolveAuthoritativeClipWithLatch(state) : null;
     }
-    // 'scene' and 'mostRecent' strategies are config-selectable but not
-    // implemented in v2026 M1; fall back to fired-then-playing on watched tracks.
+    // bestMatch / scene / mostRecent: ingest hint is first fired-or-playing
+    // watched clip. Matcher picks the sheet winner from tracks[].
     for (const state of trackState.values()) {
       const clip = resolveAuthoritativeClipWithLatch(state);
       if (clip) return clip;
@@ -68,22 +68,37 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   }
 
   function pendingLaunchOf() {
-    const state = authoritativeTrackState();
-    if (!state) return false;
-    return isPendingLaunch(state.playingSlotIndex, state.firedSlotIndex);
+    const { authoritative } = getIngest();
+    if (authoritative.strategy === 'track') {
+      const state = authoritativeTrackState();
+      if (!state) return false;
+      return isPendingLaunch(state.playingSlotIndex, state.firedSlotIndex);
+    }
+    for (const state of trackState.values()) {
+      if (isPendingLaunch(state.playingSlotIndex, state.firedSlotIndex)) return true;
+    }
+    return false;
   }
 
   function emitNowPlaying() {
     // All watched tracks (including stopped) so Session / ops can see the full
-    // candidate set; clipName/slotIndex are null when nothing is playing.
+    // candidate set. Prefer fired-or-playing (latched) so bestMatch can
+    // anticipate launches the same way the cue-track strategy did.
     const tracks = [...trackState.entries()]
       .sort(([a], [b]) => a - b)
-      .map(([trackIndex, s]) => ({
-        trackIndex,
-        trackName: s.trackName,
-        clipName: s.playingClipName ?? null,
-        slotIndex: isValidSlot(s.playingSlotIndex) ? s.playingSlotIndex : null,
-      }));
+      .map(([trackIndex, s]) => {
+        const clipName = resolveAuthoritativeClipWithLatch(s);
+        const pending = isPendingLaunch(s.playingSlotIndex, s.firedSlotIndex);
+        const slotIndex = pending && isValidSlot(s.firedSlotIndex)
+          ? s.firedSlotIndex
+          : (isValidSlot(s.playingSlotIndex) ? s.playingSlotIndex : null);
+        return {
+          trackIndex,
+          trackName: s.trackName,
+          clipName: clipName ?? null,
+          slotIndex,
+        };
+      });
 
     const pendingLaunch = pendingLaunchOf();
     const event = makeNowPlaying({

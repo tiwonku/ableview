@@ -83,18 +83,23 @@ export function mountSessionLogPanel(selector) {
     fieldset.appendChild(el('legend', null, 'Session log'));
     fieldset.appendChild(renderStatusBox(status));
 
-    const toggleRow = el('div', 'settings-checkbox-row');
     const toggle = el('input');
     toggle.type = 'checkbox';
     toggle.id = 'sessionLogEnabled';
+    toggle.className = 'settings-checkbox';
     toggle.checked = status?.enabled === true;
-    const toggleLabel = el('label', null, 'Enable logging');
+
+    const toggleRow = el('div', 'settings-field settings-field-checkbox');
+    toggleRow.appendChild(toggle);
+    const toggleLabel = el('label', 'settings-checkbox-label', 'Enable logging');
     toggleLabel.htmlFor = 'sessionLogEnabled';
-    toggleRow.append(toggle, toggleLabel);
+    toggleRow.appendChild(toggleLabel);
     fieldset.appendChild(toggleRow);
 
-    const nameLabel = el('label', 'settings-field', 'Session name');
-    fieldset.appendChild(nameLabel);
+    const nameField = el('div', 'settings-field settings-field-stacked session-log-name-field');
+    const nameLabel = el('label', 'settings-label', 'Session name');
+    nameLabel.htmlFor = 'sessionLogName';
+    nameField.appendChild(nameLabel);
 
     const nameRow = el('div', 'session-log-name-row');
     const nameInput = el('input');
@@ -103,14 +108,15 @@ export function mountSessionLogPanel(selector) {
     nameInput.id = 'sessionLogName';
     nameInput.value = status?.sessionName ?? 'test';
     nameInput.placeholder = 'Session name';
-    const applyBtn = el('button', 'settings-btn', 'Apply session name');
+    const applyBtn = el('button', 'settings-sync', 'Apply session name');
     applyBtn.type = 'button';
     nameRow.append(nameInput, applyBtn);
-    fieldset.appendChild(nameRow);
+    nameField.appendChild(nameRow);
+    fieldset.appendChild(nameField);
 
     fieldset.appendChild(el(
       'p',
-      'settings-hint',
+      'settings-hint session-log-hint',
       'Changing the session name starts a new .jsonl file. Applying a name also enables logging. Timestamps use Art-Net SMPTE when live, otherwise local clock.',
     ));
 

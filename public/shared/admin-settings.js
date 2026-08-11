@@ -22,7 +22,16 @@ function el(tag, className, text) {
   return node;
 }
 
-function fieldRow(label, input) {
+function fieldRow(label, input, { stacked = false } = {}) {
+  if (stacked) {
+    const row = el('div', 'settings-field settings-field-stacked');
+    const lab = el('label', 'settings-label', label);
+    if (input.id) lab.htmlFor = input.id;
+    row.appendChild(lab);
+    row.appendChild(input);
+    return row;
+  }
+
   const row = el('label', 'settings-field');
   row.appendChild(el('span', 'settings-label', label));
   row.appendChild(input);
@@ -171,8 +180,7 @@ function renderAbletonSessionBox(ingestStatus, simulated) {
   const configured = ingestStatus.cueTrackConfigured;
   const cueLine = el('p', 'ableton-session-line');
   if (configured == null || configured === '') {
-    cueLine.textContent = 'Cue track: not configured';
-    cueLine.classList.add('warn');
+    cueLine.textContent = 'Cue track: optional (bestMatch uses watched tracks)';
   } else if (ingestStatus.cueTrackFound == null) {
     cueLine.textContent = `Cue track: waiting to verify "${configured}"…`;
   } else if (ingestStatus.cueTrackFound) {
@@ -183,7 +191,7 @@ function renderAbletonSessionBox(ingestStatus, simulated) {
   }
   box.appendChild(cueLine);
 
-  if (!live || ingestStatus.cueTrackFound === false) {
+  if (!live || (configured != null && configured !== '' && ingestStatus.cueTrackFound === false)) {
     box.classList.add('ableton-session--warn');
   } else if (tracks != null) {
     box.classList.add('ableton-session--ok');
@@ -202,6 +210,9 @@ function settingsFromForm(form, current) {
   let track = fd.get('authoritativeTrack')?.trim() ?? '';
   if (track !== '' && /^\d+$/.test(track)) track = Number(track);
 
+  const strategyRaw = fd.get('authoritativeStrategy')?.trim();
+  const strategy = strategyRaw || current.ingest.authoritative?.strategy || 'bestMatch';
+
   return {
     sim: {
       enabled: fd.get('simEnabled') === 'on',
@@ -212,7 +223,7 @@ function settingsFromForm(form, current) {
       oscSendPort: Number(fd.get('oscSendPort')),
       watchedTracks,
       authoritative: {
-        strategy: 'track',
+        strategy,
         track: track === '' ? null : track,
       },
     },
@@ -221,6 +232,7 @@ function settingsFromForm(form, current) {
       headerRow: Number(fd.get('headerRow')),
       matchColumn: fd.get('matchColumn')?.trim() ?? current.sheets.matchColumn,
       aliasColumn: fd.get('aliasColumn')?.trim() ?? current.sheets.aliasColumn,
+      alsFolderColumn: fd.get('alsFolderColumn')?.trim() || current.sheets.alsFolderColumn || null,
       refreshSeconds: Number(fd.get('refreshSeconds')),
     },
     match: {
@@ -267,12 +279,31 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   ingestGroup.appendChild(fieldRow('OSC send port', numberInput('oscSendPort', settings.ingest.oscSendPort, { min: 1, max: 65535 })));
   ingestGroup.appendChild(fieldRow(
     'Watched tracks',
-    textInput('watchedTracks', (settings.ingest.watchedTracks ?? []).join(', '))
+    textInput('watchedTracks', (settings.ingest.watchedTracks ?? []).join(', ')),
+    { stacked: true }
   ));
+  const strategySelect = el('select', 'settings-input');
+  strategySelect.name = 'authoritativeStrategy';
+  for (const [value, label] of [
+    ['bestMatch', 'bestMatch (all watched decks)'],
+    ['track', 'track (single cue track)'],
+  ]) {
+    const opt = el('option', null, label);
+    opt.value = value;
+    if ((settings.ingest.authoritative?.strategy ?? 'bestMatch') === value) {
+      opt.selected = true;
+    }
+    strategySelect.appendChild(opt);
+  }
+  ingestGroup.appendChild(fieldRow('Match strategy', strategySelect));
   ingestGroup.appendChild(fieldRow(
-    'Cue track (name or index)',
-    textInput('authoritativeTrack', settings.ingest.authoritative?.track ?? '')
+    'Cue track',
+    textInput('authoritativeTrack', settings.ingest.authoritative?.track ?? ''),
+    { stacked: true }
   ));
+  const cueHint = el('p', 'settings-field-hint');
+  cueHint.textContent = 'Optional with bestMatch. Required when strategy is track.';
+  ingestGroup.appendChild(cueHint);
   topRow.appendChild(ingestGroup);
 
   const sheetsGroup = el('fieldset', 'settings-group');
@@ -281,6 +312,10 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   sheetsGroup.appendChild(fieldRow('Header row', numberInput('headerRow', settings.sheets.headerRow, { min: 1 })));
   sheetsGroup.appendChild(fieldRow('Match column', textInput('matchColumn', settings.sheets.matchColumn)));
   sheetsGroup.appendChild(fieldRow('Alias column', textInput('aliasColumn', settings.sheets.aliasColumn)));
+  sheetsGroup.appendChild(fieldRow(
+    'ALS Folder column (soft match key)',
+    textInput('alsFolderColumn', settings.sheets.alsFolderColumn ?? 'ALS Folder')
+  ));
   sheetsGroup.appendChild(fieldRow('Refresh (seconds)', numberInput('refreshSeconds', settings.sheets.refreshSeconds, { min: 1 })));
 
   const sheetMeta = el('p', 'settings-sheet-status');

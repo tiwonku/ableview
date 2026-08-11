@@ -550,7 +550,7 @@ function cueTrackStat(ableton) {
   if (!ableton) return { value: '—', warn: false };
   const configured = ableton.cueTrackConfigured;
   if (configured == null || configured === '') {
-    return { value: 'Not configured', warn: true };
+    return { value: 'Not used (bestMatch)', warn: false };
   }
   if (ableton.cueTrackFound == null) {
     return { value: `Waiting… (${configured})`, warn: false };

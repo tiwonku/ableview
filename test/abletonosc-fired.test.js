@@ -59,7 +59,7 @@ test('osc sim: fired clip becomes authoritative before playing slot updates', as
     const pending = events.at(-1);
     assert.equal(pending?.authoritativeClip, 'Song B - Verse', 'switch on fire, not downbeat');
     assert.equal(pending?.pendingLaunch, true);
-    assert.equal(pending?.tracks[0]?.clipName, 'Song A - Intro', 'playing track still previous clip');
+    assert.equal(pending?.tracks[0]?.clipName, 'Song B - Verse', 'tracks expose fired-or-playing candidate');
 
     await wait(120);
     const playing = events.at(-1);

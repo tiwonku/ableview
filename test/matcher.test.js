@@ -5,7 +5,7 @@ import { createLogger } from '../src/core/logger.js';
 import { makeNowPlaying, SOURCES } from '../src/core/now-playing.js';
 import { DEFAULTS } from '../src/config/index.js';
 import { normalizeClipName, parseAliases } from '../src/match/normalize.js';
-import { matchClip, createMatcher } from '../src/match/index.js';
+import { matchClip, matchBestOfTracks, createMatcher } from '../src/match/index.js';
 
 const silentLog = createLogger();
 silentLog.level = 'silent';
@@ -75,7 +75,23 @@ test('normalizeClipName lowercases, strips punctuation, and version tags', () =>
   assert.equal(normalizeClipName('Totally Unknown Clip v3', opts), 'totally unknown clip');
   assert.equal(normalizeClipName('Track - alt', opts), 'track');
   assert.equal(normalizeClipName('Track 128bpm', opts), 'track');
-  assert.equal(normalizeClipName('HotRox_ DRUMS', opts), 'hotrox drums');
+  assert.equal(normalizeClipName('HotRox_ DRUMS', opts), 'hotrox');
+});
+
+test('normalizeClipName strips ALS bpm prefix without parsing musical keys', () => {
+  const opts = { lowercase: true, stripPunctuation: true, stripVersionTags: true };
+  assert.equal(
+    normalizeClipName('Cm_100bpm_Gazing_At_The_Glare 8 BAR INTRO', opts),
+    'gazing at the glare'
+  );
+  assert.equal(
+    normalizeClipName('F#m_100bpm_Miracles_24', opts),
+    'miracles'
+  );
+  assert.equal(
+    normalizeClipName('Cm_100bpm_GazingAtTheGlare_', opts),
+    'gazing at the glare'
+  );
 });
 
 test('parseAliases splits on pipe and comma', () => {
@@ -122,6 +138,114 @@ test('underscore role suffix matches alias stem via prefix', () => {
   assert.equal(payload.match.rowId, '70');
   assert.equal(payload.match.viaAlias, true);
   assert.equal(payload.match.matchedValue, 'HotRox');
+});
+
+test('ALS bpm stem matches Song Title without needing ALS Folder column', () => {
+  const rows = [
+    {
+      rowId: '62',
+      data: {
+        'Clip Name': 'Gazing At The Glare',
+        Aliases: '',
+      },
+    },
+  ];
+  const payload = matchClip(
+    'Cm_100bpm_Gazing_At_The_Glare 8 BAR INTRO',
+    snapshot({ rows }),
+    testConfig({
+      sheets: {
+        ...DEFAULTS.sheets,
+        matchColumn: 'Clip Name',
+        aliasColumn: 'Aliases',
+        alsFolderColumn: null,
+      },
+    })
+  );
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '62');
+  assert.equal(payload.match.matchedValue, 'Gazing At The Glare');
+});
+
+test('ALS folder soft key matches Gazing clip without exact folder string', () => {
+  const rows = [
+    {
+      rowId: '62',
+      data: {
+        'Clip Name': 'Gazing At The Glare',
+        Aliases: '',
+        'ALS Folder': 'Cm_100bpm_GazingAtTheGlare_',
+      },
+    },
+  ];
+  const payload = matchClip(
+    'Cm_100bpm_Gazing_At_The_Glare 8 BAR INTRO',
+    snapshot({ rows }),
+    testConfig({
+      sheets: {
+        ...DEFAULTS.sheets,
+        matchColumn: 'Clip Name',
+        aliasColumn: 'Aliases',
+        alsFolderColumn: 'ALS Folder',
+      },
+    })
+  );
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '62');
+});
+
+test('bestMatch picks song deck over drums cue track', () => {
+  const rows = [
+    {
+      rowId: '62',
+      data: {
+        'Clip Name': 'Gazing At The Glare',
+        Aliases: '',
+        'ALS Folder': 'Cm_100bpm_GazingAtTheGlare_',
+      },
+    },
+  ];
+  const config = testConfig({
+    sheets: {
+      ...DEFAULTS.sheets,
+      matchColumn: 'Clip Name',
+      aliasColumn: 'Aliases',
+      alsFolderColumn: 'ALS Folder',
+    },
+  });
+  const payload = matchBestOfTracks(
+    [
+      { trackIndex: 11, trackName: 'DECK A', clipName: 'DRUMS 1', slotIndex: 402 },
+      { trackIndex: 13, trackName: 'DECK C', clipName: 'Cm_100bpm_Gazing_At_The_Glare 8 BAR INTRO', slotIndex: 384 },
+    ],
+    snapshot({ rows }),
+    config
+  );
+
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '62');
+  assert.equal(payload.clipName, 'Cm_100bpm_Gazing_At_The_Glare 8 BAR INTRO');
+  const winner = payload.trackMatches.find((t) => t.winner);
+  assert.equal(winner?.trackName, 'DECK C');
+  const drums = payload.trackMatches.find((t) => t.trackName === 'DECK A');
+  assert.equal(drums?.matched, false);
+});
+
+test('bestMatch returns no match when two rows tie within confidence gap', () => {
+  const rows = [
+    { rowId: '1', data: { 'Clip Name': 'Alpha Song', Aliases: '' } },
+    { rowId: '2', data: { 'Clip Name': 'Beta Song', Aliases: '' } },
+  ];
+  const payload = matchBestOfTracks(
+    [
+      { trackIndex: 0, trackName: 'A', clipName: 'Alpha Song', slotIndex: 0 },
+      { trackIndex: 1, trackName: 'B', clipName: 'Beta Song', slotIndex: 0 },
+    ],
+    snapshot({ rows }),
+    testConfig({ match: { threshold: 0.4, minConfidenceGap: 0.5 } })
+  );
+  assert.equal(payload.match.matched, false);
+  assert.equal(payload.clipName, null);
 });
 
 test('clip with arrangement suffix matches sheet title via prefix pass', () => {
@@ -222,9 +346,11 @@ test('CuePayload contract keys', () => {
     'stale',
     'syncedAt',
     'tempo',
+    'trackMatches',
     'tracks',
   ]);
   assert.deepEqual(payload.tracks, []);
+  assert.deepEqual(payload.trackMatches, []);
   assert.deepEqual(Object.keys(payload.match).sort(), [
     'confidence',
     'matched',
@@ -387,27 +513,46 @@ test('createMatcher re-emits when beat changes for same clip without re-matching
   assert.equal(payloads[1].match.matchedValue, payloads[0].match.matchedValue);
 });
 
-test('createMatcher forwards watched-track clip changes without rematching', () => {
+test('createMatcher rematches when a watched-track clip changes under bestMatch', () => {
   const bus = createBus();
   const payloads = [];
   bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
 
+  const rows = [
+    {
+      rowId: '62',
+      data: {
+        'Clip Name': 'Gazing At The Glare',
+        Aliases: '',
+        'ALS Folder': 'Cm_100bpm_GazingAtTheGlare_',
+      },
+    },
+  ];
+
   createMatcher({
-    config: testConfig(),
+    config: testConfig({
+      ingest: { ...DEFAULTS.ingest, authoritative: { strategy: 'bestMatch', track: null } },
+      sheets: {
+        ...DEFAULTS.sheets,
+        matchColumn: 'Clip Name',
+        aliasColumn: 'Aliases',
+        alsFolderColumn: 'ALS Folder',
+      },
+    }),
     bus,
     log: silentLog,
-    getSnapshot: () => snapshot(),
+    getSnapshot: () => snapshot({ rows }),
   });
 
   bus.emit(
     EVENTS.NOW_PLAYING,
     makeNowPlaying({
       source: SOURCES.ABLETONOSC,
-      authoritativeClip: 'Song A - Intro',
-      tempo: 128,
+      authoritativeClip: 'DRUMS 1',
+      tempo: 100,
       tracks: [
-        { trackIndex: 0, trackName: 'Cue', clipName: 'Song A - Intro', slotIndex: 0 },
-        { trackIndex: 3, trackName: 'Vocals', clipName: null, slotIndex: null },
+        { trackIndex: 11, trackName: 'DECK A', clipName: 'DRUMS 1', slotIndex: 0 },
+        { trackIndex: 13, trackName: 'DECK C', clipName: null, slotIndex: null },
       ],
     })
   );
@@ -415,17 +560,23 @@ test('createMatcher forwards watched-track clip changes without rematching', () 
     EVENTS.NOW_PLAYING,
     makeNowPlaying({
       source: SOURCES.ABLETONOSC,
-      authoritativeClip: 'Song A - Intro',
-      tempo: 128,
+      authoritativeClip: 'DRUMS 1',
+      tempo: 100,
       tracks: [
-        { trackIndex: 0, trackName: 'Cue', clipName: 'Song A - Intro', slotIndex: 0 },
-        { trackIndex: 3, trackName: 'Vocals', clipName: 'Sample Hit', slotIndex: 4 },
+        { trackIndex: 11, trackName: 'DECK A', clipName: 'DRUMS 1', slotIndex: 0 },
+        {
+          trackIndex: 13,
+          trackName: 'DECK C',
+          clipName: 'Cm_100bpm_Gazing_At_The_Glare 8 BAR INTRO',
+          slotIndex: 4,
+        },
       ],
     })
   );
 
   assert.equal(payloads.length, 2);
-  assert.equal(payloads[0].match.rowId, '5');
-  assert.equal(payloads[1].match.rowId, '5');
-  assert.equal(payloads[1].tracks[1].clipName, 'Sample Hit');
+  assert.equal(payloads[0].match.matched, false);
+  assert.equal(payloads[1].match.matched, true);
+  assert.equal(payloads[1].match.rowId, '62');
+  assert.equal(payloads[1].tracks[1].clipName, 'Cm_100bpm_Gazing_At_The_Glare 8 BAR INTRO');
 });

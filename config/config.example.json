@@ -4,11 +4,14 @@
     "oscSendPort": 11000,
     "abletonHost": "127.0.0.1",
     "watchedTracks": [
-      "Cue"
+      "DECK A",
+      "DECK B",
+      "DECK C",
+      "DECK D"
     ],
     "authoritative": {
-      "strategy": "track",
-      "track": "Cue"
+      "strategy": "bestMatch",
+      "track": null
     }
   },
   "sim": {
@@ -24,6 +27,7 @@
     "headerRow": 4,
     "matchColumn": "Song Title",
     "aliasColumn": "Aliases",
+    "alsFolderColumn": "ALS Folder",
     "refreshSeconds": 30,
     "cacheFile": "./data/sheet-cache.json",
     "editorColumns": {
@@ -37,6 +41,7 @@
   },
   "match": {
     "threshold": 0.4,
+    "minConfidenceGap": 0.08,
     "normalize": {
       "lowercase": true,
       "stripPunctuation": true,
