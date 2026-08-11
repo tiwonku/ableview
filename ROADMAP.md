@@ -19,6 +19,7 @@ Build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claud
 | M11 | Show-box launchers — Windows + macOS parity (optional Inno; extends M6) | 📋 planned — [`docs/plans/M11-show-box-launchers.md`](./docs/plans/M11-show-box-launchers.md) |
 | M12 | Multi-operator edit coordination (presence, revision, conflict warnings) | 📋 planned — [`docs/plans/M12-multi-operator-edit-coordination.md`](./docs/plans/M12-multi-operator-edit-coordination.md) |
 | M13 | External deck monitor — Djay Pro multi-Mac program sources, on-air UI + session log | 📋 planned — [`docs/plans/M13-external-deck-monitor.md`](./docs/plans/M13-external-deck-monitor.md) |
+| M14 | Moments — crew Stream Deck markers via Companion HTTP → session log JSONL (Art-Net timestamps) | 📋 planned — [`docs/plans/M14-moments.md`](./docs/plans/M14-moments.md) |
 
 v2026 core scope (spec §10, §13) is complete. Items below are deferred, partial, or
 post-v2026.
