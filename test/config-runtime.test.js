@@ -30,13 +30,14 @@ function baseConfig(overrides = {}) {
   return { ...config, ...overrides };
 }
 
-test('pickEditableSettings returns ingest, sim, sheets, match, and timecode', () => {
+test('pickEditableSettings returns ingest, sim, sheets, match, timecode, and moments', () => {
   const config = baseConfig();
   const settings = pickEditableSettings(config);
-  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'sheets', 'sim', 'timecode']);
+  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'moments', 'sheets', 'sim', 'timecode']);
   assert.equal(settings.ingest.abletonHost, '127.0.0.1');
   assert.equal(settings.sim.enabled, false);
   assert.equal(settings.timecode.enabled, false);
+  assert.equal(settings.moments.autoStartOnMoment, true);
 });
 
 test('serializeFileConfig excludes secrets and env-only httpPort', () => {

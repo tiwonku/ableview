@@ -148,6 +148,17 @@ body {
   opacity: 0.9;
 }
 
+.session-log-indicator {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  opacity: 0.85;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tempo-indicator::after {
   content: ' BPM';
   letter-spacing: 0.04em;

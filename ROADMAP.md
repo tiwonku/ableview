@@ -19,7 +19,7 @@ Build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claud
 | M11 | Show-box launchers — Windows + macOS parity (optional Inno; extends M6) | 📋 planned — [`docs/plans/M11-show-box-launchers.md`](./docs/plans/M11-show-box-launchers.md) |
 | M12 | Multi-operator edit coordination (presence, revision, conflict warnings) | 📋 planned — [`docs/plans/M12-multi-operator-edit-coordination.md`](./docs/plans/M12-multi-operator-edit-coordination.md) |
 | M13 | External deck monitor — Djay Pro multi-Mac program sources, on-air UI + session log | 📋 planned — [`docs/plans/M13-external-deck-monitor.md`](./docs/plans/M13-external-deck-monitor.md) |
-| M14 | Moments — crew Stream Deck markers via Companion HTTP → session log JSONL; auto-start with timestamp session name; live title on operator views | 📋 planned — [`docs/plans/M14-moments.md`](./docs/plans/M14-moments.md) |
+| M14 | Moments — crew Stream Deck markers via Companion HTTP → session log JSONL; auto-start with timestamp session name; live title on operator views | ✅ done — [`docs/plans/M14-moments.md`](./docs/plans/M14-moments.md), [`docs/companion-moments.md`](./docs/companion-moments.md) |
 
 v2026 core scope (spec §10, §13) is complete. Items below are deferred, partial, or
 post-v2026.
@@ -36,6 +36,7 @@ post-v2026.
 | **Sheet row append** | Add cue rows on no-match from admin (full sheet) or operator views (view fields only; match column injected from clip); `POST /api/sheets/rows`; appends to Google Sheet, updates cache, rematches. | ✅ done |
 | **Responsive operator views** | Viewport-fitted Band/Lighting/Visuals for ultrawide and short displays (e.g. Xeneon Edge 2560×720); multi-column fields, line-clamp + expand for long text. | ✅ done |
 | **Session cue log** | Append-only JSONL (`track_clip` + `match` events in one file); watched-track clip changes + sheet match changes; Art-Net timestamp when live; admin toggle, session name → rotate file; sim auto-start optional. | ✅ done |
+| **Moments (Stream Deck)** | Crew markers via Companion `POST /api/moments` → session JSONL; auto-start with timestamp session name; live log title on operator views over WebSocket. | ✅ done |
 | **bestMatch over watched tracks** | Match all playing watched clips; bpm-stem normalize (no key regex); optional ALS Folder soft key; Session per-deck match/confidence/winner. Cue track optional. | ✅ done |
 
 ---

@@ -55,6 +55,11 @@ export const DEFAULTS = Object.freeze({
     autoStartWhenSim: true,
     defaultSessionName: 'test',
   },
+  moments: {
+    autoStartOnMoment: true,
+    kinds: ['dope'],
+    debounceMs: 0,
+  },
   views: {},
 });
 
@@ -143,6 +148,20 @@ export function validateConfig(config) {
   }
   if (sl.autoStartWhenSim != null && typeof sl.autoStartWhenSim !== 'boolean') {
     errors.push('sessionLog.autoStartWhenSim must be a boolean');
+  }
+
+  const moments = config.moments ?? {};
+  if (moments.autoStartOnMoment != null && typeof moments.autoStartOnMoment !== 'boolean') {
+    errors.push('moments.autoStartOnMoment must be a boolean');
+  }
+  if (moments.kinds != null) {
+    if (!Array.isArray(moments.kinds) || moments.kinds.length === 0
+      || !moments.kinds.every((k) => typeof k === 'string' && k.trim())) {
+      errors.push('moments.kinds must be a non-empty array of strings');
+    }
+  }
+  if (moments.debounceMs != null && !(moments.debounceMs >= 0)) {
+    errors.push('moments.debounceMs must be >= 0');
   }
 
   const views = config.views ?? {};

@@ -1,5 +1,7 @@
 // Session log panel (M10). GET/PATCH /api/session-log — separate from config.json settings.
 
+import { subscribeSessionLog } from './session-log-live.js';
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -35,6 +37,14 @@ function renderStatusBox(status) {
     box.appendChild(el('p', 'ableton-session-line', `File: ${status.filePath}`));
     box.appendChild(el('p', 'ableton-session-line', `Lines: ${status.lineCount ?? 0}`));
     box.appendChild(el('p', 'ableton-session-line', `Last entry: ${formatTime(status.lastLoggedAt)}`));
+    if (status.lastMoment) {
+      const who = status.lastMoment.who ? ` (${status.lastMoment.who})` : '';
+      box.appendChild(el(
+        'p',
+        'ableton-session-line',
+        `Last moment: ${status.lastMoment.kind}${who} at ${formatTime(status.lastMoment.loggedAt)}`,
+      ));
+    }
     const summary = status.launchSummary;
     if (summary && (summary.totalLaunches ?? 0) > 0) {
       const sceneCount = summary.sceneLaunches ?? 0;
@@ -60,6 +70,7 @@ export function mountSessionLogPanel(selector) {
 
   let status = null;
   let pollTimer = null;
+  let unsubscribeLive = null;
 
   const shell = el('div', 'session-log-panel');
   root.appendChild(shell);
@@ -164,6 +175,15 @@ export function mountSessionLogPanel(selector) {
   async function refresh({ silent = false } = {}) {
     try {
       status = await fetchStatus();
+      try {
+        const momentsRes = await fetch('/api/moments');
+        if (momentsRes.ok) {
+          const moments = await momentsRes.json();
+          status.lastMoment = moments.lastMoment ?? null;
+        }
+      } catch {
+        // moments API optional during partial deploy
+      }
       render();
       if (!silent) showBanner(shell, null);
     } catch (err) {
@@ -171,10 +191,23 @@ export function mountSessionLogPanel(selector) {
     }
   }
 
+  function applyLiveSessionLog(sessionLog) {
+    if (!sessionLog) return;
+    status = {
+      ...(status ?? {}),
+      enabled: sessionLog.enabled === true,
+      sessionName: sessionLog.sessionName ?? status?.sessionName ?? 'test',
+      lastLoggedAt: sessionLog.lastLoggedAt ?? status?.lastLoggedAt ?? null,
+    };
+    render();
+  }
+
   refresh();
   pollTimer = setInterval(() => refresh({ silent: true }), 5000);
+  unsubscribeLive = subscribeSessionLog(applyLiveSessionLog);
 
   return () => {
     if (pollTimer) clearInterval(pollTimer);
+    unsubscribeLive?.();
   };
 }

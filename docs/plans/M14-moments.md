@@ -725,10 +725,10 @@ Use `node:test`, `assert`, temp dir via `fs.mkdtempSync`.
 
 ## 16. Milestone completion checklist
 
-- [ ] M14a — config + `logMoment()` + auto-start naming + tests
-- [ ] M14b — POST/GET `/api/moments` + WS broadcast + API tests
-- [ ] M14c — operator status bar + admin settings + live settings panel
-- [ ] M14d — `docs/companion-moments.md` + ROADMAP
+- [x] M14a — config + `logMoment()` + auto-start naming + tests
+- [x] M14b — POST/GET `/api/moments` + WS broadcast + API tests
+- [x] M14c — operator status bar + admin settings + live settings panel
+- [x] M14d — `docs/companion-moments.md` + ROADMAP
 - [ ] Manual QA: Companion POST with logging off → operator view status bar updates without refresh
 
 ---

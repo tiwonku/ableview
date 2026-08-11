@@ -59,6 +59,7 @@ export function connectView({
   let viewsList = null;
   let lastPayload = null;
   let lastStatus = null;
+  let lastSessionLog = null;
   let lastUpdate = null;
   let connected = false;
   let stopped = false;
@@ -81,7 +82,12 @@ export function connectView({
     if (lastPayload) {
       lastPayload = { ...lastPayload, simulated: serverSimulated };
     }
-    setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);
+    setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
+  }
+
+  function applySessionLogState(sessionLog) {
+    lastSessionLog = sessionLog ?? null;
+    setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
   }
 
   function scheduleReconnect() {
@@ -136,6 +142,7 @@ export function connectView({
       );
       document.body.classList.toggle('layout-session', isSession);
       if (msg.status) lastStatus = msg.status;
+      if (msg.sessionLog) applySessionLogState(msg.sessionLog);
       applySimState(msg.simulated === true);
       if (msg.payload) {
         lastPayload = msg.payload;
@@ -148,6 +155,16 @@ export function connectView({
 
     if (msg.type === 'simState') {
       applySimState(msg.simulated === true);
+      render();
+      return;
+    }
+
+    if (msg.type === 'sessionLog' && msg.sessionLog) {
+      applySessionLogState(msg.sessionLog);
+      if (editSession || aliasSession) {
+        updateLiveChromeDuringEdit();
+        return;
+      }
       render();
       return;
     }
@@ -415,7 +432,7 @@ export function connectView({
       aliasColumn,
     };
     if (statusOnly) {
-      setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);
+      setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
       return;
     }
     const aliasFocus = aliasSession ? captureAliasPanelFocus() : null;
@@ -479,7 +496,7 @@ export function connectView({
 
   function setConnected(next) {
     connected = next;
-    setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);
+    setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
   }
 
   function connect() {

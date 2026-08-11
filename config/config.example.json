@@ -63,6 +63,11 @@
     "autoStartWhenSim": true,
     "defaultSessionName": "test"
   },
+  "moments": {
+    "autoStartOnMoment": true,
+    "kinds": ["dope", "not_dope"],
+    "debounceMs": 0
+  },
   "views": {
     "band": {
       "title": "Band",

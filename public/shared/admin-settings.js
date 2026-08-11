@@ -7,11 +7,18 @@ const TIMECODE_DEFAULTS = Object.freeze({
   staleMs: 500,
 });
 
+const MOMENTS_DEFAULTS = Object.freeze({
+  autoStartOnMoment: true,
+  kinds: ['dope'],
+  debounceMs: 0,
+});
+
 function normalizeSettings(raw) {
   if (!raw) return raw;
   return {
     ...raw,
     timecode: { ...TIMECODE_DEFAULTS, ...raw.timecode },
+    moments: { ...MOMENTS_DEFAULTS, ...raw.moments },
   };
 }
 
@@ -244,6 +251,14 @@ function settingsFromForm(form, current) {
       bindAddress: fd.get('timecodeBindAddress')?.trim() ?? current.timecode?.bindAddress ?? '0.0.0.0',
       staleMs: Number(fd.get('timecodeStaleMs')),
     },
+    moments: {
+      autoStartOnMoment: fd.get('momentsAutoStart') === 'on',
+      kinds: (fd.get('momentsKinds')?.trim() ?? 'dope')
+        .split(/[,\s]+/)
+        .map((k) => k.trim())
+        .filter(Boolean),
+      debounceMs: Number(fd.get('momentsDebounceMs')),
+    },
   };
 }
 
@@ -403,6 +418,35 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   timecodeGroup.appendChild(tcHint);
 
   bottomRow.appendChild(timecodeGroup);
+
+  const momentsGroup = el('fieldset', 'settings-group');
+  momentsGroup.appendChild(el('legend', null, 'Moments (Stream Deck)'));
+  const momentsAuto = settings.moments?.autoStartOnMoment !== false;
+  const momentsAutoCheck = el('input');
+  momentsAutoCheck.type = 'checkbox';
+  momentsAutoCheck.name = 'momentsAutoStart';
+  momentsAutoCheck.id = 'momentsAutoStart';
+  momentsAutoCheck.className = 'settings-checkbox';
+  momentsAutoCheck.checked = momentsAuto;
+  const momentsAutoRow = el('div', 'settings-field settings-field-checkbox');
+  momentsAutoRow.appendChild(momentsAutoCheck);
+  const momentsAutoLabel = el('label', 'settings-checkbox-label');
+  momentsAutoLabel.htmlFor = 'momentsAutoStart';
+  momentsAutoLabel.textContent = 'Auto-start session log on first moment tap';
+  momentsAutoRow.appendChild(momentsAutoLabel);
+  momentsGroup.appendChild(momentsAutoRow);
+  momentsGroup.appendChild(fieldRow(
+    'Allowed kinds (comma-separated)',
+    textInput('momentsKinds', (settings.moments?.kinds ?? ['dope']).join(', ')),
+  ));
+  momentsGroup.appendChild(fieldRow(
+    'Debounce (ms, 0 = off)',
+    numberInput('momentsDebounceMs', settings.moments?.debounceMs ?? 0, { min: 0, step: 50 }),
+  ));
+  const momentsHint = el('p', 'settings-sim-hint');
+  momentsHint.textContent = 'Crew Stream Deck buttons POST to /api/moments via Companion. When auto-start is on, the first tap creates a timestamp session name and updates operator views live.';
+  momentsGroup.appendChild(momentsHint);
+  bottomRow.appendChild(momentsGroup);
 
   const matchGroup = el('fieldset', 'settings-group');
   matchGroup.appendChild(el('legend', null, 'Matching'));

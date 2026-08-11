@@ -12,6 +12,18 @@ import { sanitizeSessionName, sessionFilePath } from './sanitize.js';
 import { resolveLogTimestamp } from './timestamp.js';
 import { clipKey, diffTracks, matchKey, trackStateKey } from './tracks.js';
 import { buildLaunchRecord, emptyLaunchSummary, incrementLaunchSummary, launchLogKey } from './launch.js';
+import { generateAutoSessionName } from './auto-session-name.js';
+import {
+  SessionLogDisabledError,
+  MomentDebouncedError,
+  normalizeWho,
+  normalizeNote,
+  resolveKind,
+  momentDebounceKey,
+} from './moments.js';
+
+export { SessionLogDisabledError } from './moments.js';
+export { generateAutoSessionName } from './auto-session-name.js';
 
 const SIDECAR_NAME = '.active.json';
 
@@ -47,6 +59,7 @@ export function createSessionLogger({
   getSimulated,
   log,
   cwd = process.cwd(),
+  onSessionLogChange,
 }) {
   let enabled = false;
   let sessionName = null;
@@ -61,12 +74,28 @@ export function createSessionLogger({
   let lastMatchKey = null;
   let lastLaunchKey = null;
   let launchSummary = emptyLaunchSummary();
+  let lastMoment = null;
+  let lastMomentDebounceKey = null;
+  let lastMomentDebounceAt = 0;
+  let sessionLogChangeHandler = onSessionLogChange ?? null;
 
   let onNowPlaying = null;
   let onCuePayload = null;
 
   function sessionConfig() {
     return getConfig().sessionLog ?? {};
+  }
+
+  function momentsConfig() {
+    return getConfig().moments ?? {};
+  }
+
+  function notifySessionLogChange() {
+    sessionLogChangeHandler?.();
+  }
+
+  function setOnSessionLogChange(handler) {
+    sessionLogChangeHandler = handler ?? null;
   }
 
   function sidecarPath() {
@@ -227,9 +256,10 @@ export function createSessionLogger({
     closeStream();
     resetDedupeState();
     persistSidecar();
+    notifySessionLogChange();
   }
 
-  function enableLogging(name) {
+  function enableLogging(name, { notify = true } = {}) {
     const sanitized = sanitizeSessionName(name);
     const rotating = sessionName !== sanitized || !absolutePath;
     if (rotating) {
@@ -241,6 +271,81 @@ export function createSessionLogger({
     enabled = true;
     persistSidecar();
     log.info({ sessionName: sanitized, file: filePath }, 'session log enabled');
+    if (notify) notifySessionLogChange();
+  }
+
+  function logMoment({ kind: rawKind, who: rawWho, note: rawNote } = {}) {
+    const cfg = momentsConfig();
+    let sessionLogStarted = false;
+
+    if (!enabled) {
+      if (cfg.autoStartOnMoment !== false) {
+        enableLogging(generateAutoSessionName(), { notify: false });
+        sessionLogStarted = true;
+      } else {
+        throw new SessionLogDisabledError();
+      }
+    }
+
+    const kind = resolveKind(rawKind, cfg.kinds);
+    const who = normalizeWho(rawWho);
+    const note = normalizeNote(rawNote);
+
+    const debounceMs = cfg.debounceMs ?? 0;
+    if (debounceMs > 0) {
+      const key = momentDebounceKey(kind, who);
+      const now = Date.now();
+      if (key === lastMomentDebounceKey && now - lastMomentDebounceAt < debounceMs) {
+        throw new MomentDebouncedError(debounceMs - (now - lastMomentDebounceAt));
+      }
+      lastMomentDebounceKey = key;
+      lastMomentDebounceAt = now;
+    }
+
+    const simulated = typeof getSimulated === 'function' ? getSimulated() === true : false;
+    const envelope = timestampEnvelope();
+    const record = {
+      ...envelope,
+      event: 'moment',
+      kind,
+      who,
+      note,
+      sessionName,
+      simulated,
+    };
+    appendRecord(record);
+
+    lastMoment = {
+      loggedAt: envelope.loggedAt,
+      kind,
+      who,
+      note,
+    };
+
+    notifySessionLogChange();
+
+    return {
+      ok: true,
+      timestamp: envelope.timestamp,
+      timestampSource: envelope.timestampSource,
+      loggedAt: envelope.loggedAt,
+      kind,
+      who,
+      sessionName,
+      ...(sessionLogStarted ? { sessionLogStarted: true } : {}),
+    };
+  }
+
+  function getMomentsStatus() {
+    const cfg = momentsConfig();
+    const status = getStatus();
+    return {
+      ok: true,
+      sessionLogEnabled: status.enabled === true,
+      sessionName: status.sessionName,
+      kinds: cfg.kinds ?? ['dope'],
+      lastMoment: lastMoment ? { ...lastMoment } : null,
+    };
   }
 
   function getStatus() {
@@ -284,6 +389,7 @@ export function createSessionLogger({
     if (nextName !== undefined) {
       sessionName = sanitizeSessionName(nextName);
       persistSidecar();
+      notifySessionLogChange();
     }
 
     return getStatus();
@@ -304,9 +410,9 @@ export function createSessionLogger({
       launchSummary = sidecar.launchSummary ?? emptyLaunchSummary();
       log.info({ sessionName, restored: true }, 'session log restored from sidecar');
     } else if (cfg.autoStart === true) {
-      enableLogging(cfg.defaultSessionName ?? 'test');
+      enableLogging(cfg.defaultSessionName ?? 'test', { notify: false });
     } else if (cfg.autoStartWhenSim !== false && getConfig().sim?.enabled === true) {
-      enableLogging(cfg.defaultSessionName ?? 'test');
+      enableLogging(cfg.defaultSessionName ?? 'test', { notify: false });
     } else {
       sessionName = sanitizeSessionName(cfg.defaultSessionName ?? 'test');
       persistSidecar();
@@ -334,7 +440,10 @@ export function createSessionLogger({
     start,
     stop,
     getStatus,
+    getMomentsStatus,
     applyPatch,
+    logMoment,
+    setOnSessionLogChange,
     handleNowPlaying,
     handleCuePayload,
   };

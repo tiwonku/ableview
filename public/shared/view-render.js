@@ -531,7 +531,7 @@ function resolveConnectionState(connected, payload, simulated) {
   return { text: 'Connected', mode: 'connected' };
 }
 
-function updateStatusBar({ connected, lastUpdate, payload, simulated = null }) {
+function updateStatusBar({ connected, lastUpdate, payload, simulated = null, sessionLog = null }) {
   const bar = document.getElementById('status-bar');
   if (!bar) return;
 
@@ -611,10 +611,26 @@ function updateStatusBar({ connected, lastUpdate, payload, simulated = null }) {
   if (simPill) simPill.hidden = !simOn;
   if (stalePill) stalePill.hidden = !staleOn;
   bar.classList.toggle('status-bar--alert', simOn || staleOn || mode === 'ingest-stale');
+
+  const sessionLogEl = bar.querySelector('[data-role="session-log"]');
+  if (sessionLogEl) {
+    const logging = sessionLog?.enabled === true && sessionLog?.sessionName;
+    if (logging) {
+      sessionLogEl.hidden = false;
+      sessionLogEl.textContent = `Log: ${sessionLog.sessionName}`;
+      sessionLogEl.title = `Session log: ${sessionLog.sessionName}.jsonl`;
+      sessionLogEl.setAttribute('aria-label', `Session log ${sessionLog.sessionName}`);
+    } else {
+      sessionLogEl.hidden = true;
+      sessionLogEl.textContent = '';
+      sessionLogEl.removeAttribute('title');
+      sessionLogEl.removeAttribute('aria-label');
+    }
+  }
 }
 
-export function setConnectionState(connected, lastUpdate, payload, simulated = null) {
-  updateStatusBar({ connected, lastUpdate, payload, simulated });
+export function setConnectionState(connected, lastUpdate, payload, simulated = null, sessionLog = null) {
+  updateStatusBar({ connected, lastUpdate, payload, simulated, sessionLog });
 }
 
 function formatTimestamp(iso) {

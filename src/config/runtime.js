@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { validateConfig } from './index.js';
 
 /** Sections editable from the admin settings panel (M7). */
-export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match', 'timecode'];
+export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match', 'timecode', 'moments'];
 
 function deepMerge(base, override) {
   if (override === undefined) return base;
@@ -31,6 +31,7 @@ export function serializeFileConfig(config) {
     server: { wsHeartbeatSeconds: config.server.wsHeartbeatSeconds },
     timecode: { ...config.timecode },
     sessionLog: { ...config.sessionLog },
+    moments: { ...config.moments },
     views: { ...config.views },
   };
 }
@@ -42,6 +43,7 @@ export function pickEditableSettings(config) {
     sheets: { ...config.sheets },
     match: { ...config.match },
     timecode: { ...config.timecode },
+    moments: { ...config.moments },
   };
 }
 

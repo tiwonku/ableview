@@ -7,6 +7,7 @@ import { registerConfigRoutes } from './config-api.js';
 import { registerSheetsRoutes } from './sheets-api.js';
 import { registerSimRoutes } from './sim-api.js';
 import { registerSessionLogRoutes } from './session-log-api.js';
+import { registerMomentsRoutes, buildSessionLogBroadcast } from './moments-api.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
@@ -87,6 +88,14 @@ export async function createViewServer({
     }
   }
 
+  function broadcastSessionLog() {
+    if (!sessionLog) return;
+    broadcast({
+      type: 'sessionLog',
+      sessionLog: buildSessionLogBroadcast(sessionLog),
+    });
+  }
+
   bus.on(EVENTS.CUE_PAYLOAD, (payload) => {
     lastPayload = clientPayload(payload);
     broadcast({ type: 'cue', payload: lastPayload });
@@ -139,6 +148,8 @@ export async function createViewServer({
 
   if (sessionLog) {
     registerSessionLogRoutes(app, { sessionLog, log });
+    registerMomentsRoutes(app, { sessionLog, log });
+    sessionLog.setOnSessionLogChange?.(broadcastSessionLog);
   }
 
   app.get('/views/:name', async (req, reply) => {
@@ -200,6 +211,9 @@ export async function createViewServer({
         title: v.title ?? id,
       })),
     };
+    if (sessionLog) {
+      init.sessionLog = buildSessionLogBroadcast(sessionLog);
+    }
     if (viewConfig.system) {
       init.system = true;
       init.status = buildStatus();
@@ -257,6 +271,7 @@ export async function createViewServer({
     getClientCount: () => clients.size,
     getConnectedViewCount,
     rebroadcastSimState,
+    broadcastSessionLog,
     async stop() {
       if (timecodeBroadcastTimer) clearTimeout(timecodeBroadcastTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
