@@ -4,7 +4,6 @@ import { parseRgbCell } from './color-parse.js';
 import {
   getFieldValue,
   fieldLabel,
-  isLiveField,
   resolveFieldDisplay,
   groupFieldsForLayout,
   resolveFieldsLayoutMode,
@@ -177,9 +176,13 @@ function renderNoMatchPanel(root, {
 
   const message = document.createElement('p');
   message.className = 'no-match';
-  message.textContent = playing
-    ? 'No confident match — link a playing clip to the cue sheet below.'
-    : 'No confident match — check the cue sheet or clip name.';
+  if (playing) {
+    message.textContent = editable
+      ? 'No confident match — link a playing clip to the cue sheet below.'
+      : 'No confident match — link a playing clip to the cue sheet on the admin view.';
+  } else {
+    message.textContent = 'No confident match — check the cue sheet or clip name.';
+  }
   noMatch.appendChild(message);
 
   if (playing) {
@@ -281,9 +284,7 @@ export function renderView(root, {
       saveError,
     });
   } else if (!busy && fields?.length) {
-    const visibleFields = matched
-      ? fields
-      : fields.filter((f) => isLiveField(f));
+    const visibleFields = matched ? fields : [];
 
     if (matched && editable && onStartEdit) {
       const editBar = document.createElement('div');
