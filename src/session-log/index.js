@@ -52,6 +52,26 @@ function countLinesInFile(filePath) {
   }
 }
 
+function countMomentsInFile(filePath) {
+  try {
+    if (!existsSync(filePath)) return 0;
+    const content = readFileSync(filePath, 'utf8');
+    if (!content) return 0;
+    let count = 0;
+    for (const line of content.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        if (JSON.parse(line).event === 'moment') count += 1;
+      } catch {
+        // skip malformed lines
+      }
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
 export function createSessionLogger({
   bus,
   getConfig,
@@ -75,6 +95,7 @@ export function createSessionLogger({
   let lastLaunchKey = null;
   let launchSummary = emptyLaunchSummary();
   let lastMoment = null;
+  let momentCount = 0;
   let lastMomentDebounceKey = null;
   let lastMomentDebounceAt = 0;
   let sessionLogChangeHandler = onSessionLogChange ?? null;
@@ -137,9 +158,11 @@ export function createSessionLogger({
     absolutePath = file;
     if (!existed) {
       lineCount = 0;
+      momentCount = 0;
       startedAt = new Date().toISOString();
     } else {
       lineCount = countLinesInFile(file);
+      momentCount = countMomentsInFile(file);
       startedAt = startedAt ?? new Date().toISOString();
     }
   }
@@ -314,6 +337,7 @@ export function createSessionLogger({
       simulated,
     };
     appendRecord(record);
+    momentCount += 1;
 
     lastMoment = {
       loggedAt: envelope.loggedAt,
@@ -326,12 +350,14 @@ export function createSessionLogger({
 
     return {
       ok: true,
+      feedbackState: 'success',
       timestamp: envelope.timestamp,
       timestampSource: envelope.timestampSource,
       loggedAt: envelope.loggedAt,
       kind,
       who,
       sessionName,
+      momentCount,
       ...(sessionLogStarted ? { sessionLogStarted: true } : {}),
     };
   }
@@ -343,6 +369,7 @@ export function createSessionLogger({
       ok: true,
       sessionLogEnabled: status.enabled === true,
       sessionName: status.sessionName,
+      momentCount: status.enabled ? momentCount : 0,
       kinds: cfg.kinds ?? ['dope'],
       lastMoment: lastMoment ? { ...lastMoment } : null,
     };
@@ -358,6 +385,7 @@ export function createSessionLogger({
       lineCount: enabled ? lineCount : 0,
       startedAt: enabled ? startedAt : null,
       lastLoggedAt: enabled ? lastLoggedAt : null,
+      momentCount: enabled ? momentCount : 0,
       launchSummary: enabled ? { ...launchSummary } : emptyLaunchSummary(),
       config: {
         directory: cfg.directory ?? './data/sessions',

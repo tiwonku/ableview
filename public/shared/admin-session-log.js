@@ -36,6 +36,7 @@ function renderStatusBox(status) {
   if (enabled && status.filePath) {
     box.appendChild(el('p', 'ableton-session-line', `File: ${status.filePath}`));
     box.appendChild(el('p', 'ableton-session-line', `Lines: ${status.lineCount ?? 0}`));
+    box.appendChild(el('p', 'ableton-session-line', `Moments this session: ${status.momentCount ?? 0}`));
     box.appendChild(el('p', 'ableton-session-line', `Last entry: ${formatTime(status.lastLoggedAt)}`));
     if (status.lastMoment) {
       const who = status.lastMoment.who ? ` (${status.lastMoment.who})` : '';
@@ -180,6 +181,7 @@ export function mountSessionLogPanel(selector) {
         if (momentsRes.ok) {
           const moments = await momentsRes.json();
           status.lastMoment = moments.lastMoment ?? null;
+          status.momentCount = moments.momentCount ?? status.momentCount ?? 0;
         }
       } catch {
         // moments API optional during partial deploy
@@ -198,6 +200,7 @@ export function mountSessionLogPanel(selector) {
       enabled: sessionLog.enabled === true,
       sessionName: sessionLog.sessionName ?? status?.sessionName ?? 'test',
       lastLoggedAt: sessionLog.lastLoggedAt ?? status?.lastLoggedAt ?? null,
+      momentCount: sessionLog.momentCount ?? status?.momentCount ?? 0,
     };
     render();
   }

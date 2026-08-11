@@ -11,21 +11,25 @@ import {
 function mapMomentError(err, reply) {
   if (err instanceof SessionLogDisabledError) {
     return reply.code(409).send({
+      ok: false,
+      feedbackState: 'error',
       error: err.code,
       message: err.message,
     });
   }
   if (err instanceof UnknownKindError) {
-    return reply.code(400).send({ error: err.code, kind: err.kind });
+    return reply.code(400).send({ ok: false, feedbackState: 'error', error: err.code, kind: err.kind });
   }
   if (err instanceof WhoTooLongError) {
-    return reply.code(400).send({ error: err.code });
+    return reply.code(400).send({ ok: false, feedbackState: 'error', error: err.code });
   }
   if (err instanceof NoteTooLongError) {
-    return reply.code(400).send({ error: err.code });
+    return reply.code(400).send({ ok: false, feedbackState: 'error', error: err.code });
   }
   if (err instanceof MomentDebouncedError) {
     return reply.code(429).send({
+      ok: false,
+      feedbackState: 'warning',
       error: err.code,
       retryAfterMs: Math.max(0, Math.ceil(err.retryAfterMs)),
     });
@@ -63,5 +67,6 @@ export function buildSessionLogBroadcast(sessionLog) {
     enabled: snap.enabled === true,
     sessionName: snap.sessionName ?? null,
     lastLoggedAt: snap.lastLoggedAt ?? null,
+    momentCount: snap.momentCount ?? 0,
   };
 }

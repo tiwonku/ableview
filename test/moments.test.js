@@ -148,14 +148,26 @@ test('resolveKind defaults to dope', () => {
   assert.equal(normalizeWho(''), null);
 });
 
-test('getMomentsStatus reflects last moment', () => {
+test('getMomentsStatus reflects last moment and count', () => {
   const { logger } = tempLogger();
   logger.start();
   logger.applyPatch({ enabled: true, sessionName: 'show' });
   logger.logMoment({ kind: 'dope', who: 'bass' });
+  logger.logMoment({ kind: 'dope', who: 'keys' });
   const status = logger.getMomentsStatus();
   assert.equal(status.sessionLogEnabled, true);
+  assert.equal(status.momentCount, 2);
   assert.equal(status.lastMoment.kind, 'dope');
-  assert.equal(status.lastMoment.who, 'bass');
+  assert.equal(status.lastMoment.who, 'keys');
+  logger.stop();
+});
+
+test('logMoment returns feedbackState success and momentCount', () => {
+  const { logger } = tempLogger();
+  logger.start();
+  logger.applyPatch({ enabled: true, sessionName: 'show' });
+  const result = logger.logMoment({ kind: 'dope', who: 'drums' });
+  assert.equal(result.feedbackState, 'success');
+  assert.equal(result.momentCount, 1);
   logger.stop();
 });

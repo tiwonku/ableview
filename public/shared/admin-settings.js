@@ -444,7 +444,7 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
     numberInput('momentsDebounceMs', settings.moments?.debounceMs ?? 0, { min: 0, step: 50 }),
   ));
   const momentsHint = el('p', 'settings-sim-hint');
-  momentsHint.textContent = 'Crew Stream Deck buttons POST to /api/moments via Companion. When auto-start is on, the first tap creates a timestamp session name and updates operator views live.';
+  momentsHint.textContent = 'Crew Stream Deck buttons POST to /api/moments via Companion. When auto-start is on, the first tap creates a timestamp session name and updates operator views live. Moment count appears in the Session log panel below.';
   momentsGroup.appendChild(momentsHint);
   bottomRow.appendChild(momentsGroup);
 

@@ -95,6 +95,7 @@ test('GET /api/moments returns disabled status by default', async () => {
   const body = await res.json();
   assert.equal(body.sessionLogEnabled, false);
   assert.equal(body.lastMoment, null);
+  assert.equal(body.momentCount, 0);
   assert.deepEqual(body.kinds, ['dope']);
 
   await stopTestServer(ctx);
@@ -112,8 +113,10 @@ test('POST /api/moments auto-starts logging with timestamp session name', async 
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.ok, true);
+  assert.equal(body.feedbackState, 'success');
   assert.equal(body.kind, 'dope');
   assert.equal(body.who, 'keys');
+  assert.equal(body.momentCount, 1);
   assert.equal(body.sessionLogStarted, true);
   assert.match(body.sessionName, /^\d{4}-\d{2}-\d{2}_\d{6}$/);
 
@@ -138,6 +141,7 @@ test('POST /api/moments returns 409 when auto-start disabled', async () => {
   assert.equal(res.status, 409);
   const body = await res.json();
   assert.equal(body.error, 'session_log_disabled');
+  assert.equal(body.feedbackState, 'error');
 
   await stopTestServer(ctx);
 });
@@ -159,6 +163,7 @@ test('POST /api/moments returns 400 for unknown kind', async () => {
   assert.equal(res.status, 400);
   const body = await res.json();
   assert.equal(body.error, 'unknown_kind');
+  assert.equal(body.feedbackState, 'error');
 
   await stopTestServer(ctx);
 });
@@ -191,6 +196,7 @@ test('WS client receives sessionLog on init and after moment auto-start', async 
 
   const sessionMsg = await postPromise;
   assert.equal(sessionMsg.sessionLog.enabled, true);
+  assert.equal(sessionMsg.sessionLog.momentCount, 1);
   assert.match(sessionMsg.sessionLog.sessionName, /^\d{4}-\d{2}-\d{2}_\d{6}$/);
 
   ws.close();
