@@ -25,6 +25,7 @@ function secondaryLabel(result) {
  * @param {HTMLElement} parent
  * @param {{
  *   clipName: string,
+ *   trackLabel?: string|null,
  *   aliasText: string,
  *   query: string,
  *   results: Array,
@@ -44,6 +45,7 @@ function secondaryLabel(result) {
 export function renderAliasPanel(parent, opts) {
   const {
     clipName,
+    trackLabel = null,
     aliasText,
     query,
     results = [],
@@ -89,7 +91,9 @@ export function renderAliasPanel(parent, opts) {
     el(
       'p',
       'alias-panel-context',
-      `Link clip "${clipName}" to an existing cue row via the ${aliasColumn || 'Aliases'} column.`
+      opts.trackLabel
+        ? `Link ${opts.trackLabel} clip "${clipName}" to an existing cue row via the ${aliasColumn || 'Aliases'} column.`
+        : `Link clip "${clipName}" to an existing cue row via the ${aliasColumn || 'Aliases'} column.`
     )
   );
 
@@ -215,10 +219,15 @@ export function renderAliasPanel(parent, opts) {
   });
 }
 
-export function createAliasSession(clipName) {
+export function createAliasSession(clipName, { trackName = null, trackIndex = null } = {}) {
   const name = String(clipName ?? '').trim();
+  const trackLabel = trackName?.trim()
+    || (trackIndex != null ? `track ${trackIndex}` : null);
   return {
     clipName: name,
+    trackName: trackName ?? null,
+    trackIndex: trackIndex ?? null,
+    trackLabel,
     aliasText: suggestAliasStem(name),
     query: suggestAliasStem(name),
     results: [],

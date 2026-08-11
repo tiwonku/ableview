@@ -2028,6 +2028,32 @@ body.layout-session > main#app {
   border-color: rgba(232, 160, 72, 0.35);
 }
 
+.session-track--alias-target {
+  border-color: var(--accent, #4c8bf5);
+  box-shadow: inset 3px 0 0 var(--accent, #4c8bf5);
+}
+
+.session-track-actions {
+  margin-top: 0.45rem;
+}
+
+.session-track-alias-btn {
+  margin: 0;
+  padding: 0.3rem 0.55rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(76, 139, 245, 0.12);
+  border: 1px solid rgba(76, 139, 245, 0.45);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.session-track-alias-btn:hover {
+  background: rgba(76, 139, 245, 0.2);
+}
+
 .session-track-meta {
   min-width: 0;
 }

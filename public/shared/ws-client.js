@@ -201,12 +201,16 @@ export function connectView({
     render();
   }
 
-  function startAlias() {
-    const clipName = lastPayload?.clipName?.trim();
-    if (!clipName || lastPayload?.match?.matched === true) return;
+  function startAlias(clipNameOverride, track = null) {
+    const clipName = (clipNameOverride ?? lastPayload?.clipName)?.trim();
+    if (!clipName) return;
+    if (!clipNameOverride && lastPayload?.match?.matched === true) return;
     if (editSession) cancelEdit();
 
-    aliasSession = createAliasSession(clipName);
+    aliasSession = createAliasSession(clipName, {
+      trackName: track?.trackName ?? null,
+      trackIndex: track?.trackIndex ?? null,
+    });
     saveState = 'idle';
     saveError = null;
     render();
@@ -367,6 +371,7 @@ export function connectView({
     if (!aliasSession) return null;
     return {
       clipName: aliasSession.clipName,
+      trackLabel: aliasSession.trackLabel ?? null,
       aliasText: aliasSession.aliasText,
       query: aliasSession.query,
       results: aliasSession.results,
@@ -397,11 +402,16 @@ export function connectView({
       setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);
       return;
     }
+    const aliasPanel = buildAliasPanelProps();
     if (viewId === 'session') {
-      renderSession(root, ctx);
+      renderSession(root, {
+        ...ctx,
+        aliasSession,
+        aliasPanel,
+        onStartAlias: startAlias,
+      });
       return;
     }
-    const aliasPanel = buildAliasPanelProps();
     if (viewConfig.system) {
       renderAdmin(root, {
         ...ctx,

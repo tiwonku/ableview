@@ -1,6 +1,7 @@
-// Session view: watched tracks + per-track match confidence.
+// Session view: watched tracks + per-track match confidence + alias linking.
 
 import { setConnectionState } from './view-render.js';
+import { renderAliasPanel } from './alias-panel.js';
 
 function trackRows(payload) {
   const tracks = Array.isArray(payload?.tracks) ? payload.tracks : [];
@@ -21,12 +22,40 @@ function formatConfidence(confidence) {
   return `${Math.round(confidence * 100)}%`;
 }
 
+function isAliasTargetTrack(aliasSession, track) {
+  if (!aliasSession) return false;
+  if (aliasSession.trackIndex != null && track.trackIndex != null) {
+    return aliasSession.trackIndex === track.trackIndex;
+  }
+  if (aliasSession.trackName && track.trackName) {
+    return aliasSession.trackName === track.trackName;
+  }
+  return aliasSession.clipName === track.clipName;
+}
+
 /**
  * @param {HTMLElement} root
- * @param {{ title?: string, payload?: object|null, connected?: boolean, lastUpdate?: Date|null }} ctx
+ * @param {{
+ *   title?: string,
+ *   payload?: object|null,
+ *   connected?: boolean,
+ *   lastUpdate?: Date|null,
+ *   aliasSession?: object|null,
+ *   aliasPanel?: object|null,
+ *   onStartAlias?: (clipName: string, track?: object) => void,
+ * }} ctx
  */
 export function renderSession(root, ctx) {
-  const { title, payload, connected, lastUpdate } = ctx;
+  const {
+    title,
+    payload,
+    connected,
+    lastUpdate,
+    aliasSession = null,
+    aliasPanel = null,
+    onStartAlias,
+  } = ctx;
+
   setConnectionState(connected, lastUpdate, payload);
 
   root.replaceChildren();
@@ -36,6 +65,10 @@ export function renderSession(root, ctx) {
   heading.className = 'view-title';
   heading.textContent = title || 'Session';
   root.appendChild(heading);
+
+  if (aliasSession && aliasPanel) {
+    renderAliasPanel(root, aliasPanel);
+  }
 
   const list = document.createElement('div');
   list.className = 'session-tracks';
@@ -57,9 +90,11 @@ export function renderSession(root, ctx) {
 
       const playing = Boolean(track.clipName?.trim());
       const tm = matchForTrack(payload, track);
+      const aliasTarget = isAliasTargetTrack(aliasSession, track);
 
       if (playing) row.classList.add('session-track--playing');
-      if (tm?.winner) row.classList.add('session-track--winner');
+      if (aliasTarget) row.classList.add('session-track--alias-target');
+      else if (tm?.winner) row.classList.add('session-track--winner');
       else if (tm?.matched) row.classList.add('session-track--matched');
       else if (playing) row.classList.add('session-track--nomatch');
 
@@ -95,6 +130,19 @@ export function renderSession(root, ctx) {
         matchLine.classList.add('session-track-match--none');
       }
       meta.appendChild(matchLine);
+
+      if (playing && !tm?.matched && onStartAlias && !aliasSession) {
+        const actions = document.createElement('div');
+        actions.className = 'session-track-actions';
+
+        const aliasBtn = document.createElement('button');
+        aliasBtn.type = 'button';
+        aliasBtn.className = 'session-track-alias-btn';
+        aliasBtn.textContent = 'Add as alias';
+        aliasBtn.addEventListener('click', () => onStartAlias(track.clipName, track));
+        actions.appendChild(aliasBtn);
+        meta.appendChild(actions);
+      }
 
       const clip = document.createElement('div');
       clip.className = 'session-track-clip' + (playing ? '' : ' session-track-clip--empty');
