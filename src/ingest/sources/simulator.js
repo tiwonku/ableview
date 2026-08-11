@@ -71,6 +71,7 @@ export function createSimulatorSource({ config, bus, log, getClipNames = null })
       authoritativeClip: clipName ?? null,
       tempo,
       beat,
+      isPlaying: true,
       scene,
     });
     log.info({ authoritativeClip: event.authoritativeClip, simulated: true }, 'now playing (simulated)');

@@ -110,6 +110,50 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.transport-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+  color: var(--muted);
+  opacity: 0.72;
+}
+
+.transport-indicator--playing {
+  color: var(--ok);
+  opacity: 0.85;
+}
+
+.transport-indicator--stopped {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.transport-indicator-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  display: block;
+}
+
+.status-group--live {
+  gap: 0.35rem;
+}
+
+.tempo-indicator {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  opacity: 0.9;
+}
+
+.tempo-indicator::after {
+  content: ' BPM';
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
 main {
   flex: 1;
   padding: 1.5rem 1.25rem 2rem;

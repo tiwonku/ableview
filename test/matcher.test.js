@@ -339,6 +339,7 @@ test('CuePayload contract keys', () => {
     'beat',
     'clipName',
     'ingestLive',
+    'isPlaying',
     'match',
     'pendingLaunch',
     'row',
@@ -511,6 +512,44 @@ test('createMatcher re-emits when beat changes for same clip without re-matching
   assert.equal(payloads[0].match.rowId, '5');
   assert.equal(payloads[1].match.rowId, '5');
   assert.equal(payloads[1].match.matchedValue, payloads[0].match.matchedValue);
+});
+
+test('createMatcher re-emits when isPlaying changes for same clip without re-matching', () => {
+  const bus = createBus();
+  const payloads = [];
+  bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
+
+  createMatcher({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    getSnapshot: () => snapshot(),
+  });
+
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'Song A - Intro',
+      tempo: 128,
+      isPlaying: true,
+    })
+  );
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'Song A - Intro',
+      tempo: 128,
+      isPlaying: false,
+    })
+  );
+
+  assert.equal(payloads.length, 2);
+  assert.equal(payloads[0].isPlaying, true);
+  assert.equal(payloads[1].isPlaying, false);
+  assert.equal(payloads[0].match.rowId, '5');
+  assert.equal(payloads[1].match.rowId, '5');
 });
 
 test('createMatcher rematches when a watched-track clip changes under bestMatch', () => {

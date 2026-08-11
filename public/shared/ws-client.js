@@ -36,6 +36,7 @@ function cueContentChanged(prev, next) {
     || prev.match?.matched !== next.match?.matched
     || prev.tempo !== next.tempo
     || prev.beat !== next.beat
+    || prev.isPlaying !== next.isPlaying
     || prev.pendingLaunch !== next.pendingLaunch
     || tracksKey(prev.tracks) !== tracksKey(next.tracks)
     || sceneKey(prev.scene) !== sceneKey(next.scene);

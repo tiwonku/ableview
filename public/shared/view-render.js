@@ -25,6 +25,9 @@ import {
   renderPlayingClipsStrip,
 } from './playing-clips-strip.js';
 
+const TRANSPORT_PLAY_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5.5v13l11-6.5L8 5.5z"/></svg>`;
+const TRANSPORT_PAUSE_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M7 5h3.5v14H7V5zm6.5 0H17v14h-3.5V5z"/></svg>`;
+
 /** @type {HTMLElement | null} */
 let fieldExpandOverlay = null;
 
@@ -552,6 +555,55 @@ function updateStatusBar({ connected, lastUpdate, payload, simulated = null }) {
     }
   }
 
+  const transport = bar.querySelector('[data-role="transport"]');
+  if (transport) {
+    const playing = payload?.isPlaying;
+    if (playing === true) {
+      transport.hidden = false;
+      transport.classList.toggle('transport-indicator--playing', true);
+      transport.classList.toggle('transport-indicator--stopped', false);
+      transport.title = 'Ableton playing';
+      transport.setAttribute('aria-label', 'Ableton playing');
+      if (transport.dataset.state !== 'playing') {
+        transport.dataset.state = 'playing';
+        transport.innerHTML = TRANSPORT_PLAY_ICON;
+      }
+    } else if (playing === false) {
+      transport.hidden = false;
+      transport.classList.toggle('transport-indicator--playing', false);
+      transport.classList.toggle('transport-indicator--stopped', true);
+      transport.title = 'Ableton stopped';
+      transport.setAttribute('aria-label', 'Ableton stopped');
+      if (transport.dataset.state !== 'stopped') {
+        transport.dataset.state = 'stopped';
+        transport.innerHTML = TRANSPORT_PAUSE_ICON;
+      }
+    } else {
+      transport.hidden = true;
+      transport.removeAttribute('aria-label');
+      transport.removeAttribute('title');
+      transport.dataset.state = '';
+      transport.innerHTML = '';
+      transport.classList.remove('transport-indicator--playing', 'transport-indicator--stopped');
+    }
+  }
+
+  const tempoEl = bar.querySelector('[data-role="tempo"]');
+  if (tempoEl) {
+    const tempoText = formatStatusTempo(payload?.tempo);
+    if (tempoText) {
+      tempoEl.hidden = false;
+      tempoEl.textContent = tempoText;
+      tempoEl.title = `Ableton tempo: ${formatTempo(payload.tempo)}`;
+      tempoEl.setAttribute('aria-label', `Ableton tempo ${formatTempo(payload.tempo)}`);
+    } else {
+      tempoEl.hidden = true;
+      tempoEl.textContent = '';
+      tempoEl.removeAttribute('title');
+      tempoEl.removeAttribute('aria-label');
+    }
+  }
+
   const simPill = document.getElementById('sim-pill');
   const stalePill = document.getElementById('stale-pill');
   const staleOn = Boolean(payload?.stale);
@@ -580,6 +632,13 @@ function formatTempo(tempo) {
   if (tempo == null || Number.isNaN(Number(tempo))) return '—';
   const n = Number(tempo);
   return Number.isInteger(n) ? `${n} BPM` : `${n.toFixed(1)} BPM`;
+}
+
+/** Compact header tempo, e.g. "128" or "90.5". */
+function formatStatusTempo(tempo) {
+  if (tempo == null || Number.isNaN(Number(tempo))) return null;
+  const n = Number(tempo);
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 function formatBeat(beat) {

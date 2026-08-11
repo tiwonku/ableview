@@ -43,6 +43,9 @@ export function createOscEmitter({ config, log }) {
       case '/live/song/get/tempo':
       case '/live/song/start_listen/tempo':
         return reply(from, '/live/song/get/tempo', [tempo]);
+      case '/live/song/get/is_playing':
+      case '/live/song/start_listen/is_playing':
+        return reply(from, '/live/song/get/is_playing', [1]);
       case '/live/track/start_listen/playing_slot_index':
         subscriber = from;
         return reply(from, '/live/track/get/playing_slot_index', [msg.args[0], playingSlotIndex]);

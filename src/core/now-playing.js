@@ -12,6 +12,7 @@ export function makeNowPlaying({
   authoritativeClip = null,
   tempo = null,
   beat = null,
+  isPlaying = null,
   pendingLaunch = false,
   scene = null,
 }) {
@@ -25,6 +26,7 @@ export function makeNowPlaying({
     authoritativeClip,
     tempo,
     beat,
+    isPlaying,
     pendingLaunch,
   };
   if (scene != null) payload.scene = scene;

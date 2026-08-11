@@ -31,6 +31,8 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   const trackState = new Map();
   let tempo = null;
   let beat = null;
+  /** @type {boolean|null} null until Ableton replies to is_playing */
+  let isPlaying = null;
   let lastEmittedKey = null;
   let selectedSceneIndex = null;
   /** sceneIndex -> name */
@@ -192,24 +194,26 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       authoritativeClip: authoritativeClipOf(),
       tempo,
       beat,
+      isPlaying,
       pendingLaunch,
       scene,
     });
 
     // Registration replies and explicit state queries can both report the
-    // same state; only emit when clip, tempo, beat, or launch state changed.
+    // same state; only emit when clip, tempo, beat, play state, or launch changed.
     const key = JSON.stringify([
       event.authoritativeClip,
       event.pendingLaunch,
       tracks,
       event.tempo,
       event.beat,
+      event.isPlaying,
       scene,
     ]);
     if (key === lastEmittedKey) return;
     lastEmittedKey = key;
 
-    log.info({ authoritativeClip: event.authoritativeClip, tracks: tracks.length, scene: scene.launchType }, 'now playing');
+    log.info({ authoritativeClip: event.authoritativeClip, tracks: tracks.length, scene: scene.launchType, isPlaying }, 'now playing');
     bus.emit(EVENTS.NOW_PLAYING, event);
   }
 
@@ -248,7 +252,9 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     log.info({ host: abletonHost, sendPort: oscSendPort, listenPort: oscListenPort }, 'registering AbletonOSC listeners');
     send('/live/song/get/track_names');
     send('/live/song/get/tempo');
+    send('/live/song/get/is_playing');
     send('/live/song/start_listen/tempo');
+    send('/live/song/start_listen/is_playing');
     send('/live/song/start_listen/beat');
     send('/live/view/start_listen/selected_scene');
     send('/live/view/get/selected_scene');
@@ -386,6 +392,9 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       case '/live/song/get/tempo':
         tempo = msg.args[0];
         return emitNowPlaying();
+      case '/live/song/get/is_playing':
+        isPlaying = msg.args[0] === 1 || msg.args[0] === true;
+        return emitNowPlaying();
       case '/live/song/get/beat':
         beat = msg.args[0];
         return emitNowPlaying();
@@ -455,6 +464,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     if (udp) {
       try {
         send('/live/song/stop_listen/tempo');
+        send('/live/song/stop_listen/is_playing');
         send('/live/song/stop_listen/beat');
         send('/live/view/stop_listen/selected_scene');
         for (const index of trackState.keys()) {

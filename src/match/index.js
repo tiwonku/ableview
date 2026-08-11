@@ -297,6 +297,7 @@ function nowPlayingKey(event) {
     clip: event.authoritativeClip,
     tempo: event.tempo,
     beat: event.beat,
+    isPlaying: event.isPlaying ?? null,
     source: event.source,
     pendingLaunch: event.pendingLaunch ?? false,
     tracks: event.tracks ?? [],
@@ -349,6 +350,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
         ...lastPayload,
         tempo: event.tempo,
         beat: event.beat,
+        isPlaying: event.isPlaying ?? null,
         pendingLaunch: event.pendingLaunch ?? false,
         tracks: event.tracks ?? [],
         scene: event.scene ?? null,
@@ -361,6 +363,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
       payload = matchNowPlaying(event, snapshot, resolveConfig());
       payload.tempo = event.tempo;
       payload.beat = event.beat;
+      payload.isPlaying = event.isPlaying ?? null;
       payload.tracks = event.tracks ?? [];
       payload.scene = event.scene ?? null;
       payload.simulated = simulated;
