@@ -16,6 +16,7 @@ import {
   viewFieldColumns,
 } from './admin-row-editor.js';
 import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
+import { playingTracks } from './playing-clips-strip.js';
 import { mountViewNav } from './view-nav.js';
 
 const RECONNECT_MS = 1500;
@@ -94,9 +95,9 @@ export function connectView({
       editSession,
     };
     if (viewConfig.system) {
-      updateAdminLiveChrome(root, { ...chrome, status: lastStatus });
+      updateAdminLiveChrome(root, { ...chrome, status: lastStatus, matchColumn });
     } else {
-      updateViewLiveChrome(root, chrome);
+      updateViewLiveChrome(root, { ...chrome, matchColumn });
     }
   }
 
@@ -180,7 +181,8 @@ export function connectView({
   }
 
   function startCreate() {
-    const clipName = lastPayload?.clipName?.trim();
+    const clipName = lastPayload?.clipName?.trim()
+      || playingTracks(lastPayload)[0]?.clipName?.trim();
     if (!clipName || lastPayload?.match?.matched === true) return;
     if (!matchColumn) return;
     if (aliasSession) cancelAlias();
@@ -399,6 +401,7 @@ export function connectView({
       status: lastStatus,
       connected,
       lastUpdate,
+      matchColumn,
     };
     if (statusOnly) {
       setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);

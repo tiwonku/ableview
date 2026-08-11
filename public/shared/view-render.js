@@ -17,12 +17,17 @@ import {
   buildFieldLabels,
 } from './admin-row-editor.js';
 import { renderAliasPanel } from './alias-panel.js';
+import {
+  hasPlayingClips,
+  resolveHeroDisplay,
+  renderPlayingClipsStrip,
+} from './playing-clips-strip.js';
 
 /** @type {HTMLElement | null} */
 let fieldExpandOverlay = null;
 
-function renderNoMatchActions(parent, { onStartCreate, onStartAlias }) {
-  if (!onStartCreate && !onStartAlias) return;
+function renderNoMatchActions(parent, { onStartCreate, onStartAlias, hideAlias = false }) {
+  if (!onStartCreate && (!onStartAlias || hideAlias)) return;
 
   const actions = document.createElement('div');
   actions.className = 'no-match-actions';
@@ -36,7 +41,7 @@ function renderNoMatchActions(parent, { onStartCreate, onStartAlias }) {
     actions.appendChild(addBtn);
   }
 
-  if (onStartAlias) {
+  if (onStartAlias && !hideAlias) {
     const aliasBtn = document.createElement('button');
     aliasBtn.type = 'button';
     aliasBtn.className = 'admin-editor-btn';
@@ -124,17 +129,17 @@ function isLaunching(payload) {
   return Boolean(payload?.pendingLaunch) && !payload?.simulated;
 }
 
-function renderClipNameRow(parent, clipName, payload) {
+function renderHeroRow(parent, heroText, payload, { empty = false } = {}) {
   const row = document.createElement('div');
   row.className = 'clip-head' + (isLaunching(payload) ? ' clip-head--launching' : '');
 
   const clipEl = document.createElement('p');
-  clipEl.className = 'clip-name' + (clipName ? '' : ' empty-clip');
+  clipEl.className = 'clip-name' + (empty ? ' empty-clip' : '');
 
-  if (clipName) {
+  if (heroText && !empty) {
     const text = document.createElement('span');
     text.className = 'clip-name-text';
-    text.textContent = clipName;
+    text.textContent = heroText;
     clipEl.appendChild(text);
 
     if (isLaunching(payload)) {
@@ -146,11 +151,49 @@ function renderClipNameRow(parent, clipName, payload) {
       clipEl.appendChild(badge);
     }
   } else {
-    clipEl.textContent = 'Nothing playing';
+    clipEl.textContent = heroText || 'Nothing playing';
   }
 
   row.appendChild(clipEl);
   parent.appendChild(row);
+}
+
+function renderNoMatchPanel(root, {
+  payload,
+  editable,
+  aliasSession,
+  onStartCreate,
+  onStartAlias,
+}) {
+  const playing = hasPlayingClips(payload);
+  const canAct = editable && (onStartCreate || onStartAlias);
+  const noMatch = document.createElement('div');
+  noMatch.className = canAct ? 'no-match-panel' : 'no-match';
+
+  const message = document.createElement('p');
+  message.className = 'no-match';
+  message.textContent = playing
+    ? 'No confident match — link a playing clip to the cue sheet below.'
+    : 'No confident match — check the cue sheet or clip name.';
+  noMatch.appendChild(message);
+
+  if (playing) {
+    renderPlayingClipsStrip(noMatch, payload, {
+      onStartAlias: editable ? onStartAlias : undefined,
+      aliasSession,
+      showDeckNames: true,
+    });
+  }
+
+  if (canAct) {
+    renderNoMatchActions(noMatch, {
+      onStartCreate: editable ? onStartCreate : undefined,
+      onStartAlias: editable ? onStartAlias : undefined,
+      hideAlias: playing,
+    });
+  }
+
+  root.appendChild(noMatch);
 }
 
 export function renderView(root, {
@@ -159,6 +202,7 @@ export function renderView(root, {
   payload,
   connected,
   lastUpdate,
+  matchColumn = null,
   editable = false,
   editSession = null,
   aliasSession = null,
@@ -182,28 +226,21 @@ export function renderView(root, {
   const clipHead = document.createElement('div');
   clipHead.id = 'view-clip-head';
   root.appendChild(clipHead);
-  renderViewClipHead(clipHead, payload);
+  renderViewClipHead(clipHead, payload, matchColumn);
 
   const matched = payload?.match?.matched === true;
   const busy = Boolean(editSession || aliasSession);
-  if (payload && payload.clipName?.trim() && !matched && !busy) {
-    const canAct = editable && (onStartCreate || onStartAlias);
-    const noMatch = document.createElement('div');
-    noMatch.className = canAct ? 'no-match-panel' : 'no-match';
+  const showNoMatch = payload && !matched && !busy
+    && (hasPlayingClips(payload) || payload.clipName?.trim());
 
-    const message = document.createElement('p');
-    message.className = 'no-match';
-    message.textContent = 'No confident match — check the cue sheet or clip name.';
-    noMatch.appendChild(message);
-
-    if (canAct) {
-      renderNoMatchActions(noMatch, {
-        onStartCreate: editable ? onStartCreate : undefined,
-        onStartAlias: editable ? onStartAlias : undefined,
-      });
-    }
-
-    root.appendChild(noMatch);
+  if (showNoMatch) {
+    renderNoMatchPanel(root, {
+      payload,
+      editable,
+      aliasSession,
+      onStartCreate,
+      onStartAlias,
+    });
   }
 
   const viewEditorColumns = buildViewEditorColumns(fields, editorColumns);
@@ -279,19 +316,19 @@ export function renderView(root, {
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-export function updateViewLiveChrome(root, { payload, connected, lastUpdate, editSession }) {
+export function updateViewLiveChrome(root, { payload, connected, lastUpdate, editSession, matchColumn = null }) {
   const clipHead = root.querySelector('#view-clip-head');
-  if (clipHead) renderViewClipHead(clipHead, payload);
+  if (clipHead) renderViewClipHead(clipHead, payload, matchColumn);
 
   if (editSession) updateEditContextBanner(root, editSession, payload);
 
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-function renderViewClipHead(parent, payload) {
+function renderViewClipHead(parent, payload, matchColumn = null) {
   parent.innerHTML = '';
-  const clipName = payload?.clipName?.trim() || null;
-  renderClipNameRow(parent, clipName, payload);
+  const hero = resolveHeroDisplay(payload, matchColumn);
+  renderHeroRow(parent, hero.text, payload, { empty: hero.empty });
 }
 
 function renderTextField(field, payload, displayHint, layoutMode = 'hero') {
@@ -604,6 +641,7 @@ export function renderAdmin(root, {
   status,
   connected,
   lastUpdate,
+  matchColumn = null,
   editSession = null,
   aliasSession = null,
   aliasPanel = null,
@@ -626,7 +664,7 @@ export function renderAdmin(root, {
   const clipHead = document.createElement('div');
   clipHead.id = 'admin-clip-head';
   root.appendChild(clipHead);
-  renderAdminClipHead(clipHead, payload);
+  renderAdminClipHead(clipHead, payload, matchColumn);
 
   const stats = document.createElement('div');
   stats.id = 'admin-stats';
@@ -635,17 +673,17 @@ export function renderAdmin(root, {
   renderAdminStats(stats, payload, status);
 
   const busy = Boolean(editSession || aliasSession);
-  if (payload && payload.clipName?.trim() && payload.match?.matched !== true && !busy) {
-    const noMatch = document.createElement('div');
-    noMatch.className = 'no-match-panel';
+  const showNoMatch = payload && payload.match?.matched !== true && !busy
+    && (hasPlayingClips(payload) || payload.clipName?.trim());
 
-    const message = document.createElement('p');
-    message.className = 'no-match';
-    message.textContent = 'No confident match — check the cue sheet or clip name.';
-    noMatch.appendChild(message);
-
-    renderNoMatchActions(noMatch, { onStartCreate, onStartAlias });
-    root.appendChild(noMatch);
+  if (showNoMatch) {
+    renderNoMatchPanel(root, {
+      payload,
+      editable: true,
+      aliasSession,
+      onStartCreate,
+      onStartAlias,
+    });
   }
 
   if (aliasSession && aliasPanel) {
@@ -669,9 +707,9 @@ export function renderAdmin(root, {
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-export function updateAdminLiveChrome(root, { payload, status, connected, lastUpdate, editSession }) {
+export function updateAdminLiveChrome(root, { payload, status, connected, lastUpdate, editSession, matchColumn = null }) {
   const clipHead = root.querySelector('#admin-clip-head');
-  if (clipHead) renderAdminClipHead(clipHead, payload);
+  if (clipHead) renderAdminClipHead(clipHead, payload, matchColumn);
 
   const stats = root.querySelector('#admin-stats');
   if (stats) renderAdminStats(stats, payload, status);
@@ -681,10 +719,19 @@ export function updateAdminLiveChrome(root, { payload, status, connected, lastUp
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-function renderAdminClipHead(parent, payload) {
+function renderAdminClipHead(parent, payload, matchColumn = null) {
   parent.innerHTML = '';
-  const clipName = payload?.clipName?.trim() || null;
-  renderClipNameRow(parent, clipName, payload);
+  const hero = resolveHeroDisplay(payload, matchColumn);
+  renderHeroRow(parent, hero.text, payload, { empty: hero.empty });
+
+  const clipName = payload?.clipName?.trim();
+  const matched = payload?.match?.matched === true;
+  if (clipName && matched && hero.text !== clipName) {
+    const sub = document.createElement('p');
+    sub.className = 'clip-head-sub';
+    sub.textContent = `Clip: ${clipName}`;
+    parent.appendChild(sub);
+  }
 }
 
 function renderAdminStats(parent, payload, status) {
@@ -692,7 +739,8 @@ function renderAdminStats(parent, payload, status) {
 
   const matched = payload?.match?.matched === true;
   const clipName = payload?.clipName?.trim() || null;
-  addStat(parent, 'Match', matched ? 'Yes' : 'No', { warn: payload && clipName && !matched });
+  const playing = hasPlayingClips(payload);
+  addStat(parent, 'Match', matched ? 'Yes' : 'No', { warn: payload && !matched && (playing || clipName) });
   addStat(parent, 'Confidence', formatConfidence(payload?.match?.confidence));
   addStat(parent, 'Row ID', payload?.match?.rowId ?? '—');
   addStat(parent, 'Matched value', payload?.match?.matchedValue ?? '—');

@@ -2,35 +2,19 @@
 
 import { setConnectionState } from './view-render.js';
 import { renderAliasPanel } from './alias-panel.js';
+import {
+  matchForTrack,
+  isAliasTargetTrack,
+} from './playing-clips-strip.js';
 
 function trackRows(payload) {
   const tracks = Array.isArray(payload?.tracks) ? payload.tracks : [];
   return [...tracks].sort((a, b) => (a.trackIndex ?? 0) - (b.trackIndex ?? 0));
 }
 
-function matchForTrack(payload, track) {
-  const list = Array.isArray(payload?.trackMatches) ? payload.trackMatches : [];
-  return list.find(
-    (m) =>
-      m.trackIndex === track.trackIndex
-      || (m.trackName && track.trackName && m.trackName === track.trackName)
-  ) ?? null;
-}
-
 function formatConfidence(confidence) {
   if (confidence == null || Number.isNaN(confidence)) return '0%';
   return `${Math.round(confidence * 100)}%`;
-}
-
-function isAliasTargetTrack(aliasSession, track) {
-  if (!aliasSession) return false;
-  if (aliasSession.trackIndex != null && track.trackIndex != null) {
-    return aliasSession.trackIndex === track.trackIndex;
-  }
-  if (aliasSession.trackName && track.trackName) {
-    return aliasSession.trackName === track.trackName;
-  }
-  return aliasSession.clipName === track.clipName;
 }
 
 /**
