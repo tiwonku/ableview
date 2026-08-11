@@ -5,6 +5,7 @@ import {
   captureCreateSession,
   buildViewEditorColumns,
   buildFieldLabels,
+  buildOperatorCreateFields,
   viewFieldColumns,
 } from '../public/shared/admin-row-editor.js';
 
@@ -91,6 +92,49 @@ test('captureCreateSession uses all headers when columns omitted', () => {
     Key: '',
     BPM: '',
   });
+});
+
+test('captureCreateSession pre-fills aliasColumn with suggested stem', () => {
+  const session = captureCreateSession({
+    clipName: 'Hot Rox DRUMS',
+    headers: ['Song Title', 'Aliases', 'Key'],
+    matchColumn: 'Song Title',
+    aliasColumn: 'Aliases',
+    columns: ['Song Title', 'Aliases', 'Key'],
+  });
+
+  assert.equal(session.row['Song Title'], 'Hot Rox DRUMS');
+  assert.equal(session.row.Aliases, 'Hot Rox');
+});
+
+test('captureCreateSession stores track context for per-deck create', () => {
+  const session = captureCreateSession({
+    clipName: 'HotRox_ DRUMS',
+    headers: ['Song Title'],
+    matchColumn: 'Song Title',
+    trackName: 'Deck B',
+    trackIndex: 2,
+  });
+
+  assert.equal(session.trackName, 'Deck B');
+  assert.equal(session.trackIndex, 2);
+});
+
+test('buildOperatorCreateFields puts title and aliases before view fields', () => {
+  const session = captureCreateSession({
+    clipName: 'Clip A',
+    headers: ['Song Title', 'Aliases', 'Key', 'BPM'],
+    matchColumn: 'Song Title',
+    aliasColumn: 'Aliases',
+    columns: ['Song Title', 'Aliases', 'Key', 'BPM'],
+  });
+  const fields = [
+    { column: 'Key', label: 'Key' },
+    { column: 'BPM', label: 'BPM' },
+  ];
+
+  const list = buildOperatorCreateFields(fields, 'Song Title', 'Aliases', session);
+  assert.deepEqual(list.map((f) => f.column), ['Song Title', 'Aliases', 'Key', 'BPM']);
 });
 
 test('buildViewEditorColumns merges editorColumns and field types', () => {

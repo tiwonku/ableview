@@ -2,9 +2,11 @@
 
 import { setConnectionState } from './view-render.js';
 import { renderAliasPanel } from './alias-panel.js';
+import { renderRowEditorPanel } from './admin-row-editor.js';
 import {
   matchForTrack,
   isAliasTargetTrack,
+  isCreateTargetTrack,
 } from './playing-clips-strip.js';
 
 function trackRows(payload) {
@@ -26,7 +28,14 @@ function formatConfidence(confidence) {
  *   lastUpdate?: Date|null,
  *   aliasSession?: object|null,
  *   aliasPanel?: object|null,
+ *   editSession?: object|null,
+ *   editorColumns?: object,
+ *   saveState?: string,
+ *   saveError?: string|null,
  *   onStartAlias?: (clipName: string, track?: object) => void,
+ *   onStartCreate?: (clipName: string, track?: object) => void,
+ *   onCancelEdit?: Function,
+ *   onSaveEdit?: Function,
  * }} ctx
  */
 export function renderSession(root, ctx) {
@@ -37,7 +46,14 @@ export function renderSession(root, ctx) {
     lastUpdate,
     aliasSession = null,
     aliasPanel = null,
+    editSession = null,
+    editorColumns = {},
+    saveState = 'idle',
+    saveError = null,
     onStartAlias,
+    onStartCreate,
+    onCancelEdit,
+    onSaveEdit,
   } = ctx;
 
   setConnectionState(connected, lastUpdate, payload);
@@ -52,7 +68,21 @@ export function renderSession(root, ctx) {
 
   if (aliasSession && aliasPanel) {
     renderAliasPanel(root, aliasPanel);
+  } else if (editSession && onCancelEdit && onSaveEdit) {
+    renderRowEditorPanel(root, {
+      session: editSession,
+      editorColumns,
+      livePayload: payload,
+      onCancel: onCancelEdit,
+      onSave: onSaveEdit,
+      saveState,
+      saveError,
+      panelId: 'session-row-panel',
+    });
   }
+
+  const createSession = editSession?.mode === 'create' ? editSession : null;
+  const busy = Boolean(aliasSession || editSession);
 
   const list = document.createElement('div');
   list.className = 'session-tracks';
@@ -75,9 +105,11 @@ export function renderSession(root, ctx) {
       const playing = Boolean(track.clipName?.trim());
       const tm = matchForTrack(payload, track);
       const aliasTarget = isAliasTargetTrack(aliasSession, track);
+      const createTarget = isCreateTargetTrack(createSession, track);
 
       if (playing) row.classList.add('session-track--playing');
       if (aliasTarget) row.classList.add('session-track--alias-target');
+      else if (createTarget) row.classList.add('session-track--create-target');
       else if (tm?.winner) row.classList.add('session-track--winner');
       else if (tm?.matched) row.classList.add('session-track--matched');
       else if (playing) row.classList.add('session-track--nomatch');
@@ -115,16 +147,28 @@ export function renderSession(root, ctx) {
       }
       meta.appendChild(matchLine);
 
-      if (playing && !tm?.matched && onStartAlias && !aliasSession) {
+      if (playing && !tm?.matched && !busy && (onStartAlias || onStartCreate)) {
         const actions = document.createElement('div');
         actions.className = 'session-track-actions';
 
-        const aliasBtn = document.createElement('button');
-        aliasBtn.type = 'button';
-        aliasBtn.className = 'session-track-alias-btn';
-        aliasBtn.textContent = 'Add as alias';
-        aliasBtn.addEventListener('click', () => onStartAlias(track.clipName, track));
-        actions.appendChild(aliasBtn);
+        if (onStartAlias) {
+          const aliasBtn = document.createElement('button');
+          aliasBtn.type = 'button';
+          aliasBtn.className = 'session-track-alias-btn';
+          aliasBtn.textContent = 'Add as alias';
+          aliasBtn.addEventListener('click', () => onStartAlias(track.clipName, track));
+          actions.appendChild(aliasBtn);
+        }
+
+        if (onStartCreate) {
+          const createBtn = document.createElement('button');
+          createBtn.type = 'button';
+          createBtn.className = 'session-track-create-btn';
+          createBtn.textContent = 'Add cue row';
+          createBtn.addEventListener('click', () => onStartCreate(track.clipName, track));
+          actions.appendChild(createBtn);
+        }
+
         meta.appendChild(actions);
       }
 

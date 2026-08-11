@@ -208,6 +208,7 @@ export async function createViewServer({
       if (snapshot) {
         init.sheetHeaders = snapshot.headers ?? [];
         init.matchColumn = snapshot.matchColumn ?? getLiveConfig().sheets?.matchColumn ?? null;
+        init.aliasColumn = snapshot.aliasColumn ?? getLiveConfig().sheets?.aliasColumn ?? null;
       }
     } else {
       init.editable = viewConfig.editable !== false;
@@ -215,6 +216,7 @@ export async function createViewServer({
         init.editorColumns = getLiveConfig().sheets?.editorColumns ?? {};
         const snapshot = sheetsActions?.getSnapshot?.();
         init.matchColumn = snapshot?.matchColumn ?? getLiveConfig().sheets?.matchColumn ?? null;
+        init.aliasColumn = snapshot?.aliasColumn ?? getLiveConfig().sheets?.aliasColumn ?? null;
       }
     }
     ws.send(JSON.stringify(init));

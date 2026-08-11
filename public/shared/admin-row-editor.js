@@ -6,6 +6,8 @@ import {
   DEFAULT_ICON,
 } from './sheet-format.js';
 import { parseRgbCell } from './color-parse.js';
+import { suggestAliasStem } from './alias-stem.js';
+import { operatorCreateColumns } from './playing-clips-strip.js';
 
 export function viewFieldColumns(fields) {
   return (fields ?? []).map((field) => field.column).filter(Boolean);
@@ -43,19 +45,50 @@ export function captureEditSession(payload, { columns } = {}) {
   };
 }
 
-export function captureCreateSession({ clipName, headers, matchColumn, columns }) {
+export function captureCreateSession({
+  clipName,
+  headers,
+  matchColumn,
+  aliasColumn = null,
+  columns,
+  trackName = null,
+  trackIndex = null,
+}) {
   const cols = columns?.length ? columns : headers.filter(Boolean);
+  const trimmedClip = clipName?.trim() ?? '';
   const row = Object.fromEntries(
-    cols.map((name) => [name, name === matchColumn ? (clipName?.trim() ?? '') : ''])
+    cols.map((name) => {
+      if (name === matchColumn) {
+        return [name, trimmedClip];
+      }
+      if (aliasColumn && name === aliasColumn) {
+        return [name, suggestAliasStem(trimmedClip) || trimmedClip];
+      }
+      return [name, ''];
+    })
   );
 
   return {
     mode: 'create',
     rowId: null,
     row,
-    clipNameAtEdit: clipName?.trim() ?? '',
+    clipNameAtEdit: trimmedClip,
     matchedValueAtEdit: '',
+    trackName: trackName ?? null,
+    trackIndex: trackIndex ?? null,
   };
+}
+
+/** Field list for operator create form (title + aliases + view columns). */
+export function buildOperatorCreateFields(viewFields, matchColumn, aliasColumn, session) {
+  const columns = operatorCreateColumns(viewFields, matchColumn, aliasColumn);
+  return columns
+    .filter((column) => column in session.row)
+    .map((column) => {
+      const fromView = (viewFields ?? []).find((f) => f.column === column);
+      if (fromView) return fromView;
+      return { column, label: column, display: 'text' };
+    });
 }
 
 export function renderRowEditorPanel(parent, {
@@ -132,6 +165,8 @@ export function renderRowEditorPanel(parent, {
 export function renderOperatorRowEditorPanel(parent, {
   session,
   fields = [],
+  matchColumn = null,
+  aliasColumn = null,
   editorColumns = {},
   fieldLabels = {},
   panelId = 'view-row-panel',
@@ -190,9 +225,11 @@ export function renderOperatorRowEditorPanel(parent, {
   form.className = 'fields fields--edit';
   if (session.rowId != null) form.dataset.rowId = session.rowId;
 
-  const fieldList = fields?.length
-    ? fields.filter((f) => f?.column && f.column in session.row)
-    : Object.keys(session.row).map((column) => ({ column, type: editorColumns[column]?.type }));
+  const fieldList = session.mode === 'create'
+    ? buildOperatorCreateFields(fields, matchColumn, aliasColumn, session)
+    : (fields?.length
+      ? fields.filter((f) => f?.column && f.column in session.row)
+      : Object.keys(session.row).map((column) => ({ column, type: editorColumns[column]?.type })));
 
   for (let i = 0; i < fieldList.length; i++) {
     const field = fieldList[i];

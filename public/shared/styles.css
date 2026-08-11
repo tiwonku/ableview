@@ -289,6 +289,18 @@ main {
   box-shadow: inset 3px 0 0 var(--accent, #4c8bf5);
 }
 
+.playing-clip-chip--create-target {
+  border-color: rgba(91, 200, 120, 0.75);
+  box-shadow: inset 3px 0 0 rgba(91, 200, 120, 0.85);
+}
+
+.playing-clip-chip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+}
+
 .playing-clip-chip-deck {
   font-size: 0.72rem;
   font-weight: 650;
@@ -318,8 +330,6 @@ main {
 }
 
 .playing-clip-chip-alias-btn {
-  align-self: flex-start;
-  margin-top: 0.15rem;
   padding: 0.3rem 0.55rem;
   font: inherit;
   font-size: 0.78rem;
@@ -333,6 +343,22 @@ main {
 
 .playing-clip-chip-alias-btn:hover {
   background: rgba(76, 139, 245, 0.2);
+}
+
+.playing-clip-chip-create-btn {
+  padding: 0.3rem 0.55rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(91, 200, 120, 0.12);
+  border: 1px solid rgba(91, 200, 120, 0.45);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.playing-clip-chip-create-btn:hover {
+  background: rgba(91, 200, 120, 0.22);
 }
 
 .clip-head-sub {
@@ -2119,7 +2145,15 @@ body.layout-session > main#app {
   box-shadow: inset 3px 0 0 var(--accent, #4c8bf5);
 }
 
+.session-track--create-target {
+  border-color: rgba(91, 200, 120, 0.75);
+  box-shadow: inset 3px 0 0 rgba(91, 200, 120, 0.85);
+}
+
 .session-track-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
   margin-top: 0.45rem;
 }
 
@@ -2138,6 +2172,22 @@ body.layout-session > main#app {
 
 .session-track-alias-btn:hover {
   background: rgba(76, 139, 245, 0.2);
+}
+
+.session-track-create-btn {
+  padding: 0.35rem 0.65rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(91, 200, 120, 0.12);
+  border: 1px solid rgba(91, 200, 120, 0.45);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.session-track-create-btn:hover {
+  background: rgba(91, 200, 120, 0.22);
 }
 
 .session-track-meta {

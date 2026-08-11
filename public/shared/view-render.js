@@ -162,13 +162,13 @@ function renderNoMatchPanel(root, {
   payload,
   editable,
   aliasSession,
+  createSession,
   onStartCreate,
   onStartAlias,
 }) {
   const playing = hasPlayingClips(payload);
-  const canAct = editable && (onStartCreate || onStartAlias);
   const noMatch = document.createElement('div');
-  noMatch.className = canAct ? 'no-match-panel' : 'no-match';
+  noMatch.className = editable ? 'no-match-panel' : 'no-match';
 
   const message = document.createElement('p');
   message.className = 'no-match';
@@ -180,16 +180,15 @@ function renderNoMatchPanel(root, {
   if (playing) {
     renderPlayingClipsStrip(noMatch, payload, {
       onStartAlias: editable ? onStartAlias : undefined,
+      onStartCreate: editable ? onStartCreate : undefined,
       aliasSession,
+      createSession,
       showDeckNames: true,
     });
-  }
-
-  if (canAct) {
+  } else if (editable && (onStartCreate || onStartAlias)) {
     renderNoMatchActions(noMatch, {
-      onStartCreate: editable ? onStartCreate : undefined,
-      onStartAlias: editable ? onStartAlias : undefined,
-      hideAlias: playing,
+      onStartCreate,
+      onStartAlias,
     });
   }
 
@@ -203,6 +202,7 @@ export function renderView(root, {
   connected,
   lastUpdate,
   matchColumn = null,
+  aliasColumn = null,
   editable = false,
   editSession = null,
   aliasSession = null,
@@ -223,13 +223,14 @@ export function renderView(root, {
   titleEl.textContent = title ?? 'View';
   root.appendChild(titleEl);
 
+  const matched = payload?.match?.matched === true;
+  const busy = Boolean(editSession || aliasSession);
+
   const clipHead = document.createElement('div');
   clipHead.id = 'view-clip-head';
   root.appendChild(clipHead);
-  renderViewClipHead(clipHead, payload, matchColumn);
+  renderViewClipHead(clipHead, payload, matchColumn, { busy });
 
-  const matched = payload?.match?.matched === true;
-  const busy = Boolean(editSession || aliasSession);
   const showNoMatch = payload && !matched && !busy
     && (hasPlayingClips(payload) || payload.clipName?.trim());
 
@@ -238,13 +239,24 @@ export function renderView(root, {
       payload,
       editable,
       aliasSession,
+      createSession: editSession?.mode === 'create' ? editSession : null,
       onStartCreate,
       onStartAlias,
     });
   }
 
   const viewEditorColumns = buildViewEditorColumns(fields, editorColumns);
-  const fieldLabels = buildFieldLabels(fields);
+  if (matchColumn && !viewEditorColumns[matchColumn]) {
+    viewEditorColumns[matchColumn] = { type: 'text' };
+  }
+  if (aliasColumn && !viewEditorColumns[aliasColumn]) {
+    viewEditorColumns[aliasColumn] = { type: 'text' };
+  }
+  const fieldLabels = {
+    ...buildFieldLabels(fields),
+    ...(matchColumn ? { [matchColumn]: matchColumn } : {}),
+    ...(aliasColumn ? { [aliasColumn]: aliasColumn } : {}),
+  };
 
   if (aliasSession && aliasPanel) {
     renderAliasPanel(root, aliasPanel);
@@ -252,6 +264,8 @@ export function renderView(root, {
     renderOperatorRowEditorPanel(root, {
       session: editSession,
       fields,
+      matchColumn,
+      aliasColumn,
       editorColumns: viewEditorColumns,
       fieldLabels,
       panelId: 'view-row-panel',
@@ -318,16 +332,18 @@ export function renderView(root, {
 
 export function updateViewLiveChrome(root, { payload, connected, lastUpdate, editSession, matchColumn = null }) {
   const clipHead = root.querySelector('#view-clip-head');
-  if (clipHead) renderViewClipHead(clipHead, payload, matchColumn);
+  const busy = Boolean(editSession);
+  if (clipHead) renderViewClipHead(clipHead, payload, matchColumn, { busy });
 
   if (editSession) updateEditContextBanner(root, editSession, payload);
 
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-function renderViewClipHead(parent, payload, matchColumn = null) {
+function renderViewClipHead(parent, payload, matchColumn = null, { busy = false } = {}) {
   parent.innerHTML = '';
-  const hero = resolveHeroDisplay(payload, matchColumn);
+  const hero = resolveHeroDisplay(payload, matchColumn, { busy });
+  if (!hero.showHero) return;
   renderHeroRow(parent, hero.text, payload, { empty: hero.empty });
 }
 
@@ -642,6 +658,7 @@ export function renderAdmin(root, {
   connected,
   lastUpdate,
   matchColumn = null,
+  aliasColumn = null,
   editSession = null,
   aliasSession = null,
   aliasPanel = null,
@@ -661,10 +678,12 @@ export function renderAdmin(root, {
   titleEl.textContent = title ?? 'Admin';
   root.appendChild(titleEl);
 
+  const busy = Boolean(editSession || aliasSession);
+
   const clipHead = document.createElement('div');
   clipHead.id = 'admin-clip-head';
   root.appendChild(clipHead);
-  renderAdminClipHead(clipHead, payload, matchColumn);
+  renderAdminClipHead(clipHead, payload, matchColumn, { busy });
 
   const stats = document.createElement('div');
   stats.id = 'admin-stats';
@@ -672,8 +691,8 @@ export function renderAdmin(root, {
   root.appendChild(stats);
   renderAdminStats(stats, payload, status);
 
-  const busy = Boolean(editSession || aliasSession);
-  const showNoMatch = payload && payload.match?.matched !== true && !busy
+  const matched = payload?.match?.matched === true;
+  const showNoMatch = payload && !matched && !busy
     && (hasPlayingClips(payload) || payload.clipName?.trim());
 
   if (showNoMatch) {
@@ -681,6 +700,7 @@ export function renderAdmin(root, {
       payload,
       editable: true,
       aliasSession,
+      createSession: editSession?.mode === 'create' ? editSession : null,
       onStartCreate,
       onStartAlias,
     });
@@ -709,7 +729,8 @@ export function renderAdmin(root, {
 
 export function updateAdminLiveChrome(root, { payload, status, connected, lastUpdate, editSession, matchColumn = null }) {
   const clipHead = root.querySelector('#admin-clip-head');
-  if (clipHead) renderAdminClipHead(clipHead, payload, matchColumn);
+  const busy = Boolean(editSession);
+  if (clipHead) renderAdminClipHead(clipHead, payload, matchColumn, { busy });
 
   const stats = root.querySelector('#admin-stats');
   if (stats) renderAdminStats(stats, payload, status);
@@ -719,9 +740,12 @@ export function updateAdminLiveChrome(root, { payload, status, connected, lastUp
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-function renderAdminClipHead(parent, payload, matchColumn = null) {
+function renderAdminClipHead(parent, payload, matchColumn = null, { busy = false } = {}) {
   parent.innerHTML = '';
-  const hero = resolveHeroDisplay(payload, matchColumn);
+  const hero = resolveHeroDisplay(payload, matchColumn, { busy });
+  if (!hero.showHero) {
+    return;
+  }
   renderHeroRow(parent, hero.text, payload, { empty: hero.empty });
 
   const clipName = payload?.clipName?.trim();

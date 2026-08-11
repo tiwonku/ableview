@@ -1,5 +1,7 @@
 // Shared helpers: playing watched tracks, hero title, compact clip strip for no-match UX.
 
+import { suggestAliasStem } from './alias-stem.js';
+
 export function playingTracks(payload) {
   return (payload?.tracks ?? [])
     .filter((t) => t.clipName?.trim())
@@ -43,31 +45,64 @@ export function resolveMatchedTitle(payload, matchColumn = null) {
   return fromRow || fromMatch || payload?.clipName?.trim() || null;
 }
 
+export function isCreateTargetTrack(createSession, track) {
+  if (!createSession || createSession.mode !== 'create') return false;
+  if (createSession.trackIndex != null && track.trackIndex != null) {
+    return createSession.trackIndex === track.trackIndex;
+  }
+  if (createSession.trackName && track.trackName) {
+    return createSession.trackName === track.trackName;
+  }
+  return createSession.clipNameAtEdit === track.clipName;
+}
+
 /**
  * Hero line for operator views.
- * @returns {{ text: string, empty: boolean }}
+ * @returns {{ text?: string, empty?: boolean, showHero: boolean }}
  */
-export function resolveHeroDisplay(payload, matchColumn = null) {
+export function resolveHeroDisplay(payload, matchColumn = null, { busy = false } = {}) {
+  if (busy) return { showHero: false };
+
   const matchedTitle = resolveMatchedTitle(payload, matchColumn);
   if (matchedTitle) {
-    return { text: matchedTitle, empty: false };
+    return { text: matchedTitle, empty: false, showHero: true };
   }
   if (hasPlayingClips(payload)) {
-    return { text: 'Nothing matched', empty: true };
+    return { showHero: false };
   }
-  return { text: 'Nothing playing', empty: true };
+  return { text: 'Nothing playing', empty: true, showHero: true };
+}
+
+/** Columns for operator-view create: title, aliases, then view fields. */
+export function operatorCreateColumns(viewFields, matchColumn, aliasColumn) {
+  const cols = [];
+  if (matchColumn) cols.push(matchColumn);
+  if (aliasColumn && aliasColumn !== matchColumn) cols.push(aliasColumn);
+  for (const field of viewFields ?? []) {
+    const column = field?.column;
+    if (column && !cols.includes(column)) cols.push(column);
+  }
+  return cols;
 }
 
 /**
  * Compact horizontal strip of playing clips (no-match remediation).
  * @param {HTMLElement} parent
  * @param {object} payload
- * @param {{ onStartAlias?: Function, aliasSession?: object|null, showDeckNames?: boolean }} opts
+ * @param {{
+ *   onStartAlias?: Function,
+ *   onStartCreate?: Function,
+ *   aliasSession?: object|null,
+ *   createSession?: object|null,
+ *   showDeckNames?: boolean,
+ * }} opts
  */
 export function renderPlayingClipsStrip(parent, payload, opts = {}) {
   const {
     onStartAlias,
+    onStartCreate,
     aliasSession = null,
+    createSession = null,
     showDeckNames = true,
   } = opts;
 
@@ -81,11 +116,14 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
   for (const track of tracks) {
     const tm = matchForTrack(payload, track);
     const aliasTarget = isAliasTargetTrack(aliasSession, track);
+    const createTarget = isCreateTargetTrack(createSession, track);
+    const unmatched = !tm?.matched;
 
     const chip = document.createElement('div');
     chip.className = 'playing-clip-chip';
     chip.setAttribute('role', 'listitem');
     if (aliasTarget) chip.classList.add('playing-clip-chip--alias-target');
+    else if (createTarget) chip.classList.add('playing-clip-chip--create-target');
     else if (tm?.matched) chip.classList.add('playing-clip-chip--weak-match');
     else chip.classList.add('playing-clip-chip--nomatch');
 
@@ -113,13 +151,29 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
     }
     chip.appendChild(meta);
 
-    if (onStartAlias && !aliasSession && !tm?.matched) {
-      const aliasBtn = document.createElement('button');
-      aliasBtn.type = 'button';
-      aliasBtn.className = 'playing-clip-chip-alias-btn';
-      aliasBtn.textContent = 'Add as alias';
-      aliasBtn.addEventListener('click', () => onStartAlias(track.clipName, track));
-      chip.appendChild(aliasBtn);
+    if (!aliasSession && !createSession && unmatched) {
+      const actions = document.createElement('div');
+      actions.className = 'playing-clip-chip-actions';
+
+      if (onStartAlias) {
+        const aliasBtn = document.createElement('button');
+        aliasBtn.type = 'button';
+        aliasBtn.className = 'playing-clip-chip-alias-btn';
+        aliasBtn.textContent = 'Add as alias';
+        aliasBtn.addEventListener('click', () => onStartAlias(track.clipName, track));
+        actions.appendChild(aliasBtn);
+      }
+
+      if (onStartCreate) {
+        const createBtn = document.createElement('button');
+        createBtn.type = 'button';
+        createBtn.className = 'playing-clip-chip-create-btn';
+        createBtn.textContent = 'Add cue row';
+        createBtn.addEventListener('click', () => onStartCreate(track.clipName, track));
+        actions.appendChild(createBtn);
+      }
+
+      if (actions.childElementCount) chip.appendChild(actions);
     }
 
     strip.appendChild(chip);
@@ -127,3 +181,5 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
 
   parent.appendChild(strip);
 }
+
+export { suggestAliasStem };

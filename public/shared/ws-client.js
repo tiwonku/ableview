@@ -13,10 +13,9 @@ import {
   collectEditorChanges,
   collectEditorValues,
   captureCreateSession,
-  viewFieldColumns,
 } from './admin-row-editor.js';
 import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
-import { playingTracks } from './playing-clips-strip.js';
+import { playingTracks, operatorCreateColumns } from './playing-clips-strip.js';
 import { mountViewNav } from './view-nav.js';
 
 const RECONNECT_MS = 1500;
@@ -62,6 +61,7 @@ export function connectView({
   let editorColumns = {};
   let sheetHeaders = [];
   let matchColumn = null;
+  let aliasColumn = null;
   let saveState = 'idle';
   let saveError = null;
   let serverSimulated = false;
@@ -120,6 +120,7 @@ export function connectView({
       editorColumns = msg.editorColumns ?? {};
       sheetHeaders = msg.sheetHeaders ?? [];
       matchColumn = msg.matchColumn ?? null;
+      aliasColumn = msg.aliasColumn ?? null;
       viewsList = msg.views ?? null;
       mountViewNav(viewId, viewsList, { settingsActive });
       const isSession = viewId === 'session';
@@ -180,24 +181,27 @@ export function connectView({
     render();
   }
 
-  function startCreate() {
-    const clipName = lastPayload?.clipName?.trim()
+  function startCreate(clipNameOverride, track = null) {
+    const clipName = (clipNameOverride ?? lastPayload?.clipName)?.trim()
       || playingTracks(lastPayload)[0]?.clipName?.trim();
     if (!clipName || lastPayload?.match?.matched === true) return;
     if (!matchColumn) return;
     if (aliasSession) cancelAlias();
 
-    const columns = viewConfig.system
+    const isSystem = viewConfig.system;
+    const columns = isSystem
       ? sheetHeaders.filter(Boolean)
-      : viewFieldColumns(viewConfig.fields);
-    if (!viewConfig.system && !columns.length) return;
-    if (viewConfig.system && !columns.length) return;
+      : operatorCreateColumns(viewConfig.fields, matchColumn, aliasColumn);
+    if (!columns.length) return;
 
     editSession = captureCreateSession({
       clipName,
       headers: sheetHeaders,
       matchColumn,
-      columns: viewConfig.system ? undefined : columns,
+      aliasColumn,
+      columns: isSystem ? undefined : columns,
+      trackName: track?.trackName ?? null,
+      trackIndex: track?.trackIndex ?? null,
     });
     saveState = 'idle';
     saveError = null;
@@ -402,6 +406,7 @@ export function connectView({
       connected,
       lastUpdate,
       matchColumn,
+      aliasColumn,
     };
     if (statusOnly) {
       setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);
@@ -419,9 +424,16 @@ export function connectView({
     if (viewId === 'session') {
       renderSession(root, {
         ...ctx,
+        editSession,
         aliasSession,
         aliasPanel,
+        editorColumns,
+        saveState,
+        saveError,
         onStartAlias: startAlias,
+        onStartCreate: startCreate,
+        onCancelEdit: cancelEdit,
+        onSaveEdit: saveEdit,
       });
       return;
     }
