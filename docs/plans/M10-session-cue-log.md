@@ -1,14 +1,14 @@
 # M10 — Session cue log (clip → match audit trail)
 
-Build plan for an append-only **session log** of authoritative clip changes and resolved sheet
-rows (with timestamps), controlled from the admin **Settings** page. Distinct from structured
-**ops logging** (`pino` / optional `LOG_FILE` in `src/core/logger.js`).
+Build plan for an append-only **session log** of watched-track clip changes and resolved sheet
+matches (with SMPTE-style timestamps), controlled from the admin **Settings** page. Distinct from
+structured **ops logging** (`pino` / optional `LOG_FILE` in `src/core/logger.js`).
 
 **Agent workflow:** one sub-milestone (M10a–M10c) per session/commit. Run `npm test` after each
 stage. Prototype with `npm run sim` before show validation.
 
-**Related:** [`ableview_spec_from_claude.md`](../../ableview_spec_from_claude.md) §9.2
-(`CuePayload`), [`AGENTS.md`](../../AGENTS.md), [`ROADMAP.md`](../../ROADMAP.md).
+**Related:** [`ableview_spec_from_claude.md`](../../ableview_spec_from_claude.md) §9.1
+(`NowPlaying`), §9.2 (`CuePayload`), [`AGENTS.md`](../../AGENTS.md), [`ROADMAP.md`](../../ROADMAP.md).
 
 ---
 
@@ -16,22 +16,27 @@ stage. Prototype with `npm run sim` before show validation.
 
 ### Goal
 
-- While logging is **on**, append one record per **meaningful cue event** to a session file
-  under `data/` (JSON Lines by default).
-- Each record includes: wall-clock timestamp, clip name (or clear), match outcome, confidence,
-  row id, optional full matched row, transport metadata, and sim/stale flags.
-- **Settings UI** (`public/views/settings.html` + `public/shared/admin-settings.js`):
+- While logging is **on**, append one record per **meaningful show event** to a **single**
+  session file under `data/` (JSON Lines).
+- Two **event types** in the same file (distinguished by `event`):
+  - **`track_clip`** — a watched track's playing clip or slot changed (raw Ableton timeline).
+  - **`match`** — the authoritative cue clip's Google Sheet resolution changed (operator-facing
+    match outcome).
+- Each record includes an **SMPTE-style timestamp**: Art-Net timecode when the signal is live,
+  otherwise local wall clock in the same `HH:MM:SS:FF` display format (see §4.1, §7.4).
+- **Settings UI** (`public/views/settings.html` + session-log panel):
   - Toggle logging on/off at runtime.
   - Set **session name** (basename); changing name **starts a new file** (rotate), preserving
     the previous file.
-  - Show current file path, line count (or bytes), logging enabled state.
+  - Show current file path, line count, logging enabled state.
 - **Config defaults** in `config.json`: directory, default session name, whether to auto-start
   logging on boot (with sim-friendly default documented in example config).
 
 ### Non-goals
 
 - Replacing or duplicating `pino` application logs.
-- High-frequency transport logging (tempo/beat ticks while the same clip is held).
+- High-frequency transport logging (tempo/beat ticks while clips are held).
+- **Separate log files** for clips vs matches (one JSONL per session name; filter by `event`).
 - CSV as the primary format in v1 (optional later; JSONL is the contract).
 - Logging admin sheet row edits as separate events (unless added in a follow-up; see §12).
 - Authenticated download API or multi-user ACL (admin/settings URL is the trust boundary, same
@@ -44,12 +49,15 @@ stage. Prototype with `npm run sim` before show validation.
 
 ```
   ingest / sim
-       → NOW_PLAYING
+       → NOW_PLAYING ──────────────→ session logger (track_clip events)
        → matcher → CUE_PAYLOAD ──┬──→ view server (WS cue)
                                  │
-                                 └──→ session logger (NEW)
+                                 └──→ session logger (match events)
                                         append JSONL when policy says "log this"
                                         rotate file on session name change
+
+  Art-Net UDP
+       → timecode listener ────────→ getTimecodeStatus() ──→ timestamp at append
 
   admin Settings
        → GET/PATCH /api/session-log  (runtime state, NOT config.json session name)
@@ -64,23 +72,35 @@ flowchart LR
   subgraph match [Matcher]
     CP["CUE_PAYLOAD"]
   end
+  subgraph tc [Timecode]
+    AN["Art-Net listener"]
+  end
   subgraph outputs [Outputs]
     WS["View server WS"]
     SL["Session logger"]
     Disk["data/sessions/*.jsonl"]
   end
   NP --> match
+  NP --> SL
   CP --> WS
   CP --> SL
+  AN --> SL
   SL --> Disk
 ```
 
-**Integration point:** subscribe to `EVENTS.CUE_PAYLOAD` in a new module; do **not** modify
-matcher dedupe logic for logging—implement a **second** dedupe in the logger (§6).
+**Integration points:**
 
-**Bootstrap:** `src/index.js` — create logger after `createBus()`, pass `getConfig` and
-`getSimulated: () => ingest.simulated`, call `sessionLog.start()` after view server is up (or
-before ingest.start), `sessionLog.stop()` in shutdown handler before exit.
+- Subscribe to **`EVENTS.NOW_PLAYING`** for per-track clip diffs (`track_clip` events).
+- Subscribe to **`EVENTS.CUE_PAYLOAD`** for sheet match diffs (`match` events).
+- Inject **`getTimecodeStatus`** from the existing timecode listener (same handle passed to
+  health/admin today).
+- Do **not** modify matcher or ingest dedupe logic—implement separate dedupe state in the logger
+  (§6).
+
+**Bootstrap:** `src/index.js` — create logger after `createBus()` and `createTimecodeListener()`,
+pass `getConfig`, `getTimecodeStatus: () => timecode.getStatus()`, and
+`getSimulated: () => ingest.simulated`. Call `sessionLog.start()` after view server is up (or
+before `ingest.start()`), `sessionLog.stop()` in shutdown handler before exit.
 
 **Server:** register REST routes from `src/server/session-log-api.js`; inject `sessionLog`
 handle from bootstrap (same pattern as `sheetsActions` / `simActions`).
@@ -96,24 +116,80 @@ handle from bootstrap (same pattern as `sheetsActions` / `simActions`).
 | OD-L3 | Default session basename on rotate | ISO date + time local-safe slug, e.g. `session-2026-07-27T22-15-00Z` |
 | OD-L4 | Auto-start on boot | **`sessionLog.autoStart: false`** in committed example; **`true` only when `sim.enabled`** if `sessionLog.autoStartWhenSim: true` (both configurable) |
 | OD-L5 | Default basename when sim auto-starts | **`test`** → file `test.jsonl` (operator can rename/rotate before rehearsal) |
-| OD-L6 | Row payload in file | **Full `row` object** when `match.matched === true` (same as `CuePayload.row`); omit `row` when no match |
-| OD-L7 | Transport-only `CUE_PAYLOAD` | **Do not log** (same clip + source, only tempo/beat/pendingLaunch changed) |
-| OD-L8 | Rematch same clip | **Do log** when match fingerprint changes (§6.2) |
-| OD-L9 | Runtime vs persisted session name | **Runtime only** in API + optional sidecar `data/sessions/.active.json`; **do not** write active session name into `config.json` on each rotate |
+| OD-L6 | Row payload in match events | **Full `row` object** when `match.matched === true` (same as `CuePayload.row`); omit `row` when no match |
+| OD-L7 | Transport-only `CUE_PAYLOAD` | **Do not log** a `match` event (same authoritative clip + match fingerprint, only tempo/beat/pendingLaunch changed) |
+| OD-L8 | Rematch same clip | **Do log** a `match` event when match fingerprint changes (§6.3) |
+| OD-L9 | Runtime vs persisted session name | **Runtime only** in API + sidecar `data/sessions/.active.json`; **do not** write active session name into `config.json` on each rotate |
 | OD-L10 | Configurable via admin settings form | **`sessionLog.autoStartWhenSim`** and **`sessionLog.directory`** editable via existing `/api/config/settings` only if added to `EDITABLE_SECTIONS`; **enabled + active session name** via `/api/session-log` only |
+| OD-L11 | Log file layout | **Single file** per session name; **`event`** field distinguishes `track_clip` vs `match` |
+| OD-L12 | Timestamp | **`timestamp`** = Art-Net SMPTE display when `timecode.live === true`; else local wall clock as `HH:MM:SS:00` (frames `00`, colon separator). **`timestampSource`**: `"artnet"` \| `"clock"`. Optional **`loggedAt`** ISO8601 for absolute ordering/debug |
+| OD-L13 | Watched-track scope | Log **`track_clip`** for every entry in `NowPlaying.tracks` (ingest already filters to watched tracks). Diff per `(trackIndex, clipName, slotIndex)` |
 
 ---
 
 ## 4. Data contracts
 
-### 4.1 Log record (one JSONL line)
+### 4.1 Log records (one JSONL line each)
 
-Written by session logger; stable field names for downstream tools.
+All records share a common timestamp envelope. Event-specific fields vary by `event`.
+
+#### Shared fields (all events)
+
+| Field | Required | Notes |
+|---|---|---|
+| `timestamp` | yes | SMPTE-style display string, e.g. `01:23:45:12` or `01:23:45;12` (DF). From Art-Net when live, else wall clock (§7.4) |
+| `timestampSource` | yes | `"artnet"` \| `"clock"` |
+| `loggedAt` | no | ISO8601 append time; recommended for cross-session sort and debugging |
+| `event` | yes | `"track_clip"` \| `"match"` |
+| `sessionName` | yes | Basename (no path) active when line written |
+| `simulated` | yes | From `NowPlaying` / payload |
+| `tempo`, `beat` | yes | From the source event (may be null) |
+| `pendingLaunch` | yes | From the source event |
+
+#### `event: "track_clip"`
+
+Emitted when a watched track's playing clip or slot changes (§6.2).
 
 ```json
 {
+  "timestamp": "01:23:45:12",
+  "timestampSource": "artnet",
   "loggedAt": "2026-07-27T22:15:04.512Z",
-  "event": "cue",
+  "event": "track_clip",
+  "trackIndex": 3,
+  "trackName": "Vocals",
+  "clipName": "Sample Hit",
+  "slotIndex": 4,
+  "authoritativeClip": "Song A - Intro",
+  "tempo": 128,
+  "beat": 12,
+  "pendingLaunch": false,
+  "simulated": false,
+  "sessionName": "test"
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `trackIndex` | yes | Ableton track index |
+| `trackName` | yes | Track name from session |
+| `clipName` | yes | Playing clip name; `null` when stopped |
+| `slotIndex` | yes | Playing slot; `null` when stopped |
+| `authoritativeClip` | yes | Cue-track authoritative clip at this moment (context for correlation) |
+
+One line **per changed track** on each qualifying `NOW_PLAYING` event. If two tracks change in
+the same ingest tick, append two lines (same `timestamp` is fine).
+
+#### `event: "match"`
+
+Emitted when the authoritative clip's sheet resolution changes (§6.3).
+
+```json
+{
+  "timestamp": "01:23:45:12",
+  "timestampSource": "artnet",
+  "loggedAt": "2026-07-27T22:15:04.512Z",
+  "event": "match",
   "clipName": "Song A - Intro",
   "match": {
     "matched": true,
@@ -123,32 +199,33 @@ Written by session logger; stable field names for downstream tools.
     "viaAlias": false
   },
   "row": { "Song Title": "Song A - Intro", "Key": "A minor", "BPM": "128" },
+  "reason": "clip_change",
+  "syncedAt": "2026-07-27T22:12:00.000Z",
+  "stale": false,
   "tempo": 128,
   "beat": 12,
   "pendingLaunch": false,
-  "syncedAt": "2026-07-27T22:12:00.000Z",
-  "stale": false,
   "simulated": false,
-  "sessionName": "test",
-  "reason": "clip_change"
+  "sessionName": "test"
 }
 ```
 
 | Field | Required | Notes |
 |---|---|---|
-| `loggedAt` | yes | `new Date().toISOString()` at append time |
-| `event` | yes | Always `"cue"` in M10 |
-| `clipName` | yes | `null` when authoritative clip cleared |
+| `clipName` | yes | Authoritative cue clip; `null` when cleared |
 | `match` | yes | Same shape as `CuePayload.match` (`makeMatchResult`) |
 | `row` | no | Present when matched and row exists on payload |
-| `tempo`, `beat`, `pendingLaunch` | yes | From payload (may be null) |
-| `syncedAt`, `stale`, `simulated` | yes | From payload; `simulated` may be overridden from `ingest.simulated` at log time if payload lagged config toggle |
-| `sessionName` | yes | Basename (no path) active when line written |
-| `reason` | yes | `"clip_change"` \| `"match_change"` \| `"manual_rematch"` (§6) |
+| `syncedAt`, `stale` | yes | From payload |
+| `reason` | yes | `"clip_change"` \| `"match_change"` (§6.3) |
 
-**Do not** log internal dedupe keys in the file unless debugging flag added later.
+**Correlation:** A cue-track clip change typically produces **both** a `track_clip` line (for
+the Cue track) and a `match` line (new sheet row). Non-authoritative track changes produce
+**only** `track_clip`. Sheet sync / rematch with the same clip produces **only** `match` with
+`reason: "match_change"`.
 
-### 4.2 Sidecar `data/sessions/.active.json` (optional but recommended)
+**Do not** log internal dedupe keys in the file unless a debugging flag is added later.
+
+### 4.2 Sidecar `data/sessions/.active.json`
 
 Persist runtime across process restart without polluting `config.json`.
 
@@ -162,7 +239,7 @@ Persist runtime across process restart without polluting `config.json`.
 }
 ```
 
-- Updated after each append (or batched every N lines—prefer **after each append** for simplicity in M10).
+- Updated after each append (prefer **after each append** for simplicity in M10).
 - On startup: if file missing, use config defaults only.
 - **Gitignored** (under `data/`).
 
@@ -256,22 +333,70 @@ else → disabled
 
 ## 6. Event filtering (critical — implement exactly)
 
-### 6.1 Matcher behavior (context)
+### 6.1 Ingest / matcher behavior (context)
 
-`createMatcher` emits `CUE_PAYLOAD` when:
+**`NOW_PLAYING`** (from `src/ingest/sources/abletonosc.js` and simulator):
 
-- `nowPlayingKey` changes (clip, tempo, beat, source, pendingLaunch), or
-- `force: true` on rematch (sheet sync, config reload).
+- Emits when authoritative clip, pending launch, **tracks array**, tempo, or beat changes.
+- `tracks[]` lists all **watched** tracks with `{ trackIndex, trackName, clipName, slotIndex }`.
 
-It may emit **transport-only** payloads: same clip + source, updated tempo/beat only
-(`transportOnly` branch in `src/match/index.js`).
+**`CUE_PAYLOAD`** (from `src/match/index.js`):
 
-### 6.2 Logger state
+- Emits on any `nowPlayingKey` change, or `force: true` on rematch.
+- May emit **transport-only** payloads: same authoritative clip + source, updated tempo/beat only
+  (`transportOnly` branch)—tracks array may still update without authoritative clip change.
+
+### 6.2 `track_clip` — `NOW_PLAYING` handler
 
 Maintain on the session logger instance:
 
 ```js
-lastClipKey = null;   // JSON.stringify({ clip: clipName ?? null, simulated: bool }) — use payload.simulated
+lastTrackState = null;  // Map or JSON.stringify of trackIndex -> { clipName, slotIndex }
+```
+
+Define helper:
+
+```js
+function trackStateKey(tracks) {
+  return JSON.stringify(
+    (tracks ?? [])
+      .map((t) => [t.trackIndex, t.clipName ?? null, t.slotIndex ?? null])
+      .sort((a, b) => a[0] - b[0])
+  );
+}
+
+function diffTracks(prevTracks, nextTracks) {
+  // return array of { trackIndex, trackName, clipName, slotIndex } that changed
+}
+```
+
+On each `NOW_PLAYING` event (when logging enabled):
+
+```
+nextKey = trackStateKey(event.tracks)
+if (nextKey === lastTrackState) SKIP
+changed = diffTracks(parsed(lastTrackState), event.tracks)
+for (track of changed) {
+  append { event: 'track_clip', ...track fields, authoritativeClip: event.authoritativeClip, ... }
+}
+lastTrackState = nextKey
+```
+
+When logging is **disabled**, prefer **reset `lastTrackState` on disable** so the first event
+after re-enable logs even if tracks unchanged.
+
+When **`enabled` toggles true**, reset `lastTrackState` so the next `NOW_PLAYING` logs current
+state.
+
+**Do not** emit `track_clip` for tempo/beat-only `NOW_PLAYING` events—the ingest dedupes those
+before emit, so if `NOW_PLAYING` fires, at least one meaningful field (including tracks) changed.
+
+### 6.3 `match` — `CUE_PAYLOAD` handler
+
+Maintain:
+
+```js
+lastClipKey = null;   // JSON.stringify({ clip: clipName ?? null, simulated: bool })
 lastMatchKey = null;  // JSON.stringify({ clip, matched, confidence, rowId, matchedValue, viaAlias })
 ```
 
@@ -295,9 +420,7 @@ function matchKey(payload) {
 }
 ```
 
-### 6.3 Should log?
-
-On each `CUE_PAYLOAD`:
+On each `CUE_PAYLOAD` (when logging enabled):
 
 ```
 ck = clipKey(payload)
@@ -305,10 +428,10 @@ mk = matchKey(payload)
 
 if (ck !== lastClipKey) {
   reason = 'clip_change'
-  LOG
+  append { event: 'match', reason, ...payload fields }
 } else if (mk !== lastMatchKey) {
   reason = 'match_change'   // rematch / sheet sync / threshold change
-  LOG
+  append { event: 'match', reason, ...payload fields }
 } else {
   SKIP   // transport-only or duplicate
 }
@@ -317,15 +440,22 @@ lastClipKey = ck
 lastMatchKey = mk
 ```
 
-When logging is **disabled**, still update `lastClipKey` / `lastMatchKey` if desired—or reset
-keys on disable so first event after re-enable always logs (prefer **reset on disable**).
+When logging is **disabled**, **reset** `lastClipKey` / `lastMatchKey` on disable.
 
 When **`enabled` toggles true**, reset keys so the next payload logs even if clip unchanged.
 
-### 6.4 Optional: `manual_rematch` reason
+### 6.4 Ordering when both fire
 
-If implementer passes `{ force: true }` through bus (not available today), skip for M10. Use
-`match_change` for all rematch-induced diffs.
+On a cue-track clip change, ingest emits `NOW_PLAYING` then matcher emits `CUE_PAYLOAD`. Logger
+handlers run in subscription order—subscribe to `NOW_PLAYING` **before** `CUE_PAYLOAD` so
+`track_clip` lines appear before the corresponding `match` line in the file.
+
+Use the **same** `resolveLogTimestamp(getTimecodeStatus())` call per append (timestamps may differ
+by a few ms if Art-Net is updating; that is acceptable).
+
+### 6.5 `manual_rematch` reason
+
+Not used in M10. Use `match_change` for all rematch-induced diffs.
 
 ---
 
@@ -333,7 +463,7 @@ If implementer passes `{ force: true }` through bus (not available today), skip 
 
 ### 7.1 `src/session-log/index.js`
 
-Export `createSessionLogger({ bus, getConfig, log, cwd })`:
+Export `createSessionLogger({ bus, getConfig, getTimecodeStatus, log, cwd })`:
 
 | Method | Purpose |
 |---|---|
@@ -341,7 +471,8 @@ Export `createSessionLogger({ bus, getConfig, log, cwd })`:
 | `stop()` | unsubscribe, end stream, flush |
 | `getStatus()` | object for GET API |
 | `applyPatch({ enabled, sessionName })` | PATCH logic |
-| `handleCuePayload(payload)` | internal; bound to bus |
+| `handleNowPlaying(event)` | internal; `track_clip` logic |
+| `handleCuePayload(payload)` | internal; `match` logic |
 
 **File I/O:**
 
@@ -350,8 +481,7 @@ Export `createSessionLogger({ bus, getConfig, log, cwd })`:
 - Call `stream.end()` on rotate/disable/stop.
 - No extra dependencies.
 
-**Line count:** increment in memory on each write; optionally verify with async read on GET if
-needed (M10: in-memory counter is enough).
+**Line count:** increment in memory on each write; in-memory counter is enough for M10.
 
 ### 7.2 `src/session-log/sanitize.js`
 
@@ -368,7 +498,39 @@ export function sessionFilePath(directory, sessionName, cwd) {
 }
 ```
 
-### 7.3 `src/server/session-log-api.js`
+### 7.3 `src/session-log/timestamp.js`
+
+```js
+import { formatTimecodeDisplay } from '../core/timecode.js';
+
+export function resolveLogTimestamp(getTimecodeStatus) {
+  const status = getTimecodeStatus?.() ?? {};
+  if (status.enabled === true && status.live === true && status.timecode?.display) {
+    return {
+      timestamp: status.timecode.display,
+      timestampSource: 'artnet',
+    };
+  }
+  const now = new Date();
+  return {
+    timestamp: formatTimecodeDisplay({
+      hours: now.getHours(),
+      minutes: now.getMinutes(),
+      seconds: now.getSeconds(),
+      frames: 0,
+      dropFrame: false,
+    }),
+    timestampSource: 'clock',
+  };
+}
+```
+
+- Reuse `formatTimecodeDisplay` from `src/core/timecode.js` (same colon/semicolon rules as
+  Art-Net display).
+- Clock fallback always uses **frames `00`** and **colon** separator (no drop-frame semantics
+  for wall clock).
+
+### 7.4 `src/server/session-log-api.js`
 
 `registerSessionLogRoutes(app, { sessionLog, log })` — thin wrappers.
 
@@ -390,32 +552,39 @@ export function sessionFilePath(directory, sessionName, cwd) {
 **Scope**
 
 - Config section + validation + `config.example.json`.
-- `src/session-log/` (logger, sanitize, sidecar read/write).
-- Subscribe to `EVENTS.CUE_PAYLOAD` in `src/index.js`; shutdown hook.
+- `src/session-log/` (logger, sanitize, timestamp, sidecar read/write).
+- Subscribe to **`EVENTS.NOW_PLAYING`** and **`EVENTS.CUE_PAYLOAD`** in `src/index.js`; pass
+  `getTimecodeStatus`; shutdown hook.
 - Unit tests with temp directory and manual bus emits.
 
 **Files (expected)**
 
 - `src/session-log/index.js`
 - `src/session-log/sanitize.js`
+- `src/session-log/timestamp.js`
 - `src/config/index.js`
 - `src/config/runtime.js` — add `sessionLog` to `serializeFileConfig` only
 - `config/config.example.json`
 - `src/index.js`
 - `test/session-log.test.js`
+- `test/session-log-timestamp.test.js` (optional; may live in `session-log.test.js`)
 
 **Acceptance**
 
-- With logging enabled, simulating bus payloads writes JSONL lines to temp dir.
-- Transport-only second payload with same clip does **not** append second line.
-- Rematch with different `rowId` **does** append.
-- `clipName: null` clear logs one line.
+- With logging enabled, `NOW_PLAYING` with a watched-track clip change appends `track_clip` line(s).
+- Vocals clip change while Cue unchanged appends **only** `track_clip` (no `match`).
+- Cue-track clip change appends `track_clip` **and** `match` with `reason: "clip_change"`.
+- Transport-only second `CUE_PAYLOAD` with same clip does **not** append a second `match` line.
+- Rematch with different `rowId` **does** append `match` with `reason: "match_change"`.
+- `clipName: null` clear logs appropriate `match` line.
+- Timestamp uses Art-Net display when `getTimecodeStatus()` reports live; else clock fallback.
 - `npm test` green; NFR-1 untouched.
 
 **Agent prompt**
 
 > Implement M10a per `docs/plans/M10-session-cue-log.md`: `sessionLog` config, session logger
-> module, bus subscription, filtering §6, fixture tests. No REST or admin UI.
+> module with `track_clip` + `match` handlers (§6), Art-Net timestamp helper (§7.3), bus
+> subscriptions, fixture tests. No REST or admin UI.
 
 ---
 
@@ -453,11 +622,8 @@ export function sessionFilePath(directory, sessionName, cwd) {
 **Scope**
 
 - New fieldset **Session log** on settings page (below sim group or separate row):
-  - Checkbox **Enable logging** (maps to PATCH `enabled`—immediate, not part of Save settings
-    form **or** include in form with separate save handler—prefer **immediate toggle** + **Apply
-    session name** button to avoid coupling to config.json save).
-  - Text input **Session name** + button **Start new session file** (PATCH with name; if same
-    as current, no-op or optional "rotate anyway" not in M10).
+  - Checkbox **Enable logging** (maps to PATCH `enabled`—immediate toggle).
+  - Text input **Session name** + button **Start new session file** (PATCH with name).
   - Read-only status: path, line count, last logged time.
 - Minimal CSS in `public/shared/styles.css` if needed (reuse `settings-*` classes).
 - Update `ROADMAP.md` M10 row when complete.
@@ -465,18 +631,14 @@ export function sessionFilePath(directory, sessionName, cwd) {
 **UX recommendation (implement as specified):**
 
 - **Toggle** calls `PATCH { enabled }` immediately; show banner on error.
-- **Session name** input + **Apply** calls `PATCH { sessionName }` (auto-enables if operator
-  applies name while disabled—optional: only rotate when enabled; default **require enabled** for
-  apply name, or applying name sets `enabled: true`—choose **applying name enables logging** for
-  fewer clicks).
-- Poll `GET /api/session-log` every 5s or refresh after toggle/apply and after save settings.
+- **Session name** input + **Apply** calls `PATCH { sessionName }`; **applying name enables
+  logging** for fewer clicks.
+- Poll `GET /api/session-log` every 5s or refresh after toggle/apply.
 
 **Files (expected)**
 
-- `public/shared/admin-session-log.js` (new module) **or** extend `admin-settings.js`—prefer
-  **separate module** `admin-session-log.js` mounted from `settings.html` to keep M7 form simple.
-- `public/views/settings.html` — mount second panel below settings form.
-- `docs/plans/M10-session-cue-log.md` §10 runbook (this doc).
+- `public/shared/admin-session-log.js` (new module) mounted from `settings.html`.
+- `public/views/settings.html` — mount panel below settings form.
 
 **Acceptance**
 
@@ -494,17 +656,24 @@ export function sessionFilePath(directory, sessionName, cwd) {
 ## 10. Operator runbook
 
 1. Before rehearsal: open **Settings** (`/views/settings.html`).
-2. Set session name (e.g. `rehearsal-july-27`); enable logging.
-3. Run show or sim; confirm **line count** increases on clip changes only (not every beat).
-4. To start a new segment: change session name → **Apply** (previous `.jsonl` remains on disk).
-5. After show: copy files from `data/sessions/` off the NUC for analysis (JSONL import into
-   spreadsheet via jq or Python).
-6. Disable logging on show night if disk space is tight (unlikely for text JSONL).
+2. Enable Art-Net timecode in settings if the show sends SMPTE (optional but recommended for log
+   timestamps).
+3. Set session name (e.g. `rehearsal-july-27`); enable logging.
+4. Run show or sim; confirm **line count** increases on clip changes (not every beat).
+5. To start a new segment: change session name → **Apply** (previous `.jsonl` remains on disk).
+6. After show: copy files from `data/sessions/` off the NUC for analysis.
 
 **Example jq:**
 
 ```bash
-jq -c '.clipName, .match.matched' data/sessions/show-night-1.jsonl
+# All cue-track match events
+jq -c 'select(.event == "match") | {timestamp, clipName, matched: .match.matched}' data/sessions/show-night-1.jsonl
+
+# All watched-track clip fires
+jq -c 'select(.event == "track_clip") | {timestamp, trackName, clipName}' data/sessions/show-night-1.jsonl
+
+# Timeline merged (both event types)
+jq -c '{timestamp, event, track: .trackName, clip: (.clipName // .authoritativeClip)}' data/sessions/show-night-1.jsonl
 ```
 
 ---
@@ -514,8 +683,11 @@ jq -c '.clipName, .match.matched' data/sessions/show-night-1.jsonl
 | Test | File |
 |---|---|
 | Sanitize rejects `../evil` | `test/session-log.test.js` |
-| Filter skips transport-only | `test/session-log.test.js` |
-| Filter logs match_change after rematch | `test/session-log.test.js` |
+| `track_clip` on watched-track change only | `test/session-log.test.js` |
+| Cue change → `track_clip` + `match` | `test/session-log.test.js` |
+| Filter skips transport-only `match` | `test/session-log.test.js` |
+| Filter logs `match_change` after rematch | `test/session-log.test.js` |
+| Timestamp artnet vs clock fallback | `test/session-log.test.js` or `session-log-timestamp.test.js` |
 | Rotate creates two files | `test/session-log.test.js` or API test |
 | GET/PATCH 400 bad name | `test/session-log-api.test.js` |
 | Sidecar restored on restart | optional integration test with stop/start logger |
@@ -532,16 +704,21 @@ Use `node:test`, `assert`, temp dir via `fs.mkdtempSync` under `os.tmpdir()`.
 - **Download** `GET /api/session-log/download` (Content-Disposition).
 - **Max file size** rotation within same session name (`test.001.jsonl`).
 - Add `sessionLog` to admin **Save settings** form via `EDITABLE_SECTIONS`.
+- Derive clock fallback frames from Ableton beat/tempo when Art-Net is off (richer than `:00`).
 
 ---
 
 ## 13. Known limitations
 
-- Log timestamp is **append time**, not ingest `NowPlaying.timestamp` (not on `CuePayload`).
-- Full row snapshot may be **stale** relative to later sheet edits until rematch.
+- Clock fallback uses **frames `00`** — not sub-frame accurate when Art-Net is unavailable.
+- `loggedAt` (when present) reflects append time; `timestamp` reflects Art-Net sample or wall
+  clock at append—not ingest `NowPlaying.timestamp`.
+- Full row snapshot in `match` events may be **stale** relative to later sheet edits until rematch.
 - Reusing a session name **appends** to existing file (by design).
 - No encryption; treat `data/sessions/` like cue notes on disk.
-- Very fast clip changes: one line per policy event; no batching.
+- Very fast clip changes: one line per policy event per track; no batching.
+- Art-Net stale window (`timecode.staleMs`): timestamps flip to `clock` when signal drops even
+  mid-show.
 
 ---
 
@@ -549,16 +726,16 @@ Use `node:test`, `assert`, temp dir via `fs.mkdtempSync` under `os.tmpdir()`.
 
 | Stage | Agent-assisted (indicative) |
 |---|---|
-| M10a | ~2–4 hours |
+| M10a | ~3–5 hours (dual bus handlers + timestamp helper + tests) |
 | M10b | ~1–2 hours |
 | M10c | ~2–3 hours |
-| **Total** | ~0.5–1 day |
+| **Total** | ~1–1.5 days |
 
 ---
 
 ## 15. Milestone completion checklist
 
-- [ ] M10a — config + logger + bus + tests
+- [ ] M10a — config + logger + dual bus handlers + timestamp + tests
 - [ ] M10b — REST API + server tests
 - [ ] M10c — settings UI + sim runbook verified
 - [ ] `ROADMAP.md` M10 marked done
@@ -571,9 +748,10 @@ Use `node:test`, `assert`, temp dir via `fs.mkdtempSync` under `os.tmpdir()`.
 **Session 1 — M10a**
 
 > Implement M10a per `docs/plans/M10-session-cue-log.md` §9 (M10a): add `sessionLog` config,
-> `src/session-log/` with JSONL append and §6 filtering, wire in `src/index.js`, tests in
-> `test/session-log.test.js`. Follow existing patterns in `src/sheets/` and `src/core/bus.js`.
-> Run `npm test`. Do not commit unless asked.
+> `src/session-log/` with JSONL append, `track_clip` (NOW_PLAYING §6.2) and `match`
+> (CUE_PAYLOAD §6.3) handlers, `resolveLogTimestamp` (§7.3), wire in `src/index.js` with
+> `getTimecodeStatus`, tests in `test/session-log.test.js`. Follow existing patterns in
+> `src/sheets/` and `src/core/bus.js`. Run `npm test`. Do not commit unless asked.
 
 **Session 2 — M10b**
 
