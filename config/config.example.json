@@ -52,6 +52,12 @@
     "bindAddress": "0.0.0.0",
     "staleMs": 500
   },
+  "sessionLog": {
+    "directory": "./data/sessions",
+    "autoStart": false,
+    "autoStartWhenSim": true,
+    "defaultSessionName": "test"
+  },
   "views": {
     "band": {
       "title": "Band",

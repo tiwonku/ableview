@@ -101,6 +101,7 @@ AbletonOSC / Simulator  →  event bus  →  [matcher]  →  [view server]  → 
 | Config | `src/config/index.js` | `.env` + `config/config.json` loader with validation. |
 | Ingest | `src/ingest/` | Source interface. Real: `abletonosc.js`. Sim: `simulator.js` + optional `sim/osc-emitter.js`. |
 | Logger | `src/core/logger.js` | pino, structured JSON. |
+| Session log | `src/session-log/` | Append-only JSONL of `track_clip` + `match` events (M10). |
 
 ### Planned modules (not yet implemented)
 

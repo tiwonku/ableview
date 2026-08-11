@@ -2003,3 +2003,26 @@ body.layout-session > main#app {
     gap: 0.35rem;
   }
 }
+
+.session-log-main {
+  margin-top: 1.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.session-log-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.session-log-name-row .settings-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.session-log-status {
+  margin-bottom: 0.75rem;
+}

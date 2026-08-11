@@ -47,6 +47,12 @@ export const DEFAULTS = Object.freeze({
     bindAddress: '0.0.0.0',
     staleMs: 500,
   },
+  sessionLog: {
+    directory: './data/sessions',
+    autoStart: false,
+    autoStartWhenSim: true,
+    defaultSessionName: 'test',
+  },
   views: {},
 });
 
@@ -115,6 +121,20 @@ export function validateConfig(config) {
   if (tc.staleMs != null && !(tc.staleMs >= 0)) errors.push('timecode.staleMs must be >= 0');
   if (tc.bindAddress != null && typeof tc.bindAddress !== 'string') {
     errors.push('timecode.bindAddress must be a string');
+  }
+
+  const sl = config.sessionLog ?? {};
+  if (sl.directory != null && (typeof sl.directory !== 'string' || !sl.directory.trim())) {
+    errors.push('sessionLog.directory must be a non-empty string');
+  }
+  if (sl.defaultSessionName != null && typeof sl.defaultSessionName !== 'string') {
+    errors.push('sessionLog.defaultSessionName must be a string');
+  }
+  if (sl.autoStart != null && typeof sl.autoStart !== 'boolean') {
+    errors.push('sessionLog.autoStart must be a boolean');
+  }
+  if (sl.autoStartWhenSim != null && typeof sl.autoStartWhenSim !== 'boolean') {
+    errors.push('sessionLog.autoStartWhenSim must be a boolean');
   }
 
   const views = config.views ?? {};

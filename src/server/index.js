@@ -6,6 +6,7 @@ import { buildHealthReport } from './health.js';
 import { registerConfigRoutes } from './config-api.js';
 import { registerSheetsRoutes } from './sheets-api.js';
 import { registerSimRoutes } from './sim-api.js';
+import { registerSessionLogRoutes } from './session-log-api.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
@@ -20,6 +21,7 @@ export async function createViewServer({
   configRuntime,
   sheetsActions,
   simActions,
+  sessionLog,
 }) {
   let lastPayload = null;
   const clients = new Map();
@@ -133,6 +135,10 @@ export async function createViewServer({
 
   if (simActions) {
     registerSimRoutes(app, { simActions, log });
+  }
+
+  if (sessionLog) {
+    registerSessionLogRoutes(app, { sessionLog, log });
   }
 
   app.get('/views/:name', async (req, reply) => {

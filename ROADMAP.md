@@ -15,7 +15,7 @@ Build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claud
 | M7 | Admin settings GUI | ✅ done |
 | M8 | Sheet row editor | ✅ done |
 | M9 | Waveform + playhead (offline cache + OSC playhead) | 📋 planned — [`docs/plans/M9-waveform-playhead.md`](./docs/plans/M9-waveform-playhead.md) |
-| M10 | Session cue log (JSONL: watched-track clips + sheet matches, Art-Net timestamps, settings UI) | 📋 planned — [`docs/plans/M10-session-cue-log.md`](./docs/plans/M10-session-cue-log.md) |
+| M10 | Session cue log (JSONL: watched-track clips + sheet matches, Art-Net timestamps, settings UI) | ✅ done |
 | M11 | Show-box launchers — Windows + macOS parity (optional Inno; extends M6) | 📋 planned — [`docs/plans/M11-show-box-launchers.md`](./docs/plans/M11-show-box-launchers.md) |
 
 v2026 core scope (spec §10, §13) is complete. Items below are deferred, partial, or
@@ -32,18 +32,19 @@ post-v2026.
 | **View-scoped row editor** | Operator views edit their configured fields by default; set `editable: false` to hide the button. Same widgets and edit-session locking as admin. | ✅ done |
 | **Sheet row append** | Add cue rows on no-match from admin (full sheet) or operator views (view fields only; match column injected from clip); `POST /api/sheets/rows`; appends to Google Sheet, updates cache, rematches. | ✅ done |
 | **Responsive operator views** | Viewport-fitted Band/Lighting/Visuals for ultrawide and short displays (e.g. Xeneon Edge 2560×720); multi-column fields, line-clamp + expand for long text. | ✅ done |
-| **Session cue log** | Append-only JSONL (`track_clip` + `match` events in one file); watched-track clip changes + sheet match changes; Art-Net timestamp when live; admin toggle, session name → rotate file; sim auto-start optional. | 📋 planned — [`docs/plans/M10-session-cue-log.md`](./docs/plans/M10-session-cue-log.md) |
+| **Session cue log** | Append-only JSONL (`track_clip` + `match` events in one file); watched-track clip changes + sheet match changes; Art-Net timestamp when live; admin toggle, session name → rotate file; sim auto-start optional. | ✅ done |
+| **bestMatch over watched tracks** | Match all playing watched clips; bpm-stem normalize (no key regex); optional ALS Folder soft key; Session per-deck match/confidence/winner. Cue track optional. | ✅ done |
 
 ---
 
 ## Partially implemented (spec gaps)
 
 These are mentioned in the spec but not fully built. The app works without them using the
-default `track` strategy and the other sim drivers.
+default `bestMatch` strategy and the other sim drivers.
 
 | Item | Spec ref | Current state |
 |---|---|---|
-| **`scene` / `mostRecent` cue strategies** | §6 | Config-valid, but only `track` is fully implemented. Other strategies fall back to “any playing watched clip.” |
+| **`scene` / `mostRecent` cue strategies** | §6 | Config-valid; `bestMatch` and `track` are implemented. `scene` / `mostRecent` fall back to first fired-or-playing watched clip for ingest hint. |
 | **Manual sim driver from admin** | §7 | Admin sim panel (internal mode): fire/clear, pause/resume, prev/next, clip picker from scenario or sheet. OSC sim mode still has no manual controls. |
 | **View field maps in admin** | M7 scope note | Still edited in local `config/config.json` (or SSH). Admin covers ingest, sim, sheets, and match — not per-view layouts. |
 | **`.env` secrets in admin** | M7 scope note | `SHEET_ID`, service account key path, and `HTTP_PORT` remain in `.env` only. |
@@ -79,7 +80,7 @@ From spec §12 — confirm with the maintainer before hardcoding show-specific a
 
 | ID | Topic | Status |
 |---|---|---|
-| OD-1 | Authoritative cue source | **Resolved** — `track` strategy on a designated cue track (`ingest.authoritative.track`). |
+| OD-1 | Authoritative cue source | **Updated** — default `bestMatch` over watched tracks; optional `track` strategy still available. |
 | OD-2 | Implementation language | Node.js in use; Python + FastAPI remains a valid alternative with the same architecture. |
 | OD-3 | View names + sheet columns | Example field maps in `config/config.example.json`; confirm real operator views and columns per show. |
 | OD-4 | Match column + aliases | Confirm which sheet column clip names match against and whether aliases are maintained. |

@@ -7,6 +7,7 @@ import { createSheetsStore } from './sheets/index.js';
 import { createMatcher } from './match/index.js';
 import { createViewServer } from './server/index.js';
 import { createTimecodeListener } from './timecode/index.js';
+import { createSessionLogger } from './session-log/index.js';
 
 const log = createLogger({ app: 'ableview' });
 
@@ -48,6 +49,14 @@ async function main() {
     log: log.child({ module: 'timecode' }),
   });
 
+  const sessionLog = createSessionLogger({
+    bus,
+    getConfig,
+    getTimecodeStatus: () => timecode.getStatus(),
+    getSimulated: () => ingest.simulated,
+    log: log.child({ module: 'session-log' }),
+  });
+
   const viewServer = await createViewServer({
     config,
     bus,
@@ -78,7 +87,10 @@ async function main() {
       getIngestStatus: () => ingest.getIngestStatus(),
       getTimecodeStatus: () => timecode.getStatus(),
     }),
+    sessionLog,
   });
+
+  sessionLog.start();
 
   configRuntime.onReload(async (sections) => {
     if (sections.includes('sim') || sections.includes('ingest')) {
@@ -124,6 +136,7 @@ async function main() {
 
   const shutdown = async (signal) => {
     log.info({ signal }, 'shutting down');
+    sessionLog.stop();
     timecode.stop();
     ingest.stop();
     sheets.stop();

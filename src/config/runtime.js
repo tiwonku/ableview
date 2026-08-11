@@ -30,6 +30,7 @@ export function serializeFileConfig(config) {
     match: { ...config.match },
     server: { wsHeartbeatSeconds: config.server.wsHeartbeatSeconds },
     timecode: { ...config.timecode },
+    sessionLog: { ...config.sessionLog },
     views: { ...config.views },
   };
 }

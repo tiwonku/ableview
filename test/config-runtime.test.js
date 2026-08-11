@@ -193,6 +193,7 @@ test('settings view HTML loads settings panel script', async () => {
   const html = await res.text();
   assert.match(html, /AbleView — Settings/);
   assert.match(html, /admin-settings\.js/);
+  assert.match(html, /admin-session-log\.js/);
   assert.match(html, /statusOnly: true/);
 
   await server.stop();

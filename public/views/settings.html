@@ -18,12 +18,15 @@
     <span data-role="last-update" title="Last cue update">—</span>
   </header>
   <main id="app" class="settings-main" aria-label="Settings"></main>
+  <section id="session-log" class="settings-main session-log-main" aria-label="Session log"></section>
   <script type="module">
     import { connectView } from '/shared/ws-client.js';
     import { mountSettingsPanel } from '/shared/admin-settings.js';
+    import { mountSessionLogPanel } from '/shared/admin-session-log.js';
 
     connectView({ viewId: 'admin', statusOnly: true, settingsActive: true });
     mountSettingsPanel('#app');
+    mountSessionLogPanel('#session-log');
   </script>
 </body>
 </html>

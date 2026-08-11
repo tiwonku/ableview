@@ -735,11 +735,11 @@ Use `node:test`, `assert`, temp dir via `fs.mkdtempSync` under `os.tmpdir()`.
 
 ## 15. Milestone completion checklist
 
-- [ ] M10a — config + logger + dual bus handlers + timestamp + tests
-- [ ] M10b — REST API + server tests
-- [ ] M10c — settings UI + sim runbook verified
-- [ ] `ROADMAP.md` M10 marked done
-- [ ] Optional one-line in `AGENTS.md` planned modules table (`src/session-log/`)
+- [x] M10a — config + logger + dual bus handlers + timestamp + tests
+- [x] M10b — REST API + server tests
+- [x] M10c — settings UI + sim runbook verified
+- [x] `ROADMAP.md` M10 marked done
+- [x] Optional one-line in `AGENTS.md` planned modules table (`src/session-log/`)
 
 ---
 
