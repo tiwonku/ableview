@@ -34,12 +34,15 @@ test('manual driver emits a NowPlaying event matching the §9.1 contract', () =>
     'authoritativeClip',
     'beat',
     'pendingLaunch',
+    'scene',
     'source',
     'tempo',
     'timestamp',
     'tracks',
   ]);
   assert.equal(e.tracks[0].clipName, 'Song A - Intro');
+  assert.equal(e.scene?.launchType, 'clip');
+  assert.equal(e.scene?.launchId, 1);
 });
 
 test('firing null clip means nothing playing', () => {

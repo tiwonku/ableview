@@ -14,6 +14,7 @@ export function makeCuePayload({
   pendingLaunch = false,
   tracks = [],
   trackMatches = [],
+  scene = null,
 }) {
   const payload = {
     clipName,
@@ -28,6 +29,7 @@ export function makeCuePayload({
     tracks: Array.isArray(tracks) ? tracks : [],
     trackMatches: Array.isArray(trackMatches) ? trackMatches : [],
   };
+  if (scene != null) payload.scene = scene;
   if (row != null) payload.row = row;
   if (ableton != null) payload.ableton = ableton;
   return payload;

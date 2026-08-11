@@ -19,6 +19,31 @@ function formatConfidence(confidence) {
   return `${Math.round(confidence * 100)}%`;
 }
 
+function formatSceneBanner(scene, payload) {
+  if (!scene?.launchType || scene.index == null) return null;
+
+  const slotLabel = `Row ${scene.index + 1}`;
+  const pending = scene.pending || payload?.pendingLaunch;
+  const pendingTag = pending ? ' · launching' : '';
+
+  if (scene.launchType === 'scene') {
+    const name = scene.name?.trim();
+    const title = name ? `"${name}"` : slotLabel;
+    return {
+      kind: 'scene',
+      primary: `Scene ${title}${pendingTag}`,
+      secondary: name ? slotLabel : null,
+    };
+  }
+
+  const track = scene.trackName || (scene.trackIndex != null ? `Track ${scene.trackIndex}` : 'Track');
+  return {
+    kind: 'clip',
+    primary: `Clip launch · ${track}${pendingTag}`,
+    secondary: slotLabel,
+  };
+}
+
 /**
  * @param {HTMLElement} root
  * @param {{
@@ -65,6 +90,26 @@ export function renderSession(root, ctx) {
   heading.className = 'view-title';
   heading.textContent = title || 'Session';
   root.appendChild(heading);
+
+  const sceneBanner = formatSceneBanner(payload?.scene, payload);
+  if (sceneBanner) {
+    const banner = document.createElement('div');
+    banner.className = `session-scene-banner session-scene-banner--${sceneBanner.kind}`;
+    if (sceneBanner.pending || payload?.pendingLaunch) {
+      banner.classList.add('session-scene-banner--pending');
+    }
+    const primary = document.createElement('div');
+    primary.className = 'session-scene-banner-primary';
+    primary.textContent = sceneBanner.primary;
+    banner.appendChild(primary);
+    if (sceneBanner.secondary) {
+      const secondary = document.createElement('div');
+      secondary.className = 'session-scene-banner-secondary';
+      secondary.textContent = sceneBanner.secondary;
+      banner.appendChild(secondary);
+    }
+    root.appendChild(banner);
+  }
 
   if (aliasSession && aliasPanel) {
     renderAliasPanel(root, aliasPanel);

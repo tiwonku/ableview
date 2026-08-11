@@ -351,6 +351,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
         beat: event.beat,
         pendingLaunch: event.pendingLaunch ?? false,
         tracks: event.tracks ?? [],
+        scene: event.scene ?? null,
         simulated,
         ingestLive: simulated ? true : ingestLive,
         ableton: simulated ? null : ableton,
@@ -361,6 +362,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
       payload.tempo = event.tempo;
       payload.beat = event.beat;
       payload.tracks = event.tracks ?? [];
+      payload.scene = event.scene ?? null;
       payload.simulated = simulated;
       payload.pendingLaunch = event.pendingLaunch ?? false;
       payload.ingestLive = simulated ? true : ingestLive;

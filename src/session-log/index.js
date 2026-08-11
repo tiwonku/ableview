@@ -11,6 +11,7 @@ import { SOURCES } from '../core/now-playing.js';
 import { sanitizeSessionName, sessionFilePath } from './sanitize.js';
 import { resolveLogTimestamp } from './timestamp.js';
 import { clipKey, diffTracks, matchKey, trackStateKey } from './tracks.js';
+import { buildLaunchRecord, emptyLaunchSummary, incrementLaunchSummary, launchLogKey } from './launch.js';
 
 const SIDECAR_NAME = '.active.json';
 
@@ -58,6 +59,8 @@ export function createSessionLogger({
   let lastTrackState = null;
   let lastClipKey = null;
   let lastMatchKey = null;
+  let lastLaunchKey = null;
+  let launchSummary = emptyLaunchSummary();
 
   let onNowPlaying = null;
   let onCuePayload = null;
@@ -75,6 +78,8 @@ export function createSessionLogger({
     lastTrackState = null;
     lastClipKey = null;
     lastMatchKey = null;
+    lastLaunchKey = null;
+    launchSummary = emptyLaunchSummary();
   }
 
   function persistSidecar() {
@@ -85,6 +90,7 @@ export function createSessionLogger({
       startedAt,
       lineCount,
       lastLoggedAt,
+      launchSummary,
     });
   }
 
@@ -134,6 +140,21 @@ export function createSessionLogger({
 
   function handleNowPlaying(event) {
     if (!enabled) return;
+
+    const scene = event.scene ?? null;
+    const launchKey = launchLogKey(scene);
+    if (launchKey && launchKey !== lastLaunchKey) {
+      lastLaunchKey = launchKey;
+      const envelope = timestampEnvelope();
+      appendRecord(buildLaunchRecord(scene, envelope, {
+        authoritativeClip: event.authoritativeClip ?? null,
+        tempo: event.tempo ?? null,
+        beat: event.beat ?? null,
+        simulated: isSimulatedFromEvent(event),
+        sessionName,
+      }));
+      launchSummary = incrementLaunchSummary(launchSummary, scene.launchType);
+    }
 
     const nextKey = trackStateKey(event.tracks);
     if (nextKey === lastTrackState) return;
@@ -232,6 +253,7 @@ export function createSessionLogger({
       lineCount: enabled ? lineCount : 0,
       startedAt: enabled ? startedAt : null,
       lastLoggedAt: enabled ? lastLoggedAt : null,
+      launchSummary: enabled ? { ...launchSummary } : emptyLaunchSummary(),
       config: {
         directory: cfg.directory ?? './data/sessions',
         autoStart: cfg.autoStart === true,
@@ -279,6 +301,7 @@ export function createSessionLogger({
       lineCount = sidecar.lineCount ?? lineCount;
       startedAt = sidecar.startedAt ?? startedAt;
       lastLoggedAt = sidecar.lastLoggedAt ?? null;
+      launchSummary = sidecar.launchSummary ?? emptyLaunchSummary();
       log.info({ sessionName, restored: true }, 'session log restored from sidecar');
     } else if (cfg.autoStart === true) {
       enableLogging(cfg.defaultSessionName ?? 'test');

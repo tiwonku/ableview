@@ -2100,6 +2100,44 @@ body.layout-session > main#app {
   letter-spacing: 0.02em;
 }
 
+.session-main .view-title {
+  margin-bottom: 0.35rem;
+}
+
+.session-scene-banner {
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.session-scene-banner--scene {
+  border-color: rgba(96, 165, 250, 0.35);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.session-scene-banner--clip {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.session-scene-banner--pending {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.session-scene-banner-primary {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.session-scene-banner-secondary {
+  margin-top: 0.2rem;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
 .session-tracks {
   display: flex;
   flex-direction: column;

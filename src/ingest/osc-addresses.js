@@ -21,6 +21,11 @@ export const OSC_READ_ALLOWLIST = Object.freeze([
   '/live/track/start_listen/fired_slot_index',
   '/live/track/stop_listen/fired_slot_index',
   '/live/clip/get/name',
+  '/live/view/get/selected_scene',
+  '/live/view/start_listen/selected_scene',
+  '/live/view/stop_listen/selected_scene',
+  '/live/scene/get/name',
+  '/live/scene/get/is_triggered',
 ]);
 
 const ALLOWSET = new Set(OSC_READ_ALLOWLIST);

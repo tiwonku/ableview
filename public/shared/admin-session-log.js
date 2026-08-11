@@ -35,6 +35,18 @@ function renderStatusBox(status) {
     box.appendChild(el('p', 'ableton-session-line', `File: ${status.filePath}`));
     box.appendChild(el('p', 'ableton-session-line', `Lines: ${status.lineCount ?? 0}`));
     box.appendChild(el('p', 'ableton-session-line', `Last entry: ${formatTime(status.lastLoggedAt)}`));
+    const summary = status.launchSummary;
+    if (summary && (summary.totalLaunches ?? 0) > 0) {
+      const sceneCount = summary.sceneLaunches ?? 0;
+      const clipCount = summary.clipLaunches ?? 0;
+      const total = summary.totalLaunches ?? sceneCount + clipCount;
+      const scenePct = total > 0 ? Math.round((sceneCount / total) * 100) : 0;
+      box.appendChild(el(
+        'p',
+        'ableton-session-line',
+        `Launches: ${total} (${sceneCount} scene, ${clipCount} clip · ${scenePct}% scenes)`,
+      ));
+    }
   } else if (status?.sessionName) {
     box.appendChild(el('p', 'ableton-session-line', `Session name: ${status.sessionName}`));
   }
@@ -76,7 +88,7 @@ export function mountSessionLogPanel(selector) {
     shell.appendChild(el(
       'p',
       'settings-lead',
-      'Append-only JSONL of watched-track clip changes and sheet match events. Files live under data/sessions/ (not in git).',
+      'Append-only JSONL of watched-track clip changes, scene/clip launch events, and sheet match events. Files live under data/sessions/ (not in git).',
     ));
 
     const fieldset = el('fieldset', 'settings-group session-log-group');

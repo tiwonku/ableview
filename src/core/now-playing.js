@@ -13,11 +13,12 @@ export function makeNowPlaying({
   tempo = null,
   beat = null,
   pendingLaunch = false,
+  scene = null,
 }) {
   if (source !== SOURCES.ABLETONOSC && source !== SOURCES.SIMULATOR) {
     throw new Error(`Invalid NowPlaying source: ${source}`);
   }
-  return {
+  const payload = {
     timestamp: new Date().toISOString(),
     source,
     tracks,
@@ -26,4 +27,6 @@ export function makeNowPlaying({
     beat,
     pendingLaunch,
   };
+  if (scene != null) payload.scene = scene;
+  return payload;
 }

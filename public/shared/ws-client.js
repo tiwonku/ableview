@@ -25,6 +25,10 @@ function tracksKey(tracks) {
   return JSON.stringify(tracks ?? []);
 }
 
+function sceneKey(scene) {
+  return JSON.stringify(scene ?? null);
+}
+
 function cueContentChanged(prev, next) {
   if (!prev) return true;
   return prev.clipName !== next.clipName
@@ -33,7 +37,8 @@ function cueContentChanged(prev, next) {
     || prev.tempo !== next.tempo
     || prev.beat !== next.beat
     || prev.pendingLaunch !== next.pendingLaunch
-    || tracksKey(prev.tracks) !== tracksKey(next.tracks);
+    || tracksKey(prev.tracks) !== tracksKey(next.tracks)
+    || sceneKey(prev.scene) !== sceneKey(next.scene);
 }
 
 export function connectView({

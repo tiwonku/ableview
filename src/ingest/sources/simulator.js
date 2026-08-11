@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { EVENTS } from '../../core/bus.js';
 import { makeNowPlaying, SOURCES } from '../../core/now-playing.js';
+import { makeSceneInfo, sceneFromNowPlayingTracks } from '../scene-launch.js';
 
 const SIM_TRACK = { trackIndex: 0, trackName: 'Cue', slotIndex: 0 };
 
@@ -54,13 +55,23 @@ export function createSimulatorSource({ config, bus, log, getClipNames = null })
     return scenarioLoop;
   }
 
+  let launchIdCounter = 0;
+
   function emit(clipName, { tempo = null, beat = null } = {}) {
+    const tracks = clipName == null ? [] : [{ ...SIM_TRACK, clipName }];
+    const sceneBase = clipName == null
+      ? makeSceneInfo()
+      : sceneFromNowPlayingTracks(tracks, { pendingLaunch: false });
+    const scene = clipName == null
+      ? sceneBase
+      : { ...sceneBase, launchId: ++launchIdCounter };
     const event = makeNowPlaying({
       source: SOURCES.SIMULATOR,
-      tracks: clipName == null ? [] : [{ ...SIM_TRACK, clipName }],
+      tracks,
       authoritativeClip: clipName ?? null,
       tempo,
       beat,
+      scene,
     });
     log.info({ authoritativeClip: event.authoritativeClip, simulated: true }, 'now playing (simulated)');
     bus.emit(EVENTS.NOW_PLAYING, event);
