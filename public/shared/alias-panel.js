@@ -40,8 +40,43 @@ function secondaryLabel(result) {
  *   onAliasChange: (alias: string) => void,
  *   onCancel: () => void,
  *   onSave: () => void,
+ *   focusRestore?: { field: 'search'|'alias', start: number, end: number }|null,
+ *   autoFocusSearch?: boolean,
  * }} opts
  */
+
+/** Remember which alias-panel input had focus before a full re-render. */
+export function captureAliasPanelFocus() {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLInputElement)) return null;
+  if (active.classList.contains('alias-search-input')) {
+    return { field: 'search', start: active.selectionStart ?? 0, end: active.selectionEnd ?? 0 };
+  }
+  if (active.classList.contains('alias-text-input')) {
+    return { field: 'alias', start: active.selectionStart ?? 0, end: active.selectionEnd ?? 0 };
+  }
+  return null;
+}
+
+function restoreAliasPanelFocus(section, focus, { autoFocusSearch = false } = {}) {
+  if (focus) {
+    const sel = focus.field === 'search' ? '.alias-search-input' : '.alias-text-input';
+    const input = section.querySelector(sel);
+    if (input) {
+      input.focus();
+      input.setSelectionRange(focus.start, focus.end);
+      return;
+    }
+  }
+  if (autoFocusSearch) {
+    const searchInput = section.querySelector('.alias-search-input');
+    if (searchInput) {
+      searchInput.focus();
+      searchInput.select?.();
+    }
+  }
+}
+
 export function renderAliasPanel(parent, opts) {
   const {
     clipName,
@@ -60,6 +95,8 @@ export function renderAliasPanel(parent, opts) {
     onAliasChange,
     onCancel,
     onSave,
+    focusRestore = null,
+    autoFocusSearch = false,
   } = opts;
 
   const section = el('section', 'alias-panel');
@@ -213,9 +250,7 @@ export function renderAliasPanel(parent, opts) {
   parent.appendChild(section);
 
   queueMicrotask(() => {
-    if (document.activeElement?.tagName === 'INPUT') return;
-    searchInput.focus();
-    searchInput.select?.();
+    restoreAliasPanelFocus(section, focusRestore, { autoFocusSearch });
   });
 }
 

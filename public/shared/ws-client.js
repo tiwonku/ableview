@@ -15,7 +15,7 @@ import {
   captureCreateSession,
   viewFieldColumns,
 } from './admin-row-editor.js';
-import { createAliasSession } from './alias-panel.js';
+import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
 import { mountViewNav } from './view-nav.js';
 
 const RECONNECT_MS = 1500;
@@ -66,6 +66,7 @@ export function connectView({
   let serverSimulated = false;
   let aliasSearchTimer = null;
   let aliasSearchSeq = 0;
+  let aliasAutoFocusSearch = false;
 
   function applySimState(simulated) {
     serverSimulated = simulated === true;
@@ -211,6 +212,7 @@ export function connectView({
       trackName: track?.trackName ?? null,
       trackIndex: track?.trackIndex ?? null,
     });
+    aliasAutoFocusSearch = true;
     saveState = 'idle';
     saveError = null;
     render();
@@ -402,7 +404,15 @@ export function connectView({
       setConnectionState(connected, lastUpdate, lastPayload, serverSimulated);
       return;
     }
+    const aliasFocus = aliasSession ? captureAliasPanelFocus() : null;
+    const autoFocusSearch = aliasAutoFocusSearch;
+    aliasAutoFocusSearch = false;
+
     const aliasPanel = buildAliasPanelProps();
+    if (aliasPanel) {
+      aliasPanel.focusRestore = aliasFocus;
+      aliasPanel.autoFocusSearch = autoFocusSearch;
+    }
     if (viewId === 'session') {
       renderSession(root, {
         ...ctx,
