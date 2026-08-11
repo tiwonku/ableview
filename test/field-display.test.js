@@ -4,6 +4,10 @@ import {
   resolveFieldDisplay,
   groupFieldsForLayout,
   resolveFieldsLayoutMode,
+  getFieldValue,
+  fieldLabel,
+  formatTempoFieldValue,
+  isLiveField,
 } from '../public/shared/field-display.js';
 
 test('resolveFieldDisplay respects explicit display', () => {
@@ -84,4 +88,31 @@ test('groupFieldsForLayout groups colors and caps row width', () => {
   assert.equal(rows[2].type, 'colors');
   assert.equal(rows[2].fields.length, 2);
   assert.equal(rows[3].type, 'note');
+});
+
+test('getFieldValue reads live tempo from CuePayload', () => {
+  const field = { source: 'tempo', label: 'Tempo' };
+  assert.equal(getFieldValue(field, { tempo: 128 }), '128');
+  assert.equal(getFieldValue(field, { tempo: 90.5 }), '90.5');
+  assert.equal(getFieldValue(field, { tempo: null }), null);
+  assert.equal(getFieldValue(field, {}), null);
+  // Sheet BPM must not win over live source
+  assert.equal(getFieldValue(field, { tempo: 100, row: { BPM: '128' } }), '100');
+});
+
+test('getFieldValue still reads sheet columns', () => {
+  assert.equal(getFieldValue({ column: 'BPM' }, { row: { BPM: '128' }, tempo: 100 }), '128');
+});
+
+test('formatTempoFieldValue and fieldLabel helpers', () => {
+  assert.equal(formatTempoFieldValue(128), '128');
+  assert.equal(formatTempoFieldValue(128.25), '128.3');
+  assert.equal(fieldLabel({ source: 'tempo' }), 'Tempo');
+  assert.equal(fieldLabel({ source: 'tempo', label: 'Live BPM' }), 'Live BPM');
+  assert.equal(isLiveField({ source: 'tempo' }), true);
+  assert.equal(isLiveField({ column: 'BPM' }), false);
+});
+
+test('resolveFieldDisplay defaults live tempo to token', () => {
+  assert.equal(resolveFieldDisplay({ source: 'tempo' }, '128'), 'token');
 });

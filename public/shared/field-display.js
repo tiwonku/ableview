@@ -1,11 +1,34 @@
 // Field display tiers for operator views (token / text / note).
 
 const NOTE_NAME_PATTERN = /notes?|panels|description|comment/i;
-const TOKEN_NAME_PATTERN = /^(key|relative key|bpm|notch|lasers)$/i;
+const TOKEN_NAME_PATTERN = /^(key|relative key|bpm|tempo|notch|lasers)$/i;
+
+/** Live CuePayload fields (not sheet columns). */
+export const LIVE_FIELD_SOURCES = Object.freeze({
+  TEMPO: 'tempo',
+});
+
+export function isLiveField(field) {
+  return field?.source === LIVE_FIELD_SOURCES.TEMPO;
+}
+
+export function isSheetField(field) {
+  return Boolean(field?.column) && !isLiveField(field);
+}
+
+/** Format Ableton tempo for operator field tokens (number only; label is separate). */
+export function formatTempoFieldValue(tempo) {
+  if (tempo == null || Number.isNaN(Number(tempo))) return null;
+  const n = Number(tempo);
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
 
 /** @returns {'token' | 'text' | 'note'} */
 export function resolveFieldDisplay(field, value, { layout = 'hero' } = {}) {
   if (field.type === 'color') return 'token';
+  if (isLiveField(field)) return field.display === 'text' || field.display === 'note'
+    ? field.display
+    : 'token';
 
   const explicit = field.display;
   if (explicit === 'token' || explicit === 'text' || explicit === 'note') {
@@ -24,7 +47,7 @@ export function resolveFieldDisplay(field, value, { layout = 'hero' } = {}) {
 
   if (
     layout !== 'strip'
-    && TOKEN_NAME_PATTERN.test(String(field.column ?? '').trim())
+    && TOKEN_NAME_PATTERN.test(String(field.column ?? field.label ?? '').trim())
   ) {
     return 'token';
   }
@@ -32,9 +55,18 @@ export function resolveFieldDisplay(field, value, { layout = 'hero' } = {}) {
 }
 
 export function getFieldValue(field, payload) {
+  if (field?.source === LIVE_FIELD_SOURCES.TEMPO) {
+    return formatTempoFieldValue(payload?.tempo);
+  }
   const raw = payload?.row?.[field.column];
   if (raw == null || String(raw).trim() === '') return null;
   return String(raw);
+}
+
+export function fieldLabel(field) {
+  if (field?.label) return field.label;
+  if (field?.source === LIVE_FIELD_SOURCES.TEMPO) return 'Tempo';
+  return field?.column ?? '';
 }
 
 export const ROW_MAX_FIELDS = 3;

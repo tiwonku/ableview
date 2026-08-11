@@ -3,6 +3,8 @@
 import { parseRgbCell } from './color-parse.js';
 import {
   getFieldValue,
+  fieldLabel,
+  isLiveField,
   resolveFieldDisplay,
   groupFieldsForLayout,
   resolveFieldsLayoutMode,
@@ -275,8 +277,12 @@ export function renderView(root, {
       saveState,
       saveError,
     });
-  } else if (matched && fields?.length) {
-    if (editable && onStartEdit) {
+  } else if (!busy && fields?.length) {
+    const visibleFields = matched
+      ? fields
+      : fields.filter((f) => isLiveField(f));
+
+    if (matched && editable && onStartEdit) {
       const editBar = document.createElement('div');
       editBar.className = 'view-edit-bar';
 
@@ -290,41 +296,9 @@ export function renderView(root, {
       root.appendChild(editBar);
     }
 
-    const fieldsWrap = document.createElement('div');
-    fieldsWrap.className = 'view-fields-wrap';
-
-    const layoutMode = resolveFieldsLayoutMode(fields);
-    const grid = document.createElement('div');
-    grid.className = `fields fields-${layoutMode}` + (fields.length > 4 ? ' fields-many' : '');
-
-    if (layoutMode === 'strip') {
-      grid.style.setProperty('--strip-cols', String(fields.length));
-      for (const field of fields) {
-        if (field.type === 'color') {
-          grid.appendChild(renderColorField(field, payload));
-        } else {
-          grid.appendChild(renderTextField(field, payload, null, layoutMode));
-        }
-      }
-    } else {
-      for (const row of groupFieldsForLayout(fields, payload)) {
-        if (row.type === 'colors') {
-          grid.appendChild(renderColorGroup(row.fields, payload));
-        } else if (row.type === 'note') {
-          grid.appendChild(renderTextField(row.field, payload, 'note'));
-        } else {
-          const rowEl = document.createElement('div');
-          rowEl.className = 'fields-row';
-          for (const item of row.items) {
-            rowEl.appendChild(renderTextField(item.field, payload, item.display));
-          }
-          grid.appendChild(rowEl);
-        }
-      }
+    if (visibleFields.length) {
+      root.appendChild(renderFieldsGrid(visibleFields, payload));
     }
-
-    fieldsWrap.appendChild(grid);
-    root.appendChild(fieldsWrap);
   }
 
   updateStatusBar({ connected, lastUpdate, payload });
@@ -347,9 +321,46 @@ function renderViewClipHead(parent, payload, matchColumn = null, { busy = false 
   renderHeroRow(parent, hero.text, payload, { empty: hero.empty });
 }
 
+function renderFieldsGrid(fields, payload) {
+  const fieldsWrap = document.createElement('div');
+  fieldsWrap.className = 'view-fields-wrap';
+
+  const layoutMode = resolveFieldsLayoutMode(fields);
+  const grid = document.createElement('div');
+  grid.className = `fields fields-${layoutMode}` + (fields.length > 4 ? ' fields-many' : '');
+
+  if (layoutMode === 'strip') {
+    grid.style.setProperty('--strip-cols', String(fields.length));
+    for (const field of fields) {
+      if (field.type === 'color') {
+        grid.appendChild(renderColorField(field, payload));
+      } else {
+        grid.appendChild(renderTextField(field, payload, null, layoutMode));
+      }
+    }
+  } else {
+    for (const row of groupFieldsForLayout(fields, payload)) {
+      if (row.type === 'colors') {
+        grid.appendChild(renderColorGroup(row.fields, payload));
+      } else if (row.type === 'note') {
+        grid.appendChild(renderTextField(row.field, payload, 'note'));
+      } else {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'fields-row';
+        for (const item of row.items) {
+          rowEl.appendChild(renderTextField(item.field, payload, item.display));
+        }
+        grid.appendChild(rowEl);
+      }
+    }
+  }
+
+  fieldsWrap.appendChild(grid);
+  return fieldsWrap;
+}
+
 function renderTextField(field, payload, displayHint, layoutMode = 'hero') {
-  const column = field.column;
-  const label = field.label ?? column;
+  const label = fieldLabel(field);
   const value = getFieldValue(field, payload);
   const display = displayHint ?? resolveFieldDisplay(field, value, { layout: layoutMode });
 
@@ -407,7 +418,7 @@ function renderColorGroup(fields, payload) {
 
 function renderColorField(field, payload) {
   const column = field.column;
-  const label = field.label ?? column;
+  const label = fieldLabel(field);
   const raw = payload.row?.[column];
   const color = parseRgbCell(raw);
 

@@ -153,7 +153,16 @@ export function validateConfig(config) {
       errors.push(`views.${viewId}.fields must be a non-empty array`);
     }
     for (const [i, field] of (view.fields ?? []).entries()) {
-      if (!field?.column) errors.push(`views.${viewId}.fields[${i}].column is required`);
+      const path = `views.${viewId}.fields[${i}]`;
+      if (field?.source === 'tempo') {
+        if (field.column) errors.push(`${path} cannot set both source and column`);
+        continue;
+      }
+      if (field?.source != null) {
+        errors.push(`${path}.source must be "tempo" (got "${field.source}")`);
+        continue;
+      }
+      if (!field?.column) errors.push(`${path}.column is required (or use source: "tempo")`);
     }
   }
 

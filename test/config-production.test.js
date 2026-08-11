@@ -29,6 +29,24 @@ test('validateConfig rejects invalid HTTP_PORT and view fields', () => {
   assert.throws(() => validateConfig(cfg), /HTTP_PORT[\s\S]*column/);
 });
 
+test('validateConfig allows source tempo fields without column', () => {
+  const cfg = baseConfig();
+  cfg.views.band.fields = [
+    { source: 'tempo', label: 'Tempo' },
+    { column: 'Key' },
+  ];
+  assert.equal(validateConfig(cfg), cfg);
+});
+
+test('validateConfig rejects unknown field source and source+column', () => {
+  const cfg = baseConfig();
+  cfg.views.band.fields = [{ source: 'beat' }];
+  assert.throws(() => validateConfig(cfg), /source must be "tempo"/);
+
+  cfg.views.band.fields = [{ source: 'tempo', column: 'BPM' }];
+  assert.throws(() => validateConfig(cfg), /cannot set both source and column/);
+});
+
 test('validateProductionReady requires sheet credentials when not simulating', () => {
   const cfg = baseConfig();
   cfg.sim.enabled = false;
