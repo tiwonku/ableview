@@ -29,8 +29,9 @@ stage. Validate with `npm run sim` + Companion **Generic HTTP Requests** before 
   (`not_dope`, `flag`, …) without API redesign.
 - **Optional identity** — `who` (e.g. `"keys"`, `"bass"`, `"deck-2"`) is set per Companion button
   in the JSON body; omit when anonymous is fine.
-- **Session log gate (default on)** — moments are rejected with a clear HTTP error when session
-  logging is disabled; config flag to relax later.
+- **Auto-start session log on first moment** — when logging is off, the first accepted moment tap
+  enables logging, creates a **timestamp-based session name**, writes the moment, and **broadcasts**
+  the new session title to all connected browser views (no refresh).
 - **Companion setup doc** — copy-paste recipe using built-in **Generic HTTP Requests** (no custom
   module required for v1).
 
@@ -41,8 +42,9 @@ stage. Validate with `npm run sim` + Companion **Generic HTTP Requests** before 
 - **OSC ingress** for moments (Ableton OSC path stays read-only; NFR-1 unchanged).
 - **Separate moments-only export file** — filter `event == "moment"` from session JSONL.
 - **Authenticated API** — LAN trust boundary same as existing `/api/*` (settings, sheets).
-- **Operator browser UI** for marking moments (hardware buttons only in v1).
-- **Auto-start session log** on first moment tap (explicit rejection when logging off; see OD-M3).
+- **Operator browser UI** for *pressing* moments (hardware buttons only in v1).
+- **Renaming an already-active session** on moment tap — auto-start naming applies only when logging
+  was **off** at press time; an enabled session keeps its current name.
 - **Rich notes UI** — optional short `note` string in JSON body only; no Stream Deck text entry in v1.
 
 ---
@@ -62,6 +64,7 @@ stage. Validate with `npm run sim` + Companion **Generic HTTP Requests** before 
 | No human bookmark channel | Crew cannot mark "that was great" without correlating wall-clock notes to VOD |
 | No Companion integration | Stream Deck is the desired UX for non-operator crew |
 | No `moment` event type | Downstream VOD tool cannot distinguish crew taps from cue timeline |
+| Session name only on Settings page | Operators cannot see which log file is active without opening admin/settings |
 
 **Desired downstream flow:**
 
@@ -87,10 +90,15 @@ show night → session JSONL (cue + moment timeline)
   Fastify route (src/server/moments-api.js)
        → sessionLog.logMoment({ kind, who, note })
                  │
+                 ├─ if !enabled && autoStartOnMoment → enableLogging(autoSessionName())
+                 ├─ if !enabled && !autoStartOnMoment → 409
                  ├─ resolveLogTimestamp(getTimecodeStatus)
                  ├─ validate kind against config allowlist
-                 ├─ reject if session log disabled (default policy)
-                 └─ append JSONL line (event: "moment")
+                 ├─ append JSONL line (event: "moment")
+                 └─ onSessionLogChange() → WS broadcast { type: "sessionLog", ... }
+                                                      │
+                                                      ▼
+                                            all /ws clients (operator + admin views)
 ```
 
 ```mermaid
@@ -103,7 +111,9 @@ flowchart LR
     API["POST /api/moments"]
     SL["Session logger"]
     TC["Art-Net timecode"]
+    WS["WebSocket broadcast"]
     JSONL["data/sessions/*.jsonl"]
+    VIEWS["Operator browsers"]
   end
   subgraph post [Post-show]
     VOD["VOD / clip tool"]
@@ -113,6 +123,8 @@ flowchart LR
   TC --> SL
   API --> SL
   SL --> JSONL
+  SL --> WS
+  WS --> VIEWS
   JSONL --> VOD
 ```
 
@@ -122,8 +134,11 @@ flowchart LR
 2. **HTTP over OSC** — Companion already speaks HTTP; avoids a second protocol surface on the show
    box and keeps Ableton ingest mentally separate.
 3. **Kind allowlist in config** — prevents typo spam (`"dop"`) while staying extensible.
-4. **Fail loud when logging off** — crew gets immediate feedback (HTTP 409) rather than silent drops.
-5. **Thin API, fat log contract** — VOD tool depends on JSONL shape, not AbleView runtime.
+4. **Auto-start with timestamp name** — first moment while logging is off starts a fresh session
+   file named for *when* logging began (local wall clock), not `defaultSessionName`.
+5. **Live session title on all views** — WebSocket push so operators see the active log name without
+   refresh; same channel used when admin toggles logging manually.
+6. **Thin API, fat log contract** — VOD tool depends on JSONL shape, not AbleView runtime.
 
 ---
 
@@ -133,16 +148,19 @@ flowchart LR
 |---|---|---|
 | OD-M1 | Event name in JSONL | **`event: "moment"`** |
 | OD-M2 | Kind field | **`kind`** string; v1 allowlist `["dope"]`; example config documents `"not_dope"` |
-| OD-M3 | Require session log enabled | **`moments.requireSessionLog: true`** — `409` when disabled |
+| OD-M3 | Auto-start session log on moment | **`moments.autoStartOnMoment: true`** — first tap while disabled enables logging + timestamp name |
 | OD-M4 | `who` field | **Optional** — omit or `null` when anonymous; max length 64, sanitized |
 | OD-M5 | `note` field | **Optional** — max length 200, single line, stripped control chars |
 | OD-M6 | API path | **`POST /api/moments`** (collection semantics; one moment per request) |
 | OD-M7 | Default `kind` when omitted | **`"dope"`** if body empty or kind missing (convenience for minimal Companion body) |
 | OD-M8 | Debounce double-taps | **Optional `moments.debounceMs`** (default `0` = off); when set, ignore duplicate `kind+who` within window |
-| OD-M9 | Success response | **`200`** + `{ ok, timestamp, timestampSource, loggedAt, kind, who, sessionName }` |
+| OD-M9 | Success response | **`200`** + `{ ok, timestamp, timestampSource, loggedAt, kind, who, sessionName, sessionLogStarted? }` |
 | OD-M10 | Companion module | **Out of v1** — document Generic HTTP; module listed in §12 |
-| OD-M11 | Admin visibility | **Optional M14c** — show last moment + count in session-log panel or settings |
+| OD-M11 | Live session title UI | **v1 required (M14c)** — status bar on all WS views; settings panel listens for same broadcast |
 | OD-M12 | Simulated flag | **`simulated: true`** when `getSimulated()` is true (same as other session events) |
+| OD-M13 | Auto-start session name | **Local wall clock** `YYYY-MM-DD_HHmmss` (show-box timezone), passed through `sanitizeSessionName()` → e.g. `2026-08-11_211504.jsonl` |
+| OD-M14 | When auto-start naming applies | **Only when logging was disabled** at moment press; existing enabled session keeps its name |
+| OD-M15 | Strict mode (opt-out) | When **`autoStartOnMoment: false`**, return **409** if logging disabled (rehearsal/shows that require pre-enable) |
 
 ---
 
@@ -152,7 +170,7 @@ Add to `config/config.example.json` (and `DEFAULTS` in `src/config/index.js`):
 
 ```json
 "moments": {
-  "requireSessionLog": true,
+  "autoStartOnMoment": true,
   "kinds": ["dope"],
   "debounceMs": 0
 }
@@ -160,12 +178,12 @@ Add to `config/config.example.json` (and `DEFAULTS` in `src/config/index.js`):
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `moments.requireSessionLog` | boolean | `true` | When true, `POST /api/moments` returns **409** if session log disabled |
+| `moments.autoStartOnMoment` | boolean | `true` | When true and logging is off, first moment enables logging with a timestamp session name |
 | `moments.kinds` | string[] | `["dope"]` | Allowlist for `kind`; unknown kind → **400** |
 | `moments.debounceMs` | number | `0` | `0` = no debounce; e.g. `300` suppresses duplicate `kind+who` within window |
 
 **Editable from admin settings (M14c):** add `moments` to `EDITABLE_SECTIONS` in
-`src/config/runtime.js` so `requireSessionLog`, `kinds`, and `debounceMs` can be tuned without
+`src/config/runtime.js` so `autoStartOnMoment`, `kinds`, and `debounceMs` can be tuned without
 SSH. Session log on/off remains **`/api/session-log`** (runtime), not config.
 
 ---
@@ -252,11 +270,19 @@ Content-Type: application/json
   "loggedAt": "2026-08-11T21:15:04.512Z",
   "kind": "dope",
   "who": "keys",
-  "sessionName": "show-night-1"
+  "sessionName": "2026-08-11_211504",
+  "sessionLogStarted": true
 }
 ```
 
-**Response 409** — session log disabled and `moments.requireSessionLog === true`
+| Response field | Notes |
+|---|---|
+| `sessionName` | Active session basename after this request |
+| `sessionLogStarted` | **`true` only when** this request turned logging on (was disabled before press) |
+
+When logging was already enabled, omit `sessionLogStarted` or set `false`; `sessionName` is unchanged.
+
+**Response 409** — session log disabled and `moments.autoStartOnMoment === false`
 
 ```json
 {
@@ -307,31 +333,138 @@ When session log disabled: `sessionLogEnabled: false`, `lastMoment: null`.
 
 ## 8. Session logger changes
 
-### 8.1 New method — `logMoment({ kind, who, note })`
+### 8.1 Auto-start session naming
+
+New helper in `src/session-log/` (e.g. `auto-session-name.js`):
+
+```javascript
+export function generateAutoSessionName(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const y = date.getFullYear();
+  const mo = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  const h = pad(date.getHours());
+  const mi = pad(date.getMinutes());
+  const s = pad(date.getSeconds());
+  return sanitizeSessionName(`${y}-${mo}-${d}_${h}${mi}${s}`);
+}
+```
+
+- Uses **show-box local timezone** (same clock crew would read on the NUC).
+- Already filesystem-safe; `sanitizeSessionName()` is idempotent on this format.
+- **Only used when** `logMoment()` auto-starts from disabled state — not for admin manual enable
+  (admin still picks the name via Settings).
+
+### 8.2 New method — `logMoment({ kind, who, note })`
 
 In `src/session-log/index.js`:
 
 ```javascript
 function logMoment({ kind, who = null, note = null }) {
-  // 1. If !enabled && requireSessionLog → throw SessionLogDisabledError (or return result object)
-  // 2. Validate kind against getConfig().moments.kinds
-  // 3. Optional debounce check (kind + who key)
-  // 4. timestampEnvelope() → appendRecord({ ...envelope, event: 'moment', kind, who, note, sessionName, simulated })
-  // 5. Update lastMoment cache for GET /api/moments
-  // 6. Return { timestamp, timestampSource, loggedAt, kind, who, sessionName }
+  const cfg = getConfig().moments ?? {};
+  let sessionLogStarted = false;
+
+  if (!enabled) {
+    if (cfg.autoStartOnMoment !== false) {
+      enableLogging(generateAutoSessionName());
+      sessionLogStarted = true;
+    } else {
+      throw new SessionLogDisabledError();
+    }
+  }
+
+  // 1. Validate kind against cfg.kinds
+  // 2. Optional debounce check (kind + who key)
+  // 3. timestampEnvelope() → appendRecord({ ...envelope, event: 'moment', kind, who, note, sessionName, simulated })
+  // 4. Update lastMoment cache for GET /api/moments
+  // 5. Return { timestamp, timestampSource, loggedAt, kind, who, sessionName, sessionLogStarted }
 }
 ```
 
 Export on `createSessionLogger` return object alongside `getStatus`, `applyPatch`.
 
+**Callback hook:** accept optional `onSessionLogChange` in `createSessionLogger({ ... })` — invoked
+after `logMoment` auto-start, `applyPatch`, and disable — so the view server can broadcast without
+import cycles.
+
 **Sidecar:** optionally extend `data/sessions/.active.json` with `lastMoment` summary (not
 required for v1 — in-memory cache refreshed on append is enough if process restart clears it).
 
-### 8.2 Wiring
+### 8.3 WebSocket — live session title (v1)
 
-- `src/index.js` — pass `sessionLog` to server (already done).
-- `src/server/index.js` — `registerMomentsRoutes(app, { sessionLog, getConfig, log })`.
-- `src/server/moments-api.js` — route handlers.
+Today `broadcastStatus()` in `src/server/index.js` sends ingest/timecode status **to admin only**.
+M14 adds a **separate, all-clients broadcast** for session log state so operator views update
+without refresh.
+
+**Message shape** (new type, do not overload `cue`):
+
+```json
+{
+  "type": "sessionLog",
+  "sessionLog": {
+    "enabled": true,
+    "sessionName": "2026-08-11_211504",
+    "lastLoggedAt": "2026-08-11T21:15:04.512Z"
+  }
+}
+```
+
+**Broadcast when:**
+
+- `logMoment()` auto-starts logging or appends while enabled
+- `PATCH /api/session-log` changes `enabled` or `sessionName`
+- WebSocket **connect** — include current `sessionLog` snapshot in `init` for every view (not only
+  admin), so late-opened tabs show the correct title immediately
+
+**Implementation sketch:**
+
+```javascript
+function broadcastSessionLog() {
+  if (!sessionLog) return;
+  const snap = sessionLog.getStatus();
+  const msg = {
+    type: 'sessionLog',
+    sessionLog: {
+      enabled: snap.enabled === true,
+      sessionName: snap.sessionName ?? null,
+      lastLoggedAt: snap.lastLoggedAt ?? null,
+    },
+  };
+  broadcast(msg); // all clients, not admin-only
+}
+```
+
+Wire `onSessionLogChange: broadcastSessionLog` from `src/index.js`.
+
+### 8.4 Operator status bar UI (v1)
+
+Add to all view HTML templates that use `#status-bar` (`band`, `lighting`, `visuals`, `session`,
+`admin`):
+
+```html
+<span data-role="session-log" class="session-log-indicator" hidden title="Session log"></span>
+```
+
+In `public/shared/ws-client.js`:
+
+- Track `lastSessionLog` from `init.sessionLog` and `sessionLog` messages.
+- In `updateStatusBar()` (or dedicated helper): when `enabled`, show session name (truncated if
+  long); when disabled, hide the element.
+- Display text: **`Log: 2026-08-11_211504`** or locale-shortened equivalent; `title` attr = full name +
+  `.jsonl` path hint.
+
+In `public/shared/admin-session-log.js` (settings page):
+
+- Subscribe to the same `sessionLog` WS message (lightweight `/ws?view=band` listener or shared
+  `session-log-live.js`) so the session name input + status box update when a crew moment auto-starts
+  logging — no manual refresh.
+
+### 8.5 Wiring
+
+- `src/index.js` — pass `sessionLog` + `onSessionLogChange` to server bootstrap.
+- `src/server/index.js` — `registerMomentsRoutes(app, { sessionLog, getConfig, log, onSessionLogChange })`; extend WS `init`.
+- `src/server/moments-api.js` — route handlers; call `onSessionLogChange` after successful POST.
+- `src/server/session-log-api.js` — call `onSessionLogChange` after PATCH.
 
 ---
 
@@ -362,7 +495,9 @@ No custom module in v1. Document in **`docs/companion-moments.md`** (M14d).
 
 Replace `"keys"` per button (`"bass"`, `"drums"`, `"foh"`, …). Omit `who` for anonymous.
 
-6. **Test** (▶) — expect HTTP 200 when session log is on; 409 when off.
+6. **Test** (▶) — expect HTTP **200** even when session log was off (auto-start); response includes
+   `sessionLogStarted: true` and a timestamp `sessionName`. Operator views should show the new log
+   name within ~1s without refresh.
 
 ### 9.3 Future "NOT DOPE" button
 
@@ -382,56 +517,65 @@ No AbleView code change beyond config allowlist.
 | Companion **internal: custom variable** + press action sets green on 200 | Manual / fragile with Generic HTTP | Custom module |
 | **GET /api/moments** poll + feedback condition | Possible but heavy | Custom module |
 | Operator confirms via admin **last moment** line | **M14c** | Good enough for rehearsal |
+| **`sessionLogStarted` in POST body** | Parse in Companion feedback (advanced) | Custom module |
 
-**Recommendation:** ship v1 without guaranteed LED feedback; document 200 vs 409 behavior; custom
-Companion module (§12) for production feedback.
+**Recommendation:** ship v1 with HTTP 200 + `sessionLogStarted`; operator status bar confirms live
+session name; custom Companion module (§12) for Stream Deck LED feedback.
 
 ---
 
 ## 10. Sub-milestones
 
-### M14a — Logger + config + validation
+### M14a — Logger + config + auto-start naming
 
 **Scope**
 
 - `moments` config section + validation in `src/config/index.js`.
+- `generateAutoSessionName()` + tests.
 - `sessionLog.logMoment()` with kind allowlist, optional `who`/`note` sanitization, timestamp
   envelope, `simulated` flag.
-- `moments.requireSessionLog` enforcement inside logger.
+- **`autoStartOnMoment`** (default true): when disabled at press, `enableLogging(timestampName)`.
 - Optional debounce when `debounceMs > 0`.
+- `onSessionLogChange` callback hook on logger (no-op in tests).
 - Unit tests in `test/moments.test.js` (temp dir JSONL, artnet vs clock timestamp mock).
 
 **Acceptance**
 
 - With session log enabled, `logMoment({ kind: 'dope', who: 'keys' })` appends one JSONL line.
-- With session log disabled + `requireSessionLog: true`, throws or returns error result (API maps
-  to 409 in M14b).
+- With session log disabled + default config, `logMoment()` enables logging, session name matches
+  `YYYY-MM-DD_HHmmss` pattern, returns `sessionLogStarted: true`.
+- With session log disabled + `autoStartOnMoment: false`, throws `SessionLogDisabledError`.
 - Unknown kind rejected.
 - `npm test` green.
 
 **Agent prompt**
 
 > Implement M14a per `docs/plans/M14-moments.md` §10 (M14a): add `moments` config defaults and
-> validation, `sessionLog.logMoment()` in `src/session-log/index.js`, tests in
+> validation, `generateAutoSessionName()`, `sessionLog.logMoment()` with auto-start, tests in
 > `test/moments.test.js`. Follow M10 timestamp patterns. Run `npm test`. Do not commit unless asked.
 
 ---
 
-### M14b — REST API
+### M14b — REST API + WebSocket broadcast
 
 **Scope**
 
 - `src/server/moments-api.js` — `POST /api/moments`, `GET /api/moments`.
 - Register in `src/server/index.js`.
+- **`broadcastSessionLog()`** — all WS clients; include `sessionLog` in WS `init`.
+- Wire `onSessionLogChange` from logger + moments API + session-log PATCH.
 - Map logger errors to HTTP status codes.
 - `test/moments-api.test.js` using `createViewServer` pattern from `test/session-log-api.test.js`.
+- WS test: client receives `sessionLog` message after POST auto-starts logging.
 
 **Acceptance**
 
 - `POST` with session log on → 200 + stamped fields; file grows by one line.
-- Session log off + default config → 409.
+- `POST` with session log off + default config → 200, new timestamp session file, `sessionLogStarted: true`.
+- Session log off + `autoStartOnMoment: false` → 409.
 - Bad kind → 400.
 - `GET` reflects `sessionLogEnabled` and last moment.
+- Connected WS client receives `sessionLog` without page refresh.
 - `npm test` green.
 
 **Agent prompt**
@@ -441,18 +585,23 @@ Companion module (§12) for production feedback.
 
 ---
 
-### M14c — Admin settings + status (optional UI)
+### M14c — Operator UI + admin settings
 
 **Scope**
 
 - Add `moments` to `EDITABLE_SECTIONS`.
-- Settings form fields: `requireSessionLog`, `kinds` (comma-separated or JSON array), `debounceMs`.
-- Session log panel: optional **last moment** + **moment count** (scan sidecar or track in logger).
+- Settings form fields: `autoStartOnMoment`, `kinds` (comma-separated or JSON array), `debounceMs`.
+- **Status bar** `[data-role="session-log"]` on all operator + admin views; handle `sessionLog` in
+  `ws-client.js`.
+- Session log panel on settings: live update via WS listener (shared helper); optional **last moment**
+  line in panel.
+- Styles for `.session-log-indicator` in `public/shared/styles.css`.
 
 **Acceptance**
 
+- Moment auto-start while band view open → status bar shows new session name without refresh.
 - Change allowlist in admin → `"not_dope"` accepted after save + config reload.
-- Settings page shows last moment when present.
+- Settings session-log panel reflects auto-started session name without manual refresh.
 - `npm test` green.
 
 **Agent prompt**
@@ -485,15 +634,19 @@ Companion module (§12) for production feedback.
 
 ## 11. Operator runbook
 
-1. Before show: enable **session logging** on Settings (`/views/settings.html`); set session name
-   (e.g. `show-night-1`).
+1. **Optional before show:** enable session logging on Settings and set a custom session name. If
+   you skip this, the **first crew moment** auto-starts logging with a timestamp filename.
 2. Enable **Art-Net timecode** in settings if the show sends SMPTE (strongly recommended for VOD
    alignment).
 3. On Companion machine: create **AbleView** Generic HTTP connection pointing at the show box.
 4. Configure one **DOPE** button per crew member; set `who` in the JSON body per person/deck.
-5. **Test** during soundcheck — press button; confirm line count increases or admin shows last moment.
-6. If button returns error: check session log toggle first (409 = logging off).
-7. After show: copy `data/sessions/show-night-1.jsonl` for the VOD tool.
+5. **Test** during soundcheck — press button with logging off; confirm:
+   - HTTP 200 + `sessionLogStarted: true`
+   - Operator views show **`Log: YYYY-MM-DD_HHmmss`** in the status bar without refresh
+   - `data/sessions/` contains the new `.jsonl` with a `moment` line
+6. If you need logging to **not** auto-start (strict rehearsal), set `moments.autoStartOnMoment`
+   to `false` in settings — buttons then return 409 until logging is enabled manually.
+7. After show: copy the session `.jsonl` from `data/sessions/` for the VOD tool.
 
 **Example jq — moments only**
 
@@ -526,7 +679,9 @@ jq -c 'select(.event == "moment" or .event == "match") | {timestamp, event, kind
 ## 13. Known limitations
 
 - **Generic HTTP** does not give reliable Stream Deck LED state on success/failure without extra
-  Companion wiring or a custom module.
+  Companion wiring or a custom module (operator status bar is the v1 confirmation path).
+- **Auto-start session names** are local wall-clock based — distinct from Art-Net `timestamp` on
+  each line; VOD tool should seek on line `timestamp`, not session basename.
 - **Clock fallback** uses frames `00` — same as M10; VOD correlation is weaker without Art-Net.
 - **No dedupe across kinds** — `dope` then `not_dope` two seconds apart both log (by design).
 - **Debounce** keyed on `kind+who` only when enabled; global debounce is not supported.
@@ -543,11 +698,13 @@ jq -c 'select(.event == "moment" or .event == "match") | {timestamp, event, kind
 | `logMoment` appends valid JSONL line | `test/moments.test.js` |
 | Art-Net vs clock timestamp | `test/moments.test.js` |
 | Unknown kind rejected | `test/moments.test.js` |
-| Session log disabled + requireSessionLog → error | `test/moments.test.js` |
+| Session log disabled + require strict mode | `test/moments.test.js` |
+| Auto-start assigns timestamp session name | `test/moments.test.js` |
 | `who` optional / sanitized | `test/moments.test.js` |
 | Debounce suppresses duplicate | `test/moments.test.js` |
-| POST 200 / 409 / 400 | `test/moments-api.test.js` |
+| POST 200 with auto-start / 409 strict / 400 | `test/moments-api.test.js` |
 | GET reflects enabled + last moment | `test/moments-api.test.js` |
+| WS `sessionLog` broadcast on auto-start | `test/moments-api.test.js` |
 | Config validation for `moments.kinds` | `test/config.test.js` or existing config tests |
 
 Use `node:test`, `assert`, temp dir via `fs.mkdtempSync`.
@@ -558,9 +715,9 @@ Use `node:test`, `assert`, temp dir via `fs.mkdtempSync`.
 
 | Stage | Agent-assisted (indicative) |
 |---|---|
-| M14a | ~2–3 hours |
-| M14b | ~1–2 hours |
-| M14c | ~1–2 hours |
+| M14a | ~2–4 hours |
+| M14b | ~2–3 hours |
+| M14c | ~2–3 hours |
 | M14d | ~30 min |
 | **Total** | ~0.5–1 day |
 
@@ -568,11 +725,11 @@ Use `node:test`, `assert`, temp dir via `fs.mkdtempSync`.
 
 ## 16. Milestone completion checklist
 
-- [ ] M14a — config + `logMoment()` + tests
-- [ ] M14b — POST/GET `/api/moments` + API tests
-- [ ] M14c — admin settings + optional last-moment UI
+- [ ] M14a — config + `logMoment()` + auto-start naming + tests
+- [ ] M14b — POST/GET `/api/moments` + WS broadcast + API tests
+- [ ] M14c — operator status bar + admin settings + live settings panel
 - [ ] M14d — `docs/companion-moments.md` + ROADMAP
-- [ ] Manual QA: Companion POST during `npm run sim` with session log enabled
+- [ ] Manual QA: Companion POST with logging off → operator view status bar updates without refresh
 
 ---
 
@@ -580,18 +737,20 @@ Use `node:test`, `assert`, temp dir via `fs.mkdtempSync`.
 
 **Session 1 — M14a**
 
-> Implement M14a per `docs/plans/M14-moments.md` §10 (M14a): `moments` config, `logMoment()` on
-> session logger, validation and tests. Run `npm test`. Do not commit unless asked.
+> Implement M14a per `docs/plans/M14-moments.md` §10 (M14a): `moments` config, `generateAutoSessionName()`,
+> `logMoment()` with auto-start on first tap, validation and tests. Run `npm test`. Do not commit unless asked.
 
 **Session 2 — M14b**
 
-> Implement M14b per `docs/plans/M14-moments.md` §10 (M14b): REST routes for `/api/moments`, wire
-> into view server, API tests. Run `npm test`. Do not commit unless asked.
+> Implement M14b per `docs/plans/M14-moments.md` §10 (M14b): REST routes for `/api/moments`, WS
+> `sessionLog` broadcast to all clients, wire into view server, API + WS tests. Run `npm test`. Do not
+> commit unless asked.
 
 **Session 3 — M14c**
 
-> Implement M14c per `docs/plans/M14-moments.md` §10 (M14c): admin-editable moments config,
-> optional last-moment display in settings. Run `npm test`. Do not commit unless asked.
+> Implement M14c per `docs/plans/M14-moments.md` §10 (M14c): operator status bar session-log
+> indicator, ws-client handler, admin-editable moments config, live settings panel updates. Run
+> `npm test`. Do not commit unless asked.
 
 **Session 4 — M14d**
 
