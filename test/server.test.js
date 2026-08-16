@@ -243,7 +243,8 @@ test('editable: false disables row editing on a view', async () => {
 
   const init = await waitForMessage(messages, ws);
   assert.equal(init.editable, false);
-  assert.equal(init.matchColumn, undefined);
+  assert.equal(init.matchColumn, 'Clip Name');
+  assert.equal(init.aliasColumn, undefined);
   assert.equal(init.editorColumns, undefined);
 
   ws.close();

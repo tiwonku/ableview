@@ -230,10 +230,10 @@ export async function createViewServer({
       }
     } else {
       init.editable = viewConfig.editable !== false;
+      const snapshot = sheetsActions?.getSnapshot?.();
+      init.matchColumn = snapshot?.matchColumn ?? getLiveConfig().sheets?.matchColumn ?? null;
       if (init.editable) {
         init.editorColumns = getLiveConfig().sheets?.editorColumns ?? {};
-        const snapshot = sheetsActions?.getSnapshot?.();
-        init.matchColumn = snapshot?.matchColumn ?? getLiveConfig().sheets?.matchColumn ?? null;
         init.aliasColumn = snapshot?.aliasColumn ?? getLiveConfig().sheets?.aliasColumn ?? null;
       }
     }
