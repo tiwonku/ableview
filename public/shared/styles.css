@@ -25,6 +25,13 @@ body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
+html:fullscreen,
+html:fullscreen body {
+  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   display: flex;
   flex-direction: column;
@@ -243,6 +250,76 @@ main {
   display: block;
   width: 1.05em;
   height: 1.05em;
+}
+
+.kiosk-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.kiosk-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.65rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--bg);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.kiosk-btn:hover,
+.kiosk-btn:focus-visible {
+  color: var(--text);
+  border-color: var(--accent);
+  outline: none;
+}
+
+.kiosk-btn-icon {
+  display: block;
+  width: 1.05em;
+  height: 1.05em;
+  flex-shrink: 0;
+}
+
+.kiosk-btn--exit {
+  touch-action: none;
+}
+
+.kiosk-btn--exit::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--hold, 0) * 100%);
+  background: rgba(224, 82, 82, 0.38);
+  pointer-events: none;
+}
+
+.kiosk-btn--exit.is-holding {
+  color: var(--text);
+  border-color: var(--danger);
+}
+
+.kiosk-exit-hint {
+  flex: 1 0 100%;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--warn);
 }
 
 .clip-head {
@@ -1577,7 +1654,8 @@ body.layout-operator .status-bar .view-nav {
 }
 
 body.layout-operator .view-nav a,
-body.layout-operator .view-nav-settings {
+body.layout-operator .view-nav-settings,
+body.layout-operator .kiosk-btn {
   flex-shrink: 0;
   min-height: clamp(2rem, 4dvh, 2.5rem);
   display: inline-flex;
@@ -1626,6 +1704,10 @@ body.layout-operator .view-nav-settings {
     max-width: none;
     margin-left: 0;
     justify-content: flex-start;
+  }
+
+  body.layout-operator .kiosk-controls {
+    margin-left: auto;
   }
 }
 

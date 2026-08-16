@@ -118,7 +118,11 @@ export async function createViewServer({
 
   const app = Fastify({ logger: false });
 
-  app.get('/', async (_req, reply) => reply.redirect('/views/band'));
+  app.get('/', async (req, reply) => {
+    const url = req.raw?.url ?? req.url ?? '';
+    const query = url.includes('?') ? url.slice(url.indexOf('?')) : '';
+    return reply.redirect(`/views/band${query}`);
+  });
 
   app.get('/health', async (_req, reply) => {
     const ctx = getHealthContext?.() ?? {};

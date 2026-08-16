@@ -148,6 +148,20 @@ Use the same codebase; follow the path for your OS. Full step-by-step instructio
    cold start is normal). Use [`deploy/RUNBOOK.md`](./deploy/RUNBOOK.md) for show-night checklists
    (including **Link VLAN vs operator VLAN** networking).
 
+#### Operator touch NUC (desktop shortcut)
+
+On a Windows operator panel, create a desktop shortcut whose **Target** is:
+
+```
+"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --start-maximized --app=http://<SHOW_BOX_IP>:8080/views/band?kiosk=1 --no-first-run --disable-features=Translate
+```
+
+Replace `<SHOW_BOX_IP>` with the show box IP on the operator VLAN, and `/views/band` with `/views/visuals` or `/views/lighting` as needed. Copy the shortcut into the Startup folder (`shell:startup`) for auto-launch.
+
+`?kiosk=1` shows **Fullscreen**, **Reload**, and hold-to-**Exit**. Tap Fullscreen after launch to hide the Windows title bar. Do not use Edge `--kiosk` — it blocks Exit.
+
+Full kiosk notes: [`deploy/RUNBOOK.md`](./deploy/RUNBOOK.md#touch-display-manual-kiosk).
+
 Do **not** enable systemd, NSSM, or Task Scheduler on your day-to-day development machine
 unless you explicitly want that behavior.
 

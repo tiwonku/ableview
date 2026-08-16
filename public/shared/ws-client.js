@@ -17,6 +17,7 @@ import {
 import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
 import { playingTracks, operatorCreateColumns } from './playing-clips-strip.js';
 import { mountViewNav } from './view-nav.js';
+import { mountKioskControls } from './kiosk-controls.js';
 
 const RECONNECT_MS = 1500;
 const ALIAS_SEARCH_DEBOUNCE_MS = 180;
@@ -52,6 +53,7 @@ export function connectView({
 }) {
   const root = statusOnly ? null : document.querySelector(rootSelector);
   if (!statusOnly && !root) throw new Error(`Missing root element: ${rootSelector}`);
+  mountKioskControls();
 
   let ws = null;
   let reconnectTimer = null;

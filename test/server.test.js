@@ -54,6 +54,21 @@ function waitForMessage(messages, ws, timeoutMs = 3000) {
   });
 }
 
+test('root redirect preserves kiosk query', async () => {
+  const bus = createBus();
+  const server = await createViewServer({ config: testConfig(), bus, log: silentLog });
+
+  const kiosk = await fetch(`http://127.0.0.1:${server.port}/?kiosk=1`, { redirect: 'manual' });
+  assert.equal(kiosk.status, 302);
+  assert.equal(kiosk.headers.get('location'), '/views/band?kiosk=1');
+
+  const plain = await fetch(`http://127.0.0.1:${server.port}/`, { redirect: 'manual' });
+  assert.equal(plain.status, 302);
+  assert.equal(plain.headers.get('location'), '/views/band');
+
+  await server.stop();
+});
+
 test('serves band view HTML', async () => {
   const bus = createBus();
   const server = await createViewServer({ config: testConfig(), bus, log: silentLog });

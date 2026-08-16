@@ -22,6 +22,7 @@ Replace `__SHOW_BOX_IP__` with the show box IP **on the VLAN where operator brow
 | Lighting | `http://__SHOW_BOX_IP__:8080/views/lighting` |
 | Admin | `http://__SHOW_BOX_IP__:8080/views/admin` |
 | Health (JSON) | `http://__SHOW_BOX_IP__:8080/health` |
+| Touch NUC (kiosk chrome) | same view URL + `?kiosk=1` — see [Touch display](#touch-display-manual-kiosk) |
 
 **Backup MacBook IP (if used):** _______________
 
@@ -172,10 +173,20 @@ Symptoms: **Disconnected** in the browser while the service is up — operators 
 No automated kiosk script in v1. On the NUC connected to the operator panel:
 
 1. Create a **show user** with auto-login (optional but recommended).
-2. Add browser startup: Edge or Chrome in **kiosk / app mode** to one operator URL, e.g.  
-   `msedge --kiosk http://__SHOW_BOX_IP__:8080/views/band`
-3. Disable screen sleep and Windows Update forced reboot during show hours.
-4. If the browser crashes, restart it — AbleView keeps running as a separate service.
+2. Add browser startup: Edge **app mode** (not `--kiosk`) so Exit can close back to the desktop. Include **`?kiosk=1`** for Fullscreen / Reload / Exit. Use **`--start-maximized`** so the window fills the panel immediately (title bar stays until the operator taps **Fullscreen**).
+
+   ```
+   "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --start-maximized --app=http://__SHOW_BOX_IP__:8080/views/band?kiosk=1 --no-first-run --disable-features=Translate
+   ```
+
+   Avoid `--kiosk` / `--edge-kiosk-type=fullscreen` on operator NUCs: that hides Windows chrome but **blocks** in-app Exit (`window.close()` is ignored). Do **not** use `--start-fullscreen` — it is slow and inconsistent with `--app=`.
+
+   Put that shortcut on the desktop and in the Startup folder (`shell:startup`).
+3. **Fullscreen** is a single tap (hides the Windows title bar). **Window** (same button, while fullscreen) brings the title bar back. **Reload** is a single tap. **Exit** is hold (~1.5 s) — it leaves fullscreen and closes the browser so the operator can reach Windows. If the browser blocks close, use Alt+F4 (keep a USB keyboard in the kit) or the window **X**.
+4. Disable screen sleep and Windows Update forced reboot during show hours.
+5. If the browser crashes, restart it — AbleView keeps running as a separate service.
+
+Laptop operators should keep the normal URLs (no `?kiosk=1`) so Fullscreen / Reload / Exit stay hidden.
 
 ---
 
