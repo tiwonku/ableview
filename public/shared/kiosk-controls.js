@@ -3,6 +3,8 @@
 export const EXIT_HOLD_MS = 1500;
 export const EXIT_HINT =
   'Couldn’t close the window. Press Alt+F4, or use the AbleView desktop shortcut.';
+export const EXIT_HINT_NOT_APP =
+  'Couldn’t close this window. Close every Edge window, then open AbleView from the desktop shortcut.';
 
 const RELOAD_ICON = `<svg class="kiosk-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`;
 const EXIT_ICON = `<svg class="kiosk-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
@@ -76,8 +78,72 @@ export function toggleKioskFullscreen({
   return enterKioskFullscreen({ doc, request });
 }
 
-export function exitToDesktop({ close, exitFullscreen } = {}) {
-  const closeFn = close ?? (() => window.close());
+/** Edge --app= windows report standalone; a normal tab does not. */
+export function isStandaloneAppWindow(win = typeof window !== 'undefined' ? window : null) {
+  if (!win) return false;
+  try {
+    return Boolean(
+      win.matchMedia?.('(display-mode: standalone)').matches
+      || win.matchMedia?.('(display-mode: minimal-ui)').matches
+      || win.navigator?.standalone,
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function exitHintForWindow(win = typeof window !== 'undefined' ? window : null) {
+  return isStandaloneAppWindow(win) ? EXIT_HINT : EXIT_HINT_NOT_APP;
+}
+
+/**
+ * Chromium only allows script close when the window was script-opened or the
+ * session history has a single entry. Kiosk view switches must not pushState.
+ */
+export function kioskLinkAction(nextId, {
+  kiosk = false,
+  statusOnly = false,
+  fullscreen = false,
+} = {}) {
+  const interceptSpa = !statusOnly && Boolean(nextId) && nextId !== 'settings'
+    && (kiosk || fullscreen);
+  if (interceptSpa) return kiosk ? 'spa-replace' : 'spa-push';
+  if (kiosk) return 'replace';
+  return 'follow';
+}
+
+function defaultClose(win = typeof window !== 'undefined' ? window : null) {
+  const target = win?.top ?? win;
+  if (!target) return;
+  try {
+    // Claim this browsing context so Chromium treats it as script-closable.
+    target.open('', '_self');
+  } catch {
+    // ignore
+  }
+  target.close();
+}
+
+export function closeKioskWindow({
+  win = typeof window !== 'undefined' ? window : null,
+  open,
+  close,
+} = {}) {
+  const target = win?.top ?? win;
+  if (open || close) {
+    try {
+      (open ?? ((url, name) => target?.open(url, name)))('', '_self');
+    } catch {
+      // ignore
+    }
+    (close ?? (() => target?.close()))();
+    return;
+  }
+  defaultClose(win);
+}
+
+export function exitToDesktop({ close, exitFullscreen, win } = {}) {
+  const closeFn = close ?? (() => closeKioskWindow({ win }));
   const leaveFs = exitFullscreen ?? (() => defaultExitFullscreen());
   return Promise.resolve()
     .then(() => leaveFs())
@@ -195,7 +261,7 @@ function showExitHint(host) {
     host.appendChild(hint);
   }
   hint.hidden = false;
-  hint.textContent = EXIT_HINT;
+  hint.textContent = exitHintForWindow();
 }
 
 function attemptExit(host, { close, afterCloseMs = 250 } = {}) {

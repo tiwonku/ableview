@@ -176,8 +176,10 @@ No automated kiosk script in v1. On the NUC connected to the operator panel:
 2. Add browser startup: Edge **app mode** (not `--kiosk`) so Exit can close back to the desktop. Include **`?kiosk=1`** for Fullscreen / Reload / Exit. Use **`--start-maximized`** so the window fills the panel immediately (title bar stays until the operator taps **Fullscreen**).
 
    ```
-   "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --start-maximized --app=http://__SHOW_BOX_IP__:8080/views/band?kiosk=1 --no-first-run --disable-features=Translate
+   "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --user-data-dir="%LOCALAPPDATA%\AbleViewKiosk" --start-maximized --app="http://__SHOW_BOX_IP__:8080/views/band?kiosk=1" --no-first-run --no-default-browser-check --disable-features=Translate
    ```
+
+   `--user-data-dir` keeps this off the everyday Edge profile. If Edge is already running without that flag, `--app=` is often treated as a normal window and in-app Exit cannot close it. Close all Edge windows once before the first launch from this shortcut. `deploy/ableview-kiosk.cmd` wraps the same flags.
 
    Avoid `--kiosk` / `--edge-kiosk-type=fullscreen` on operator NUCs: that hides Windows chrome but **blocks** in-app Exit (`window.close()` is ignored). Do **not** use `--start-fullscreen` — it is slow and inconsistent with `--app=`.
 

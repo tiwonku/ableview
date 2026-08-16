@@ -17,7 +17,7 @@ import {
 import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
 import { playingTracks, operatorCreateColumns } from './playing-clips-strip.js';
 import { mountViewNav, viewIdFromPath } from './view-nav.js';
-import { isKioskMode, mountKioskControls } from './kiosk-controls.js';
+import { isKioskMode, kioskLinkAction, mountKioskControls } from './kiosk-controls.js';
 
 const RECONNECT_MS = 1500;
 const ALIAS_SEARCH_DEBOUNCE_MS = 180;
@@ -546,23 +546,34 @@ export function connectView({
     return isKioskMode() || Boolean(document.fullscreenElement);
   }
 
-  function switchToView(nextId, href, { push = true } = {}) {
+  function switchToView(nextId, href, { historyMode = 'push' } = {}) {
     if (!nextId || nextId === currentViewId) return;
     currentViewId = nextId;
     editSession = null;
     aliasSession = null;
     saveState = 'idle';
     saveError = null;
-    if (push && href) {
+    if (href && historyMode !== 'none') {
       const url = new URL(href, location.href);
-      history.pushState({ viewId: nextId }, '', `${url.pathname}${url.search}`);
+      const next = `${url.pathname}${url.search}`;
+      if (historyMode === 'replace') history.replaceState({ viewId: nextId }, '', next);
+      else history.pushState({ viewId: nextId }, '', next);
     }
     reconnectNow();
   }
 
   function onNavigate(nextId, href) {
-    if (!shouldInterceptNav(nextId)) return true;
-    switchToView(nextId, href);
+    const action = kioskLinkAction(nextId, {
+      kiosk: isKioskMode(),
+      statusOnly,
+      fullscreen: Boolean(document.fullscreenElement),
+    });
+    if (action === 'follow') return true;
+    if (action === 'replace') {
+      if (href) location.replace(href);
+      return false;
+    }
+    switchToView(nextId, href, { historyMode: action === 'spa-replace' ? 'replace' : 'push' });
     return false;
   }
 
@@ -570,7 +581,7 @@ export function connectView({
     const nextId = viewIdFromPath(location.pathname);
     if (!nextId || nextId === 'settings' || nextId === currentViewId) return;
     if (!shouldInterceptNav(nextId)) return;
-    switchToView(nextId, null, { push: false });
+    switchToView(nextId, null, { historyMode: 'none' });
   }
 
   window.addEventListener('popstate', onPopState);

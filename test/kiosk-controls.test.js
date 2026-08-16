@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   EXIT_HOLD_MS,
   EXIT_HINT,
+  EXIT_HINT_NOT_APP,
   isKioskMode,
   withKioskQuery,
   exitToDesktop,
@@ -10,6 +11,10 @@ import {
   toggleKioskFullscreen,
   isDocumentFullscreen,
   createHoldTracker,
+  closeKioskWindow,
+  kioskLinkAction,
+  isStandaloneAppWindow,
+  exitHintForWindow,
 } from '../public/shared/kiosk-controls.js';
 
 test('isKioskMode accepts kiosk query values', () => {
@@ -114,4 +119,42 @@ test('createHoldTracker completes after duration and cancels mid-hold', () => {
 
 test('exit hint copy is operator-facing', () => {
   assert.match(EXIT_HINT, /Alt\+F4/);
+  assert.match(EXIT_HINT_NOT_APP, /desktop shortcut/);
+});
+
+test('kioskLinkAction keeps kiosk history from growing', () => {
+  assert.equal(kioskLinkAction('visuals', { kiosk: true }), 'spa-replace');
+  assert.equal(kioskLinkAction('settings', { kiosk: true }), 'replace');
+  assert.equal(kioskLinkAction('band', { kiosk: true, statusOnly: true }), 'replace');
+  assert.equal(kioskLinkAction('visuals', { fullscreen: true }), 'spa-push');
+  assert.equal(kioskLinkAction('visuals', {}), 'follow');
+});
+
+test('closeKioskWindow claims the window then closes', () => {
+  const calls = [];
+  const win = {
+    top: null,
+    open(url, target) { calls.push(['open', url, target]); },
+    close() { calls.push(['close']); },
+  };
+  win.top = win;
+  closeKioskWindow({
+    win,
+    open: (url, target) => win.open(url, target),
+    close: () => win.close(),
+  });
+  assert.deepEqual(calls, [['open', '', '_self'], ['close']]);
+});
+
+test('isStandaloneAppWindow and exit hint follow display-mode', () => {
+  const standalone = {
+    matchMedia: (query) => ({ matches: query.includes('standalone') }),
+  };
+  const browser = {
+    matchMedia: () => ({ matches: false }),
+  };
+  assert.equal(isStandaloneAppWindow(standalone), true);
+  assert.equal(isStandaloneAppWindow(browser), false);
+  assert.equal(exitHintForWindow(standalone), EXIT_HINT);
+  assert.equal(exitHintForWindow(browser), EXIT_HINT_NOT_APP);
 });
