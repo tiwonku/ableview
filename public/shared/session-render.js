@@ -134,6 +134,10 @@ export function renderSession(root, ctx) {
   list.setAttribute('role', 'list');
 
   const rows = trackRows(payload);
+  list.style.setProperty(
+    '--session-track-count',
+    String(rows.length > 0 ? Math.min(6, rows.length) : 6),
+  );
   if (rows.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'session-empty';

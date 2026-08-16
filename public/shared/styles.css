@@ -2422,35 +2422,47 @@ body.field-expand-open {
   word-break: break-word;
 }
 
-/* Session view — watched tracks + playing clip names */
+/* Session view — watched tracks fill leftover viewport like operator cards */
 
-body.layout-session > main#app {
-  flex: 1;
+html:has(body.layout-session) {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.layout-session {
+  --sess-gap: clamp(0.4rem, 1.1dvh, 0.85rem);
+  --sess-pad: clamp(0.55rem, 1.5dvh, 1.15rem);
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body.layout-session > main#app,
+body.layout-session .session-main {
+  flex: 1 1 0;
   min-height: 0;
   max-width: none;
-  margin: 0;
-  padding: 1.25rem 1.5rem 2rem;
-}
-
-.session-main {
   width: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: clamp(0.45rem, 1.2dvh, 0.85rem);
+  padding-right: max(clamp(0.65rem, 2vw, 1.15rem), env(safe-area-inset-right, 0px));
+  padding-bottom: max(clamp(0.4rem, 1dvh, 0.75rem), env(safe-area-inset-bottom, 0px));
+  padding-left: max(clamp(0.65rem, 2vw, 1.15rem), env(safe-area-inset-left, 0px));
+  overflow: hidden;
 }
 
 .session-main .view-title {
-  margin: 0 0 1.25rem;
-  font-size: 1.35rem;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-}
-
-.session-main .view-title {
-  margin-bottom: 0.35rem;
+  flex-shrink: 0;
+  margin: 0 0 clamp(0.15rem, 0.5dvh, 0.4rem);
+  font-size: clamp(0.72rem, 1.2dvh, 0.95rem);
 }
 
 .session-scene-banner {
+  flex-shrink: 0;
   border-radius: 0.5rem;
-  padding: 0.65rem 0.85rem;
-  margin-bottom: 1rem;
+  padding: clamp(0.45rem, 1.1dvh, 0.7rem) clamp(0.7rem, 1.4vw, 0.95rem);
+  margin-bottom: var(--sess-gap);
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
   background: rgba(255, 255, 255, 0.04);
 }
@@ -2470,36 +2482,63 @@ body.layout-session > main#app {
 }
 
 .session-scene-banner-primary {
-  font-size: 1.05rem;
+  font-size: clamp(0.95rem, 1.6dvh, 1.15rem);
   font-weight: 600;
   letter-spacing: 0.01em;
 }
 
 .session-scene-banner-secondary {
-  margin-top: 0.2rem;
-  font-size: 0.85rem;
+  margin-top: 0.15rem;
+  font-size: clamp(0.75rem, 1.2dvh, 0.88rem);
   opacity: 0.75;
 }
 
+.session-main > .alias-panel,
+.session-main > .admin-editor {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: min(42dvh, 24rem);
+  overflow: auto;
+  margin-bottom: var(--sess-gap);
+}
+
 .session-tracks {
+  --session-cols: 6;
+  --session-track-count: 6;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.65rem;
+  grid-template-columns: repeat(
+    min(var(--session-cols), var(--session-track-count)),
+    minmax(0, 1fr)
+  );
+  grid-auto-rows: minmax(10.5rem, 1fr);
+  gap: var(--sess-gap);
+  align-content: stretch;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .session-empty {
-  margin: 0;
+  margin: auto 0;
   color: var(--muted);
-  font-size: 1rem;
+  font-size: clamp(1rem, 2dvh, 1.25rem);
   grid-column: 1 / -1;
+  align-self: center;
+  justify-self: center;
 }
 
 .session-track {
+  container-type: size;
+  container-name: session-track;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: clamp(0.35rem, 1.2cqh, 0.75rem);
   min-width: 0;
-  padding: 0.85rem 1rem;
+  min-height: 0;
+  height: 100%;
+  padding: var(--sess-pad);
   border: 1px solid var(--border);
   border-radius: 0.45rem;
   background: var(--surface);
@@ -2573,26 +2612,28 @@ body.layout-session > main#app {
 }
 
 .session-track-meta {
+  flex-shrink: 0;
   min-width: 0;
 }
 
 .session-track-name {
-  font-size: 0.95rem;
+  font-size: clamp(0.88rem, 3.4cqh, 1.35rem);
   font-weight: 650;
   color: var(--text);
 }
 
 .session-track-index {
   margin-top: 0.15rem;
-  font-size: 0.75rem;
+  font-size: clamp(0.68rem, 2.1cqh, 0.85rem);
   color: var(--muted);
 }
 
 .session-track-match {
   margin-top: 0.35rem;
-  font-size: 0.78rem;
+  font-size: clamp(0.7rem, 2.3cqh, 0.92rem);
   font-weight: 600;
   letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
 }
 
 .session-track-match--empty {
@@ -2614,21 +2655,29 @@ body.layout-session > main#app {
 
 .session-track-clip {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.45rem 0.75rem;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.35rem;
+  flex: 1 1 auto;
   min-width: 0;
-  margin-top: auto;
-  padding-top: 0.35rem;
+  min-height: 0;
+  margin-top: 0.15rem;
+  padding-top: clamp(0.35rem, 1.4cqh, 0.7rem);
   border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-  font-size: 1.05rem;
-  font-weight: 600;
-  line-height: 1.3;
+  font-size: clamp(1.15rem, 9cqh, 3.5rem);
+  font-weight: 650;
+  line-height: 1.15;
 }
 
 .session-track-clip--empty {
+  border-top: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
   color: var(--muted);
   font-weight: 500;
+  font-size: clamp(1.25rem, 7cqh, 2.25rem);
 }
 
 .session-track-clip-name {
@@ -2636,26 +2685,27 @@ body.layout-session > main#app {
 }
 
 .session-track-slot {
-  font-size: 0.8rem;
+  font-size: clamp(0.72rem, 2.4cqh, 0.95rem);
   font-weight: 500;
   color: var(--muted);
 }
 
-@media (max-width: 900px) {
+/* Prefer 6-across; drop columns only when cards would be too narrow. */
+@media (max-width: 48rem) {
   .session-tracks {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    --session-cols: 3;
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 32rem) {
   .session-tracks {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    --session-cols: 2;
   }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 22rem) {
   .session-tracks {
-    grid-template-columns: 1fr;
+    --session-cols: 1;
   }
 }
 
