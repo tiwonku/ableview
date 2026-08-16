@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   captureEditSession,
   captureCreateSession,
@@ -43,6 +45,26 @@ test('viewFieldColumns preserves field order', () => {
     { column: 'BPM' },
   ];
   assert.deepEqual(viewFieldColumns(fields), ['RGB_1', 'Video World', 'BPM']);
+});
+
+test('viewFieldColumns skips live source fields without a column', () => {
+  const fields = [
+    { source: 'tempo', label: 'Tempo', display: 'token' },
+    { column: 'Lasers' },
+    { column: 'RGB_1', type: 'color' },
+  ];
+  assert.deepEqual(viewFieldColumns(fields), ['Lasers', 'RGB_1']);
+});
+
+test('ws-client imports viewFieldColumns for operator Edit', () => {
+  const src = readFileSync(
+    fileURLToPath(new URL('../public/shared/ws-client.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(
+    src,
+    /import\s*\{[^}]*\bviewFieldColumns\b[^}]*\}\s*from\s*['"]\.\/admin-row-editor\.js['"]/s,
+  );
 });
 
 test('buildFieldLabels uses view labels', () => {

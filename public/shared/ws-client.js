@@ -13,6 +13,7 @@ import {
   collectEditorChanges,
   collectEditorValues,
   captureCreateSession,
+  viewFieldColumns,
 } from './admin-row-editor.js';
 import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
 import { playingTracks, operatorCreateColumns } from './playing-clips-strip.js';
