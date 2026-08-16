@@ -99,14 +99,14 @@ export function exitHintForWindow(win = typeof window !== 'undefined' ? window :
 /**
  * Chromium only allows script close when the window was script-opened or the
  * session history has a single entry. Kiosk view switches must not pushState.
+ * Settings is included: a real navigation exits the Fullscreen API.
  */
 export function kioskLinkAction(nextId, {
   kiosk = false,
   statusOnly = false,
   fullscreen = false,
 } = {}) {
-  const interceptSpa = !statusOnly && Boolean(nextId) && nextId !== 'settings'
-    && (kiosk || fullscreen);
+  const interceptSpa = !statusOnly && Boolean(nextId) && (kiosk || fullscreen);
   if (interceptSpa) return kiosk ? 'spa-replace' : 'spa-push';
   if (kiosk) return 'replace';
   return 'follow';

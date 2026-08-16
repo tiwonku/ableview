@@ -57,6 +57,9 @@ export function connectView({
   mountKioskControls();
 
   let currentViewId = viewId;
+  let showingSettings = settingsActive === true;
+  let settingsGen = 0;
+  let unmountSettings = null;
   let socketGen = 0;
   let ws = null;
   let reconnectTimer = null;
@@ -139,15 +142,7 @@ export function connectView({
       matchColumn = msg.matchColumn ?? null;
       aliasColumn = msg.aliasColumn ?? null;
       viewsList = msg.views ?? null;
-      mountViewNav(currentViewId, viewsList, { settingsActive, onNavigate });
-      const isSession = currentViewId === 'session';
-      document.body.classList.toggle(
-        'layout-operator',
-        !viewConfig.system && !statusOnly && !isSession,
-      );
-      document.body.classList.toggle('layout-session', isSession);
-      document.title = `AbleView — ${viewConfig.title ?? currentViewId}`;
-      root?.classList.toggle('admin-main', viewConfig.system === true && currentViewId === 'admin');
+      syncChrome();
       if (msg.status) lastStatus = msg.status;
       if (msg.sessionLog) applySessionLogState(msg.sessionLog);
       applySimState(msg.simulated === true);
@@ -438,7 +433,7 @@ export function connectView({
       matchColumn,
       aliasColumn,
     };
-    if (statusOnly) {
+    if (statusOnly || showingSettings) {
       setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
       return;
     }
@@ -541,25 +536,89 @@ export function connectView({
     connect();
   }
 
+  function syncChrome() {
+    const isSession = !showingSettings && currentViewId === 'session';
+    const isAdmin = !showingSettings && viewConfig?.system === true && currentViewId === 'admin';
+    const isOperator = Boolean(viewConfig)
+      && !viewConfig.system
+      && !statusOnly
+      && !isSession
+      && !showingSettings;
+    document.body.classList.toggle('layout-operator', isOperator);
+    document.body.classList.toggle('layout-session', isSession);
+    document.body.classList.toggle('layout-settings', showingSettings);
+    document.title = showingSettings
+      ? 'AbleView — Settings'
+      : `AbleView — ${viewConfig?.title ?? currentViewId}`;
+    root?.classList.toggle('admin-main', isAdmin);
+    root?.classList.toggle('settings-main', showingSettings);
+    if (showingSettings) root?.setAttribute('aria-label', 'Settings');
+    else root?.removeAttribute('aria-label');
+    const simHost = document.getElementById('sim-controls-host');
+    if (simHost) simHost.hidden = showingSettings;
+    if (viewsList) {
+      mountViewNav(currentViewId, viewsList, { settingsActive: showingSettings, onNavigate });
+    }
+  }
+
+  function applyHistory(nextId, href, historyMode) {
+    if (!href || historyMode === 'none') return;
+    const url = new URL(href, location.href);
+    const next = `${url.pathname}${url.search}`;
+    if (historyMode === 'replace') history.replaceState({ viewId: nextId }, '', next);
+    else history.pushState({ viewId: nextId }, '', next);
+  }
+
+  function leaveSettings() {
+    settingsGen += 1;
+    showingSettings = false;
+    unmountSettings?.();
+    unmountSettings = null;
+    document.body.classList.remove('layout-settings');
+    root?.classList.remove('settings-main');
+    root?.removeAttribute('aria-label');
+  }
+
+  async function enterSettings(href, historyMode) {
+    if (showingSettings && unmountSettings) return;
+    showingSettings = true;
+    editSession = null;
+    aliasSession = null;
+    saveState = 'idle';
+    saveError = null;
+    applyHistory('settings', href, historyMode);
+    syncChrome();
+    const gen = ++settingsGen;
+    const { attachSettingsOverlay } = await import('./settings-overlay.js');
+    if (gen !== settingsGen || !showingSettings) return;
+    unmountSettings?.();
+    unmountSettings = attachSettingsOverlay(root);
+  }
+
   function shouldInterceptNav(nextId) {
     if (statusOnly) return false;
-    if (!nextId || nextId === 'settings') return false;
+    if (!nextId) return false;
     return isKioskMode() || Boolean(document.fullscreenElement);
   }
 
   function switchToView(nextId, href, { historyMode = 'push' } = {}) {
-    if (!nextId || nextId === currentViewId) return;
+    if (!nextId) return;
+    if (nextId === 'settings') {
+      enterSettings(href, historyMode);
+      return;
+    }
+    if (showingSettings) leaveSettings();
+    if (nextId === currentViewId) {
+      syncChrome();
+      render();
+      return;
+    }
     currentViewId = nextId;
     editSession = null;
     aliasSession = null;
     saveState = 'idle';
     saveError = null;
-    if (href && historyMode !== 'none') {
-      const url = new URL(href, location.href);
-      const next = `${url.pathname}${url.search}`;
-      if (historyMode === 'replace') history.replaceState({ viewId: nextId }, '', next);
-      else history.pushState({ viewId: nextId }, '', next);
-    }
+    applyHistory(nextId, href, historyMode);
     reconnectNow();
   }
 
@@ -580,12 +639,22 @@ export function connectView({
 
   function onPopState() {
     const nextId = viewIdFromPath(location.pathname);
-    if (!nextId || nextId === 'settings' || nextId === currentViewId) return;
+    if (!nextId) return;
+    if (nextId === 'settings') {
+      if (!shouldInterceptNav(nextId)) return;
+      enterSettings(null, 'none');
+      return;
+    }
+    if (nextId === currentViewId && !showingSettings) return;
     if (!shouldInterceptNav(nextId)) return;
     switchToView(nextId, null, { historyMode: 'none' });
   }
 
   window.addEventListener('popstate', onPopState);
+
+  if (showingSettings && !statusOnly) {
+    enterSettings(null, 'none');
+  }
 
   connect();
 
@@ -593,6 +662,7 @@ export function connectView({
     stop() {
       stopped = true;
       socketGen += 1;
+      leaveSettings();
       window.removeEventListener('popstate', onPopState);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       ws?.close();

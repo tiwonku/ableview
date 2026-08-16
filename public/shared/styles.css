@@ -35,6 +35,16 @@ html:fullscreen body {
   overflow: hidden;
 }
 
+html:fullscreen:has(body.layout-settings) {
+  overflow: auto;
+}
+
+html:fullscreen body.layout-settings {
+  overflow: auto;
+  height: auto;
+  min-height: 100%;
+}
+
 body {
   display: flex;
   flex-direction: column;

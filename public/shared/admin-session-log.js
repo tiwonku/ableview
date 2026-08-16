@@ -66,8 +66,10 @@ function renderStatusBox(status) {
 }
 
 export function mountSessionLogPanel(selector) {
-  const root = document.querySelector(selector);
-  if (!root) return;
+  const root = typeof selector === 'string'
+    ? document.querySelector(selector)
+    : selector;
+  if (!root) return () => {};
 
   let status = null;
   let pollTimer = null;

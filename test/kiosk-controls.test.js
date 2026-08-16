@@ -124,10 +124,12 @@ test('exit hint copy is operator-facing', () => {
 
 test('kioskLinkAction keeps kiosk history from growing', () => {
   assert.equal(kioskLinkAction('visuals', { kiosk: true }), 'spa-replace');
-  assert.equal(kioskLinkAction('settings', { kiosk: true }), 'replace');
+  assert.equal(kioskLinkAction('settings', { kiosk: true }), 'spa-replace');
   assert.equal(kioskLinkAction('band', { kiosk: true, statusOnly: true }), 'replace');
   assert.equal(kioskLinkAction('visuals', { fullscreen: true }), 'spa-push');
+  assert.equal(kioskLinkAction('settings', { fullscreen: true }), 'spa-push');
   assert.equal(kioskLinkAction('visuals', {}), 'follow');
+  assert.equal(kioskLinkAction('settings', {}), 'follow');
 });
 
 test('closeKioskWindow claims the window then closes', () => {

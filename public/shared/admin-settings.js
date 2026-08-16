@@ -483,8 +483,10 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
 }
 
 export function mountSettingsPanel(rootSelector) {
-  const root = document.querySelector(rootSelector);
-  if (!root) return;
+  const root = typeof rootSelector === 'string'
+    ? document.querySelector(rootSelector)
+    : rootSelector;
+  if (!root) return () => {};
 
   let settings = null;
   let status = null;
@@ -494,8 +496,10 @@ export function mountSettingsPanel(rootSelector) {
   let ingestStatus = null;
   let timecodeStatus = null;
   let pollTimer = null;
+  let stopped = false;
 
   function render() {
+    if (stopped) return;
     renderForm(root, settings, {
       onSave: save,
       onSync: syncSheet,
@@ -606,21 +610,30 @@ export function mountSettingsPanel(rootSelector) {
   }
 
   load().catch((err) => {
+    if (stopped) return;
     root.innerHTML = '';
     const errEl = el('div', 'settings-status err', err.message);
     root.appendChild(errEl);
   });
 
   pollTimer = setInterval(() => {
-    if (!settings) return;
+    if (stopped || !settings) return;
     const prevIngest = JSON.stringify(ingestStatus);
     const prevTimecode = JSON.stringify(timecodeStatus);
     loadHealthStatus()
       .then(() => {
+        if (stopped) return;
         if (JSON.stringify(ingestStatus) !== prevIngest) refreshAbletonSessionBox();
         if (JSON.stringify(timecodeStatus) !== prevTimecode) refreshTimecodeSessionBox();
       })
       .catch(() => {});
   }, 3000);
   pollTimer.unref?.();
+
+  return () => {
+    stopped = true;
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+    root.replaceChildren();
+  };
 }

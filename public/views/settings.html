@@ -6,7 +6,7 @@
   <title>AbleView — Settings</title>
   <link rel="stylesheet" href="/shared/styles.css">
 </head>
-<body>
+<body class="layout-settings">
   <header id="status-bar" class="status-bar">
     <span class="status-group">
       <span class="dot" aria-hidden="true"></span>
@@ -25,12 +25,8 @@
   <section id="session-log" class="settings-main session-log-main" aria-label="Session log"></section>
   <script type="module">
     import { connectView } from '/shared/ws-client.js';
-    import { mountSettingsPanel } from '/shared/admin-settings.js';
-    import { mountSessionLogPanel } from '/shared/admin-session-log.js';
 
-    connectView({ viewId: 'admin', statusOnly: true, settingsActive: true });
-    mountSettingsPanel('#app');
-    mountSessionLogPanel('#session-log');
+    connectView({ viewId: 'admin', settingsActive: true });
   </script>
 </body>
 </html>
