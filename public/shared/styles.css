@@ -1551,15 +1551,20 @@ body.layout-operator #app {
   display: flex;
   flex-direction: column;
   max-width: none;
-  padding: clamp(0.45rem, 1.2dvh, 0.85rem) clamp(0.65rem, 2vw, 1.15rem)
-    clamp(0.4rem, 1dvh, 0.75rem);
+  padding-top: clamp(0.45rem, 1.2dvh, 0.85rem);
+  padding-right: max(clamp(0.65rem, 2vw, 1.15rem), env(safe-area-inset-right, 0px));
+  padding-bottom: max(clamp(0.4rem, 1dvh, 0.75rem), env(safe-area-inset-bottom, 0px));
+  padding-left: max(clamp(0.65rem, 2vw, 1.15rem), env(safe-area-inset-left, 0px));
   overflow: hidden;
 }
 
 body.layout-operator .status-bar {
   flex-wrap: nowrap;
   gap: clamp(0.3rem, 0.8dvh, 0.5rem) clamp(0.4rem, 1vw, 0.65rem);
-  padding: clamp(0.3rem, 1dvh, 0.55rem) clamp(0.65rem, 2vw, 1.25rem);
+  padding-top: max(clamp(0.3rem, 1dvh, 0.55rem), env(safe-area-inset-top, 0px));
+  padding-right: max(clamp(0.65rem, 2vw, 1.25rem), env(safe-area-inset-right, 0px));
+  padding-bottom: clamp(0.3rem, 1dvh, 0.55rem);
+  padding-left: max(clamp(0.65rem, 2vw, 1.25rem), env(safe-area-inset-left, 0px));
   font-size: clamp(0.72rem, 1.4dvh, 0.85rem);
 }
 
@@ -1577,6 +1582,51 @@ body.layout-operator .view-nav-settings {
   min-height: clamp(2rem, 4dvh, 2.5rem);
   display: inline-flex;
   align-items: center;
+}
+
+@media (max-width: 36rem) {
+  body.layout-operator #app {
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+  }
+
+  body.layout-operator .status-bar {
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px));
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px));
+  }
+
+  body.layout-operator .status-bar.connected [data-role="connection"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  body.layout-operator .tempo-indicator::after {
+    content: none;
+  }
+
+  body.layout-operator .status-bar [data-role="last-update"] {
+    min-width: 0;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  body.layout-operator .status-bar .view-nav {
+    flex: 1 0 100%;
+    order: 10;
+    max-width: none;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
 }
 
 body.layout-operator .view-title {
