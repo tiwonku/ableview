@@ -10,6 +10,9 @@
   --danger: #e05252;
   --ok: #3ecf8e;
   --border: #2a2f3d;
+  --title-min: 2.5rem;
+  --chrome-btn-min: clamp(2.25rem, 4.5dvh, 2.75rem);
+  --chrome-btn-size: 0.88rem;
 }
 
 * {
@@ -192,7 +195,7 @@ main {
 .view-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.4rem;
   scrollbar-width: none;
 }
 
@@ -201,11 +204,20 @@ main {
   height: 0;
 }
 
-.view-nav a {
-  padding: 0.25rem 0.6rem;
-  font-size: 0.78rem;
+.view-nav a,
+.view-nav-settings,
+.kiosk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--chrome-btn-min);
+  padding: 0.35rem 0.85rem;
+  font-size: var(--chrome-btn-size);
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+.view-nav a {
   text-decoration: none;
   color: var(--muted);
   border: 1px solid var(--border);
@@ -226,12 +238,6 @@ main {
 }
 
 .view-nav-settings {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem 0.55rem;
-  font-size: 0.78rem;
-  font-weight: 600;
   margin-left: 0.15rem;
   text-decoration: none;
   color: var(--muted);
@@ -262,22 +268,14 @@ main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .kiosk-btn {
   position: relative;
   overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  min-height: 2.25rem;
-  padding: 0.25rem 0.65rem;
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  gap: 0.4rem;
+  font-family: inherit;
   color: var(--muted);
   border: 1px solid var(--border);
   border-radius: 0.35rem;
@@ -343,9 +341,9 @@ main {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.65rem 0.85rem;
-  font-size: clamp(2.25rem, 6vw + 1.25rem, 4.25rem);
+  font-size: clamp(var(--title-min), 6.5dvh + 5vmin, 8rem);
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.06;
   word-break: break-word;
 }
 
@@ -1617,7 +1615,6 @@ body.layout-operator {
   --op-gap: clamp(0.35rem, 1.1dvh, 1.25rem);
   --op-pad: clamp(0.45rem, 1.4dvh, 1.35rem);
   --op-text-min: 1rem;
-  --op-title-min: 2.5rem;
   --op-label-min: 0.65rem;
   height: 100dvh;
   overflow: hidden;
@@ -1654,7 +1651,7 @@ body.layout-operator .status-bar {
 body.layout-operator .status-bar .view-nav {
   flex-wrap: nowrap;
   overflow-x: auto;
-  max-width: min(62vw, 32rem);
+  max-width: min(72vw, 42rem);
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -1663,9 +1660,6 @@ body.layout-operator .view-nav a,
 body.layout-operator .view-nav-settings,
 body.layout-operator .kiosk-btn {
   flex-shrink: 0;
-  min-height: clamp(2rem, 4dvh, 2.5rem);
-  display: inline-flex;
-  align-items: center;
 }
 
 @media (max-width: 56rem), (orientation: portrait) {
@@ -1757,20 +1751,6 @@ body.layout-operator .operator-editor-context {
 
 body.layout-operator .clip-head {
   margin-bottom: clamp(0.35rem, 1.2dvh, 1rem);
-}
-
-body.layout-operator .clip-name {
-  font-size: clamp(var(--op-title-min), 6.5dvh + 5vmin, 8rem);
-  line-height: 1.06;
-}
-
-body.layout-operator #app:has(.fields-strip) .clip-name {
-  font-size: clamp(1.15rem, 3dvh + 1.5vw, 2.25rem);
-  line-height: 1.12;
-}
-
-body.layout-operator #app:has(.fields-many) .clip-name {
-  font-size: clamp(1.1rem, 2.8dvh + 1.2vw, 2rem);
 }
 
 body.layout-operator #app:has(.fields-many) .clip-head {
@@ -2197,8 +2177,8 @@ body.layout-operator .colors-row .color-copy-value {
     max-height: 4rem;
   }
 
-  body.layout-operator .clip-name {
-    font-size: clamp(var(--op-title-min), 4dvh + 5vw, 4rem);
+  .clip-name {
+    font-size: clamp(var(--title-min), 4dvh + 5vw, 4rem);
   }
 }
 
