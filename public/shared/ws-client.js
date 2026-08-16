@@ -16,8 +16,8 @@ import {
 } from './admin-row-editor.js';
 import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
 import { playingTracks, operatorCreateColumns } from './playing-clips-strip.js';
-import { mountViewNav } from './view-nav.js';
-import { mountKioskControls } from './kiosk-controls.js';
+import { mountViewNav, viewIdFromPath } from './view-nav.js';
+import { isKioskMode, mountKioskControls } from './kiosk-controls.js';
 
 const RECONNECT_MS = 1500;
 const ALIAS_SEARCH_DEBOUNCE_MS = 180;
@@ -55,6 +55,8 @@ export function connectView({
   if (!statusOnly && !root) throw new Error(`Missing root element: ${rootSelector}`);
   mountKioskControls();
 
+  let currentViewId = viewId;
+  let socketGen = 0;
   let ws = null;
   let reconnectTimer = null;
   let viewConfig = null;
@@ -129,20 +131,22 @@ export function connectView({
         fields: msg.fields ?? [],
         system: msg.system === true,
         editable: msg.system !== true && msg.editable !== false,
-        viewId,
+        viewId: currentViewId,
       };
       editorColumns = msg.editorColumns ?? {};
       sheetHeaders = msg.sheetHeaders ?? [];
       matchColumn = msg.matchColumn ?? null;
       aliasColumn = msg.aliasColumn ?? null;
       viewsList = msg.views ?? null;
-      mountViewNav(viewId, viewsList, { settingsActive });
-      const isSession = viewId === 'session';
+      mountViewNav(currentViewId, viewsList, { settingsActive, onNavigate });
+      const isSession = currentViewId === 'session';
       document.body.classList.toggle(
         'layout-operator',
         !viewConfig.system && !statusOnly && !isSession,
       );
       document.body.classList.toggle('layout-session', isSession);
+      document.title = `AbleView — ${viewConfig.title ?? currentViewId}`;
+      root?.classList.toggle('admin-main', viewConfig.system === true && currentViewId === 'admin');
       if (msg.status) lastStatus = msg.status;
       if (msg.sessionLog) applySessionLogState(msg.sessionLog);
       applySimState(msg.simulated === true);
@@ -446,7 +450,7 @@ export function connectView({
       aliasPanel.focusRestore = aliasFocus;
       aliasPanel.autoFocusSearch = autoFocusSearch;
     }
-    if (viewId === 'session') {
+    if (currentViewId === 'session') {
       renderSession(root, {
         ...ctx,
         editSession,
@@ -503,28 +507,81 @@ export function connectView({
 
   function connect() {
     if (stopped) return;
+    const gen = socketGen;
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${location.host}/ws?view=${encodeURIComponent(viewId)}`;
+    const url = `${protocol}//${location.host}/ws?view=${encodeURIComponent(currentViewId)}`;
     ws = new WebSocket(url);
 
-    ws.addEventListener('open', () => setConnected(true));
+    ws.addEventListener('open', () => {
+      if (gen !== socketGen) return;
+      setConnected(true);
+    });
     ws.addEventListener('message', onMessage);
     ws.addEventListener('close', () => {
+      if (gen !== socketGen) return;
       setConnected(false);
       ws = null;
       scheduleReconnect();
     });
     ws.addEventListener('error', () => {
+      if (gen !== socketGen) return;
       ws?.close();
     });
   }
+
+  function reconnectNow() {
+    socketGen += 1;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    const previous = ws;
+    ws = null;
+    previous?.close();
+    connect();
+  }
+
+  function shouldInterceptNav(nextId) {
+    if (statusOnly) return false;
+    if (!nextId || nextId === 'settings') return false;
+    return isKioskMode() || Boolean(document.fullscreenElement);
+  }
+
+  function switchToView(nextId, href, { push = true } = {}) {
+    if (!nextId || nextId === currentViewId) return;
+    currentViewId = nextId;
+    editSession = null;
+    aliasSession = null;
+    saveState = 'idle';
+    saveError = null;
+    if (push && href) {
+      const url = new URL(href, location.href);
+      history.pushState({ viewId: nextId }, '', `${url.pathname}${url.search}`);
+    }
+    reconnectNow();
+  }
+
+  function onNavigate(nextId, href) {
+    if (!shouldInterceptNav(nextId)) return true;
+    switchToView(nextId, href);
+    return false;
+  }
+
+  function onPopState() {
+    const nextId = viewIdFromPath(location.pathname);
+    if (!nextId || nextId === 'settings' || nextId === currentViewId) return;
+    if (!shouldInterceptNav(nextId)) return;
+    switchToView(nextId, null, { push: false });
+  }
+
+  window.addEventListener('popstate', onPopState);
 
   connect();
 
   return {
     stop() {
       stopped = true;
+      socketGen += 1;
+      window.removeEventListener('popstate', onPopState);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       ws?.close();
     },

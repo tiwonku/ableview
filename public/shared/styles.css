@@ -193,6 +193,12 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  scrollbar-width: none;
+}
+
+.view-nav::-webkit-scrollbar {
+  display: none;
+  height: 0;
 }
 
 .view-nav a {
@@ -1650,7 +1656,7 @@ body.layout-operator .status-bar .view-nav {
   overflow-x: auto;
   max-width: min(62vw, 32rem);
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 body.layout-operator .view-nav a,
@@ -1660,6 +1666,30 @@ body.layout-operator .kiosk-btn {
   min-height: clamp(2rem, 4dvh, 2.5rem);
   display: inline-flex;
   align-items: center;
+}
+
+@media (max-width: 56rem), (orientation: portrait) {
+  body.layout-operator .status-bar,
+  body.kiosk .status-bar {
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+  }
+
+  body.layout-operator .status-bar .view-nav,
+  body.kiosk .status-bar .view-nav {
+    flex: 1 0 100%;
+    order: 10;
+    max-width: none;
+    overflow: visible;
+    flex-wrap: wrap;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  body.layout-operator .kiosk-controls,
+  body.kiosk .kiosk-controls {
+    margin-left: auto;
+  }
 }
 
 @media (max-width: 36rem) {
