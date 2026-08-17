@@ -13,6 +13,8 @@ import {
   createHoldTracker,
   closeKioskWindow,
   kioskLinkAction,
+  kioskReloadAction,
+  performKioskReload,
   isStandaloneAppWindow,
   exitHintForWindow,
 } from '../public/shared/kiosk-controls.js';
@@ -130,6 +132,32 @@ test('kioskLinkAction keeps kiosk history from growing', () => {
   assert.equal(kioskLinkAction('settings', { fullscreen: true }), 'spa-push');
   assert.equal(kioskLinkAction('visuals', {}), 'follow');
   assert.equal(kioskLinkAction('settings', {}), 'follow');
+});
+
+test('kioskReloadAction stays in-document while fullscreen', () => {
+  assert.equal(kioskReloadAction({ fullscreen: true }), 'soft');
+  assert.equal(kioskReloadAction({ fullscreen: false }), 'hard');
+  assert.equal(kioskReloadAction({}), 'hard');
+});
+
+test('performKioskReload does not hard-reload while fullscreen', () => {
+  let soft = 0;
+  let hard = 0;
+  assert.equal(performKioskReload({
+    fullscreen: true,
+    softReload: () => { soft += 1; },
+    reload: () => { hard += 1; },
+  }), 'soft');
+  assert.equal(soft, 1);
+  assert.equal(hard, 0);
+
+  assert.equal(performKioskReload({
+    fullscreen: false,
+    softReload: () => { soft += 1; },
+    reload: () => { hard += 1; },
+  }), 'hard');
+  assert.equal(soft, 1);
+  assert.equal(hard, 1);
 });
 
 test('closeKioskWindow claims the window then closes', () => {

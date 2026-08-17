@@ -112,6 +112,29 @@ export function kioskLinkAction(nextId, {
   return 'follow';
 }
 
+/**
+ * Fullscreen API exits on document unload, so Reload cannot use location.reload()
+ * while fullscreen. Soft = same-document reconnect; hard = full page reload.
+ */
+export function kioskReloadAction({ fullscreen = false } = {}) {
+  return fullscreen ? 'soft' : 'hard';
+}
+
+export function performKioskReload({
+  fullscreen = false,
+  reload,
+  softReload,
+} = {}) {
+  const action = kioskReloadAction({ fullscreen });
+  if (action === 'soft') {
+    softReload?.();
+    return action;
+  }
+  const reloadFn = reload ?? (() => location.reload());
+  reloadFn();
+  return action;
+}
+
 function defaultClose(win = typeof window !== 'undefined' ? window : null) {
   const target = win?.top ?? win;
   if (!target) return;
@@ -309,6 +332,7 @@ export function mountKioskControls({
   bar,
   search,
   reload,
+  softReload,
   close,
   afterCloseMs = 250,
 } = {}) {
@@ -344,8 +368,11 @@ export function mountKioskControls({
     html: RELOAD_ICON,
   });
   reloadBtn.addEventListener('click', () => {
-    const reloadFn = reload ?? (() => location.reload());
-    reloadFn();
+    performKioskReload({
+      fullscreen: isDocumentFullscreen(),
+      reload,
+      softReload,
+    });
   });
   controls.appendChild(reloadBtn);
 

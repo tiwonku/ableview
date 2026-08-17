@@ -54,7 +54,6 @@ export function connectView({
 }) {
   const root = statusOnly ? null : document.querySelector(rootSelector);
   if (!statusOnly && !root) throw new Error(`Missing root element: ${rootSelector}`);
-  mountKioskControls();
 
   let currentViewId = viewId;
   let showingSettings = settingsActive === true;
@@ -536,6 +535,21 @@ export function connectView({
     connect();
   }
 
+  function kioskSoftReload() {
+    editSession = null;
+    aliasSession = null;
+    saveState = 'idle';
+    saveError = null;
+    if (showingSettings) {
+      unmountSettings?.();
+      unmountSettings = null;
+      enterSettings(null, 'none');
+    } else {
+      render();
+    }
+    reconnectNow();
+  }
+
   function syncChrome() {
     const isSession = !showingSettings && currentViewId === 'session';
     const isAdmin = !showingSettings && viewConfig?.system === true && currentViewId === 'admin';
@@ -651,6 +665,8 @@ export function connectView({
   }
 
   window.addEventListener('popstate', onPopState);
+
+  mountKioskControls({ softReload: kioskSoftReload });
 
   if (showingSettings && !statusOnly) {
     enterSettings(null, 'none');
