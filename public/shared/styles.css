@@ -35,11 +35,13 @@ html:fullscreen body {
   overflow: hidden;
 }
 
-html:fullscreen:has(body.layout-settings) {
+/* Operator/session fill the viewport and scroll internally. Admin + settings
+   are document-scroll pages — without this, kiosk fullscreen clips them. */
+html:fullscreen:has(body:not(.layout-operator):not(.layout-session)) {
   overflow: auto;
 }
 
-html:fullscreen body.layout-settings {
+html:fullscreen body:not(.layout-operator):not(.layout-session) {
   overflow: auto;
   height: auto;
   min-height: 100%;
