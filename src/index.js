@@ -7,6 +7,7 @@ import { createSheetsStore } from './sheets/index.js';
 import { createMatcher } from './match/index.js';
 import { createViewServer } from './server/index.js';
 import { createTimecodeListener } from './timecode/index.js';
+import { createOscOutput } from './outputs/osc.js';
 import { createSessionLogger } from './session-log/index.js';
 
 const log = createLogger({ app: 'ableview' });
@@ -47,6 +48,12 @@ async function main() {
     getConfig,
     bus,
     log: log.child({ module: 'timecode' }),
+  });
+
+  const oscOut = createOscOutput({
+    getConfig,
+    bus,
+    log: log.child({ module: 'osc-out' }),
   });
 
   const sessionLog = createSessionLogger({
@@ -116,6 +123,13 @@ async function main() {
         );
       }
     }
+    if (sections.includes('oscOut')) {
+      try {
+        await oscOut.start();
+      } catch (err) {
+        log.error({ err: err.message }, 'osc clock output failed to restart');
+      }
+    }
     if (sections.includes('sim')) viewServer.rebroadcastSimState();
   });
 
@@ -123,6 +137,11 @@ async function main() {
     log.warn('================ SIMULATION MODE ================');
   }
 
+  try {
+    await oscOut.start();
+  } catch (err) {
+    log.error({ err: err.message }, 'osc clock output failed to start');
+  }
   await ingest.start();
   try {
     await timecode.start();
@@ -137,6 +156,7 @@ async function main() {
   const shutdown = async (signal) => {
     log.info({ signal }, 'shutting down');
     sessionLog.stop();
+    oscOut.stop();
     timecode.stop();
     ingest.stop();
     sheets.stop();

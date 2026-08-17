@@ -13,12 +13,24 @@ const MOMENTS_DEFAULTS = Object.freeze({
   debounceMs: 0,
 });
 
+const OSCOUT_DEFAULTS = Object.freeze({
+  enabled: false,
+  destinations: [],
+});
+
 function normalizeSettings(raw) {
   if (!raw) return raw;
   return {
     ...raw,
     timecode: { ...TIMECODE_DEFAULTS, ...raw.timecode },
     moments: { ...MOMENTS_DEFAULTS, ...raw.moments },
+    oscOut: {
+      ...OSCOUT_DEFAULTS,
+      ...raw.oscOut,
+      destinations: Array.isArray(raw.oscOut?.destinations)
+        ? raw.oscOut.destinations.map((d) => ({ host: d.host ?? '', port: d.port ?? 11010 }))
+        : [],
+    },
   };
 }
 
@@ -207,6 +219,76 @@ function renderAbletonSessionBox(ingestStatus, simulated) {
   return box;
 }
 
+function destRow(dest = { host: '', port: 11010 }) {
+  const row = el('div', 'oscout-dest-row');
+  const host = textInput('oscOutHost', dest.host ?? '');
+  host.placeholder = '192.168.10.40';
+  host.setAttribute('aria-label', 'OSC destination host');
+  const port = numberInput('oscOutPort', dest.port ?? 11010, { min: 1, max: 65535 });
+  port.setAttribute('aria-label', 'OSC destination port');
+  const remove = el('button', 'oscout-dest-remove', 'Remove');
+  remove.type = 'button';
+  remove.addEventListener('click', () => {
+    row.remove();
+  });
+  row.appendChild(host);
+  row.appendChild(port);
+  row.appendChild(remove);
+  return row;
+}
+
+function renderOscOutGroup(settings) {
+  const group = el('fieldset', 'settings-group');
+  group.appendChild(el('legend', null, 'OSC clock out'));
+
+  const enabled = settings.oscOut?.enabled === true;
+  const check = el('input');
+  check.type = 'checkbox';
+  check.name = 'oscOutEnabled';
+  check.id = 'oscOutEnabled';
+  check.checked = enabled;
+  check.className = 'settings-checkbox';
+  const checkRow = el('div', 'settings-field settings-field-checkbox');
+  checkRow.appendChild(check);
+  const label = el('label', 'settings-checkbox-label');
+  label.htmlFor = 'oscOutEnabled';
+  label.textContent = 'Rebroadcast Live tempo, beat, bar, and transport over OSC';
+  checkRow.appendChild(label);
+  group.appendChild(checkRow);
+
+  const dests = Array.isArray(settings.oscOut?.destinations) ? settings.oscOut.destinations : [];
+  const listLabel = el('p', 'settings-label oscout-dest-heading', 'Destinations');
+  group.appendChild(listLabel);
+
+  const list = el('div', 'oscout-dest-list');
+  list.dataset.role = 'oscout-destinations';
+  if (dests.length === 0) {
+    list.appendChild(destRow());
+  } else {
+    for (const dest of dests) list.appendChild(destRow(dest));
+  }
+  group.appendChild(list);
+
+  const addRow = el('div', 'settings-sync-row');
+  const addBtn = el('button', 'settings-sync', 'Add destination');
+  addBtn.type = 'button';
+  addBtn.addEventListener('click', () => {
+    list.appendChild(destRow());
+  });
+  addRow.appendChild(addBtn);
+  group.appendChild(addRow);
+
+  const hint = el('p', 'settings-sim-hint');
+  hint.textContent = 'Each destination is a unicast UDP target (host + port). A 224–239.x multicast group is also allowed. Same messages go to every destination. This never sends toward Ableton.';
+  group.appendChild(hint);
+
+  const map = el('p', 'settings-field-hint oscout-addresses');
+  map.textContent = '/ableview/clock/tempo  f   ·  /ableview/clock/beat  i (1-based in-bar)  ·  /ableview/clock/bar  i  ·  /ableview/clock/is_playing  i  ·  /ableview/clock/signature  i i';
+  group.appendChild(map);
+
+  return group;
+}
+
 function settingsFromForm(form, current) {
   const fd = new FormData(form);
   const watchedRaw = fd.get('watchedTracks')?.trim() ?? '';
@@ -259,6 +341,24 @@ function settingsFromForm(form, current) {
         .filter(Boolean),
       debounceMs: Number(fd.get('momentsDebounceMs')),
     },
+    oscOut: oscOutFromForm(fd),
+  };
+}
+
+function oscOutFromForm(fd) {
+  const hosts = fd.getAll('oscOutHost');
+  const ports = fd.getAll('oscOutPort');
+  const destinations = [];
+  const count = Math.max(hosts.length, ports.length);
+  for (let i = 0; i < count; i++) {
+    const host = String(hosts[i] ?? '').trim();
+    const portRaw = ports[i];
+    if (!host) continue;
+    destinations.push({ host, port: Number(portRaw) });
+  }
+  return {
+    enabled: fd.get('oscOutEnabled') === 'on',
+    destinations,
   };
 }
 
@@ -456,8 +556,12 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   ));
   bottomRow.appendChild(matchGroup);
 
+  const clockRow = el('div', 'settings-row settings-row-single');
+  clockRow.appendChild(renderOscOutGroup(settings));
+
   grid.appendChild(topRow);
   grid.appendChild(bottomRow);
+  grid.appendChild(clockRow);
   form.appendChild(grid);
 
   const actions = el('div', 'settings-actions');

@@ -60,6 +60,10 @@ export const DEFAULTS = Object.freeze({
     kinds: ['dope'],
     debounceMs: 0,
   },
+  oscOut: {
+    enabled: false,
+    destinations: [],
+  },
   views: {},
 });
 
@@ -162,6 +166,30 @@ export function validateConfig(config) {
   }
   if (moments.debounceMs != null && !(moments.debounceMs >= 0)) {
     errors.push('moments.debounceMs must be >= 0');
+  }
+
+  const oscOut = config.oscOut ?? {};
+  if (oscOut.enabled != null && typeof oscOut.enabled !== 'boolean') {
+    errors.push('oscOut.enabled must be a boolean');
+  }
+  if (oscOut.destinations != null) {
+    if (!Array.isArray(oscOut.destinations)) {
+      errors.push('oscOut.destinations must be an array');
+    } else {
+      oscOut.destinations.forEach((dest, i) => {
+        const path = `oscOut.destinations[${i}]`;
+        if (!dest || typeof dest !== 'object' || Array.isArray(dest)) {
+          errors.push(`${path} must be an object`);
+          return;
+        }
+        if (typeof dest.host !== 'string' || !dest.host.trim()) {
+          errors.push(`${path}.host is required`);
+        }
+        if (!port(dest.port)) {
+          errors.push(`${path}.port must be a valid port`);
+        }
+      });
+    }
   }
 
   const views = config.views ?? {};

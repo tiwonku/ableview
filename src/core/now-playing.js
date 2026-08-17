@@ -15,6 +15,8 @@ export function makeNowPlaying({
   isPlaying = null,
   pendingLaunch = false,
   scene = null,
+  signatureNumerator = null,
+  signatureDenominator = null,
 }) {
   if (source !== SOURCES.ABLETONOSC && source !== SOURCES.SIMULATOR) {
     throw new Error(`Invalid NowPlaying source: ${source}`);
@@ -30,5 +32,7 @@ export function makeNowPlaying({
     pendingLaunch,
   };
   if (scene != null) payload.scene = scene;
+  if (signatureNumerator != null) payload.signatureNumerator = signatureNumerator;
+  if (signatureDenominator != null) payload.signatureDenominator = signatureDenominator;
   return payload;
 }

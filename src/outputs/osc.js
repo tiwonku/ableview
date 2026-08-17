@@ -1,0 +1,237 @@
+import osc from 'osc';
+import { EVENTS } from '../core/bus.js';
+import { liveTransportClock } from '../core/clock.js';
+
+// Clock rebroadcast (spec §11 tap point). A separate UDP port from Ableton
+// ingest — never send /live/** and never target ingest.abletonHost:oscSendPort.
+
+export const OSC_OUT_ADDRESSES = Object.freeze({
+  TEMPO: '/ableview/clock/tempo',
+  BEAT: '/ableview/clock/beat',
+  BAR: '/ableview/clock/bar',
+  IS_PLAYING: '/ableview/clock/is_playing',
+  SIGNATURE: '/ableview/clock/signature',
+});
+
+function finiteOrNull(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function intOrNull(value) {
+  const n = finiteOrNull(value);
+  return n == null ? null : Math.trunc(n);
+}
+
+export function isMulticastHost(host) {
+  const parts = String(host ?? '').trim().split('.');
+  if (parts.length !== 4) return false;
+  const octets = parts.map(Number);
+  if (octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  return octets[0] >= 224 && octets[0] <= 239;
+}
+
+export function isAbletonDestination(dest, ingest) {
+  if (!dest || !ingest) return false;
+  return dest.host === ingest.abletonHost && Number(dest.port) === Number(ingest.oscSendPort);
+}
+
+export function resolveDestinations(oscOut, ingest) {
+  const dests = [];
+  const skippedAbleton = [];
+  for (const raw of oscOut?.destinations ?? []) {
+    const host = String(raw?.host ?? '').trim();
+    const port = Number(raw?.port);
+    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) continue;
+    const dest = { host, port, multicast: isMulticastHost(host) };
+    if (isAbletonDestination(dest, ingest)) {
+      skippedAbleton.push(`${host}:${port}`);
+      continue;
+    }
+    dests.push(dest);
+  }
+  return { destinations: dests, skippedAbleton };
+}
+
+/**
+ * Diff previous clock state vs a NowPlaying event and return OSC packets.
+ * On downbeat (beat-in-bar === 1), bar is sent before beat.
+ */
+export function clockPackets(event, prev = null, { snapshot = false } = {}) {
+  const prevSent = prev ?? {};
+  const next = {
+    tempo: finiteOrNull(event?.tempo),
+    isPlaying: event?.isPlaying === true ? 1 : event?.isPlaying === false ? 0 : null,
+    signatureNumerator: intOrNull(event?.signatureNumerator),
+    signatureDenominator: intOrNull(event?.signatureDenominator),
+    songBeat: finiteOrNull(event?.beat),
+  };
+  const live = liveTransportClock(
+    next.songBeat,
+    next.signatureNumerator ?? 4,
+    next.signatureDenominator ?? 4,
+  );
+  next.bar = live.bar;
+  next.beatInBar = live.beat;
+
+  const packets = [];
+  const changed = (key) => snapshot || prevSent[key] !== next[key];
+
+  if (next.isPlaying != null && changed('isPlaying')) {
+    packets.push({
+      address: OSC_OUT_ADDRESSES.IS_PLAYING,
+      args: [{ type: 'i', value: next.isPlaying }],
+    });
+  }
+  if (next.tempo != null && changed('tempo')) {
+    packets.push({
+      address: OSC_OUT_ADDRESSES.TEMPO,
+      args: [{ type: 'f', value: next.tempo }],
+    });
+  }
+  if (
+    next.signatureNumerator != null
+    && next.signatureDenominator != null
+    && (snapshot
+      || prevSent.signatureNumerator !== next.signatureNumerator
+      || prevSent.signatureDenominator !== next.signatureDenominator)
+  ) {
+    packets.push({
+      address: OSC_OUT_ADDRESSES.SIGNATURE,
+      args: [
+        { type: 'i', value: next.signatureNumerator },
+        { type: 'i', value: next.signatureDenominator },
+      ],
+    });
+  }
+
+  const beatTick = next.songBeat != null && (snapshot || prevSent.songBeat !== next.songBeat);
+  const barTick = next.bar != null && changed('bar');
+  const beatInBarTick = next.beatInBar != null && (snapshot || prevSent.beatInBar !== next.beatInBar || beatTick);
+
+  if (beatTick && next.beatInBar === 1) {
+    if (next.bar != null) {
+      packets.push({
+        address: OSC_OUT_ADDRESSES.BAR,
+        args: [{ type: 'i', value: next.bar }],
+      });
+    }
+    packets.push({
+      address: OSC_OUT_ADDRESSES.BEAT,
+      args: [{ type: 'i', value: next.beatInBar }],
+    });
+  } else {
+    if (barTick) {
+      packets.push({
+        address: OSC_OUT_ADDRESSES.BAR,
+        args: [{ type: 'i', value: next.bar }],
+      });
+    }
+    if (beatInBarTick) {
+      packets.push({
+        address: OSC_OUT_ADDRESSES.BEAT,
+        args: [{ type: 'i', value: next.beatInBar }],
+      });
+    }
+  }
+
+  return { packets, sent: next };
+}
+
+export function createOscOutput({ getConfig, bus, log, sendPacket = null }) {
+  let udp = null;
+  let lastEvent = null;
+  let lastSent = null;
+
+  function enabled() {
+    return getConfig().oscOut?.enabled === true;
+  }
+
+  function dispatch(packets) {
+    if (!packets.length) return;
+    const { destinations, skippedAbleton } = resolveDestinations(
+      getConfig().oscOut,
+      getConfig().ingest,
+    );
+    if (skippedAbleton.length) {
+      log.warn({ skippedAbleton }, 'osc clock output skipped Ableton ingest destination (NFR-1)');
+    }
+    if (!destinations.length) return;
+
+    for (const dest of destinations) {
+      for (const packet of packets) {
+        if (sendPacket) {
+          sendPacket({ ...packet, host: dest.host, port: dest.port });
+        } else if (udp) {
+          udp.send({ address: packet.address, args: packet.args }, dest.host, dest.port);
+        }
+      }
+    }
+  }
+
+  function emitFromEvent(event, { snapshot = false } = {}) {
+    if (!enabled()) return;
+    if (!sendPacket && !udp) return;
+    const { packets, sent } = clockPackets(event, snapshot ? null : lastSent, { snapshot });
+    lastSent = sent;
+    dispatch(packets);
+  }
+
+  function onNowPlaying(event) {
+    lastEvent = event;
+    emitFromEvent(event);
+  }
+
+  bus.on(EVENTS.NOW_PLAYING, onNowPlaying);
+
+  async function openUdp() {
+    udp = new osc.UDPPort({
+      localAddress: '0.0.0.0',
+      localPort: 0,
+      metadata: true,
+    });
+    await new Promise((resolve, reject) => {
+      udp.once('ready', resolve);
+      udp.once('error', reject);
+      udp.open();
+    });
+    udp.on('error', (err) => {
+      log.error({ err: err.message }, 'osc clock output error');
+    });
+    const { destinations } = resolveDestinations(getConfig().oscOut, getConfig().ingest);
+    if (destinations.some((d) => d.multicast) && typeof udp.socket?.setMulticastTTL === 'function') {
+      udp.socket.setMulticastTTL(1);
+    }
+  }
+
+  function closeUdp() {
+    if (!udp) return;
+    try {
+      udp.close();
+    } catch { /* already closed */ }
+    udp = null;
+  }
+
+  async function start() {
+    closeUdp();
+    lastSent = null;
+    if (!enabled()) {
+      log.info('osc clock output disabled');
+      return;
+    }
+    if (!sendPacket) {
+      await openUdp();
+    }
+    const { destinations } = resolveDestinations(getConfig().oscOut, getConfig().ingest);
+    log.info({ destinations: destinations.length }, 'osc clock output ready');
+    if (lastEvent) emitFromEvent(lastEvent, { snapshot: true });
+  }
+
+  function stop() {
+    bus.off(EVENTS.NOW_PLAYING, onNowPlaying);
+    closeUdp();
+  }
+
+  return { start, stop };
+}

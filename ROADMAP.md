@@ -36,7 +36,7 @@ post-v2026.
 | **Sheet row append** | Add cue rows on no-match from admin (full sheet) or operator views (view fields only; match column injected from clip); `POST /api/sheets/rows`; appends to Google Sheet, updates cache, rematches. | ✅ done |
 | **Responsive operator views** | Viewport-fitted Band/Lighting/Visuals for ultrawide and short displays (e.g. Xeneon Edge 2560×720); multi-column fields, line-clamp + expand for long text. | ✅ done |
 | **Session cue log** | Append-only JSONL (`track_clip` + `match` events in one file); watched-track clip changes + sheet match changes; Art-Net timestamp when live; admin toggle, session name → rotate file; sim auto-start optional. | ✅ done |
-| **Moments (Stream Deck)** | Crew markers via Companion `POST /api/moments` → session JSONL; auto-start with timestamp session name; live log title on operator views over WebSocket. | ✅ done |
+| **OSC clock rebroadcast** | UDP fan-out of Live transport: tempo, 1-based beat-in-bar, bar, `is_playing`, signature. Multiple destinations from admin settings. Clip/cue triggers still not sent. | ✅ done |
 | **bestMatch over watched tracks** | Match all playing watched clips; bpm-stem normalize (no key regex); optional ALS Folder soft key; Session per-deck match/confidence/winner. Cue track optional. | ✅ done |
 
 ---
@@ -59,8 +59,8 @@ default `bestMatch` strategy and the other sim drivers.
 
 From spec §11 — design leaves extension points; no code ships for these yet:
 
-- **OSC rebroadcast** — emit clip/cue triggers to lighting consoles (GrandMA3, etc.) from the
-  internal event bus.
+- **OSC clip/cue rebroadcast** — emit matched clip triggers to lighting consoles (GrandMA3, etc.)
+  from the internal event bus. Clock (tempo / beat / bar / transport) already ships as `oscOut`.
 - **Waveform + playhead** — planned as **M9**: offline PNG/manifest from `.als` + project
   audio; realtime playhead via read-only `playing_position`. Build plan:
   [`docs/plans/M9-waveform-playhead.md`](./docs/plans/M9-waveform-playhead.md).

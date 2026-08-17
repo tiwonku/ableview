@@ -61,8 +61,9 @@ These come from spec §4. Violating them is a show-stopper.
 
 The tool **MUST NOT** send any OSC message that can mutate the Ableton set.
 
-- All outbound OSC goes through `assertReadOnlyAddress()` in `src/ingest/osc-addresses.js`.
+- All **Ableton-facing** outbound OSC goes through `assertReadOnlyAddress()` in `src/ingest/osc-addresses.js`.
 - The allowlist is the **only** way to emit OSC toward Ableton.
+- Clock rebroadcast (`src/outputs/osc.js`) uses a **separate UDP port** and `/ableview/clock/*` addresses. It MUST NOT target `ingest.abletonHost:oscSendPort`.
 - **Never** add write addresses (`/live/**/set`, `/live/**/fire`, `/live/**/create_*`, `/live/**/delete_*`, transport writes).
 - Tests in `test/nfr1-readonly.test.js` scan the adapter source structurally — keep them green.
 
@@ -76,7 +77,7 @@ Below-threshold matches **MUST** show an explicit "no confident match" state. Ne
 
 ### Out of scope (do NOT build)
 
-- Outbound OSC rebroadcast to lighting consoles
+- OSC rebroadcast of **clip/cue triggers** to lighting consoles (clock tempo/beat/bar/transport is implemented in `src/outputs/osc.js`)
 - Waveform + playhead display
 - Any write-back to Ableton
 
@@ -88,18 +89,19 @@ Leave extension points (event bus, `CuePayload` shape) clean — see spec §11.
 
 ```
 AbletonOSC / Simulator  →  event bus  →  [matcher]  →  [view server]  →  operator browsers
-                              ↑
-                        sheets sync (in-memory + disk cache)
+                              │              ↑
+                              └── osc clock out (UDP)    sheets sync (in-memory + disk cache)
 ```
 
 ### Key seams
 
 | Module | Path | Role |
 |---|---|---|
-| Event bus | `src/core/bus.js` | Internal pub/sub. Ingest emits `nowPlaying`; matcher and view server subscribe. Future OSC rebroadcast taps here too. |
+| Event bus | `src/core/bus.js` | Internal pub/sub. Ingest emits `nowPlaying`; matcher, view server, and OSC clock out subscribe. |
 | NowPlaying | `src/core/now-playing.js` | Ingest → matcher contract (§9.1). Both real listener and simulator emit this shape. |
 | Config | `src/config/index.js` | `.env` + `config/config.json` loader with validation. |
 | Ingest | `src/ingest/` | Source interface. Real: `abletonosc.js`. Sim: `simulator.js` + optional `sim/osc-emitter.js`. |
+| OSC clock out | `src/outputs/osc.js` | Rebroadcasts Live tempo / beat / bar / transport to configured UDP destinations. |
 | Logger | `src/core/logger.js` | pino, structured JSON. |
 | Session log | `src/session-log/` | Append-only JSONL of `track_clip` + `match` events (M10). |
 

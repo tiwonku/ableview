@@ -68,6 +68,10 @@
     "kinds": ["dope", "not_dope"],
     "debounceMs": 0
   },
+  "oscOut": {
+    "enabled": false,
+    "destinations": []
+  },
   "views": {
     "band": {
       "title": "Band",

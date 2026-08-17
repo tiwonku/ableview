@@ -30,14 +30,16 @@ function baseConfig(overrides = {}) {
   return { ...config, ...overrides };
 }
 
-test('pickEditableSettings returns ingest, sim, sheets, match, timecode, and moments', () => {
+test('pickEditableSettings returns ingest, sim, sheets, match, timecode, moments, and oscOut', () => {
   const config = baseConfig();
   const settings = pickEditableSettings(config);
-  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'moments', 'sheets', 'sim', 'timecode']);
+  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'moments', 'oscOut', 'sheets', 'sim', 'timecode']);
   assert.equal(settings.ingest.abletonHost, '127.0.0.1');
   assert.equal(settings.sim.enabled, false);
   assert.equal(settings.timecode.enabled, false);
   assert.equal(settings.moments.autoStartOnMoment, true);
+  assert.equal(settings.oscOut.enabled, false);
+  assert.deepEqual(settings.oscOut.destinations, []);
 });
 
 test('serializeFileConfig excludes secrets and env-only httpPort', () => {
@@ -156,6 +158,36 @@ test('GET and PATCH /api/config/settings', async () => {
   const tcBody = await tcRes.json();
   assert.equal(tcBody.settings.timecode.enabled, true);
   assert.deepEqual(tcBody.reloaded, ['timecode']);
+
+  const oscRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      oscOut: {
+        enabled: true,
+        destinations: [{ host: '192.168.1.40', port: 9000 }],
+      },
+    }),
+  });
+  assert.equal(oscRes.status, 200);
+  const oscBody = await oscRes.json();
+  assert.equal(oscBody.settings.oscOut.enabled, true);
+  assert.deepEqual(oscBody.settings.oscOut.destinations, [{ host: '192.168.1.40', port: 9000 }]);
+  assert.deepEqual(oscBody.reloaded, ['oscOut']);
+
+  const oscReplace = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      oscOut: {
+        enabled: true,
+        destinations: [{ host: '10.0.0.8', port: 8000 }],
+      },
+    }),
+  });
+  assert.equal(oscReplace.status, 200);
+  const oscReplaceBody = await oscReplace.json();
+  assert.deepEqual(oscReplaceBody.settings.oscOut.destinations, [{ host: '10.0.0.8', port: 8000 }]);
 
   const badRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
     method: 'PATCH',

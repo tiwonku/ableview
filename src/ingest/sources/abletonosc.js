@@ -31,6 +31,8 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   const trackState = new Map();
   let tempo = null;
   let beat = null;
+  let signatureNumerator = null;
+  let signatureDenominator = null;
   /** @type {boolean|null} null until Ableton replies to is_playing */
   let isPlaying = null;
   let lastEmittedKey = null;
@@ -197,6 +199,8 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       isPlaying,
       pendingLaunch,
       scene,
+      signatureNumerator,
+      signatureDenominator,
     });
 
     // Registration replies and explicit state queries can both report the
@@ -208,6 +212,8 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       event.tempo,
       event.beat,
       event.isPlaying,
+      event.signatureNumerator ?? null,
+      event.signatureDenominator ?? null,
       scene,
     ]);
     if (key === lastEmittedKey) return;
@@ -253,9 +259,13 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     send('/live/song/get/track_names');
     send('/live/song/get/tempo');
     send('/live/song/get/is_playing');
+    send('/live/song/get/signature_numerator');
+    send('/live/song/get/signature_denominator');
     send('/live/song/start_listen/tempo');
     send('/live/song/start_listen/is_playing');
     send('/live/song/start_listen/beat');
+    send('/live/song/start_listen/signature_numerator');
+    send('/live/song/start_listen/signature_denominator');
     send('/live/view/start_listen/selected_scene');
     send('/live/view/get/selected_scene');
     // Per-track listeners are registered once track names arrive.
@@ -398,6 +408,12 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       case '/live/song/get/beat':
         beat = msg.args[0];
         return emitNowPlaying();
+      case '/live/song/get/signature_numerator':
+        signatureNumerator = msg.args[0];
+        return emitNowPlaying();
+      case '/live/song/get/signature_denominator':
+        signatureDenominator = msg.args[0];
+        return emitNowPlaying();
       default:
         log.debug({ address: msg.address }, 'unhandled OSC message');
     }
@@ -466,6 +482,8 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
         send('/live/song/stop_listen/tempo');
         send('/live/song/stop_listen/is_playing');
         send('/live/song/stop_listen/beat');
+        send('/live/song/stop_listen/signature_numerator');
+        send('/live/song/stop_listen/signature_denominator');
         send('/live/view/stop_listen/selected_scene');
         for (const index of trackState.keys()) {
           send('/live/track/stop_listen/playing_slot_index', [index]);

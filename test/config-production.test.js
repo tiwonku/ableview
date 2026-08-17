@@ -47,6 +47,15 @@ test('validateConfig rejects unknown field source and source+column', () => {
   assert.throws(() => validateConfig(cfg), /cannot set both source and column/);
 });
 
+test('validateConfig rejects oscOut destinations without host or port', () => {
+  const cfg = baseConfig();
+  cfg.oscOut = { enabled: true, destinations: [{ host: '', port: 9000 }] };
+  assert.throws(() => validateConfig(cfg), /oscOut.destinations\[0\].host/);
+
+  cfg.oscOut = { enabled: true, destinations: [{ host: '192.168.1.10', port: 0 }] };
+  assert.throws(() => validateConfig(cfg), /oscOut.destinations\[0\].port/);
+});
+
 test('validateProductionReady requires sheet credentials when not simulating', () => {
   const cfg = baseConfig();
   cfg.sim.enabled = false;

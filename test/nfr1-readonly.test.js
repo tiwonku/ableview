@@ -49,3 +49,14 @@ test('all addresses used by the abletonosc adapter are allowlisted', () => {
     assert.ok(isReadOnlyAddress(address), `adapter sends non-allowlisted address: ${address}`);
   }
 });
+
+test('clock OSC output never uses Ableton /live addresses', () => {
+  const source = readFileSync(new URL('../src/outputs/osc.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /['"]\/live\//);
+  assert.doesNotMatch(source, /assertReadOnlyAddress/);
+  assert.match(source, /\/ableview\/clock\/tempo/);
+  assert.match(source, /\/ableview\/clock\/beat/);
+  assert.match(source, /\/ableview\/clock\/bar/);
+  assert.match(source, /\/ableview\/clock\/is_playing/);
+  assert.match(source, /\/ableview\/clock\/signature/);
+});

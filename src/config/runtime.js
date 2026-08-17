@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { validateConfig } from './index.js';
 
 /** Sections editable from the admin settings panel (M7). */
-export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match', 'timecode', 'moments'];
+export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match', 'timecode', 'moments', 'oscOut'];
 
 function deepMerge(base, override) {
   if (override === undefined) return base;
@@ -32,6 +32,12 @@ export function serializeFileConfig(config) {
     timecode: { ...config.timecode },
     sessionLog: { ...config.sessionLog },
     moments: { ...config.moments },
+    oscOut: {
+      enabled: config.oscOut?.enabled === true,
+      destinations: Array.isArray(config.oscOut?.destinations)
+        ? config.oscOut.destinations.map((d) => ({ host: d.host, port: d.port }))
+        : [],
+    },
     views: { ...config.views },
   };
 }
@@ -44,6 +50,12 @@ export function pickEditableSettings(config) {
     match: { ...config.match },
     timecode: { ...config.timecode },
     moments: { ...config.moments },
+    oscOut: {
+      enabled: config.oscOut?.enabled === true,
+      destinations: Array.isArray(config.oscOut?.destinations)
+        ? config.oscOut.destinations.map((d) => ({ host: d.host, port: d.port }))
+        : [],
+    },
   };
 }
 
@@ -91,6 +103,17 @@ export function createConfigRuntime({ config, configPath = './config/config.json
 
     for (const section of Object.keys(limited)) {
       config[section] = deepMerge(config[section], limited[section]);
+    }
+
+    // Destination list is replaced as a whole (add/remove in admin), not merged by index.
+    if (limited.oscOut?.destinations !== undefined) {
+      if (!config.oscOut) config.oscOut = { enabled: false, destinations: [] };
+      config.oscOut.destinations = Array.isArray(limited.oscOut.destinations)
+        ? limited.oscOut.destinations.map((d) => ({
+          host: String(d?.host ?? '').trim(),
+          port: Number(d?.port),
+        }))
+        : [];
     }
 
     validateConfig(config);

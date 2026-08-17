@@ -1209,6 +1209,10 @@ main {
   }
 }
 
+.settings-row-single {
+  grid-template-columns: 1fr;
+}
+
 .settings-group {
   margin: 0;
   padding: 1rem 1.15rem;
@@ -1476,6 +1480,48 @@ select.settings-input option {
 .settings-sync:disabled {
   opacity: 0.6;
   cursor: wait;
+}
+
+.oscout-dest-heading {
+  margin: 0.75rem 0 0.35rem;
+  padding-top: 0;
+}
+
+.oscout-dest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.5rem;
+}
+
+.oscout-dest-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.oscout-dest-remove {
+  padding: 0.4rem 0.7rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.oscout-dest-remove:hover {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.oscout-addresses {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  word-break: break-word;
 }
 
 #sim-controls-host {
