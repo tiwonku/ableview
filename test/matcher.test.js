@@ -314,6 +314,38 @@ test('below-threshold clip returns matched false (NFR-7)', () => {
   assert.equal(payload.row, undefined);
 });
 
+test('Fuse hit below confidence floor is unmatched (NFR-7)', () => {
+  const rows = [
+    { rowId: '124', data: { 'Clip Name': 'Regular Priority', Aliases: '' } },
+  ];
+  const payload = matchClip(
+    'LORDE thrillofit',
+    snapshot({ rows }),
+    testConfig({ match: { threshold: 0.5 } })
+  );
+  assert.equal(payload.match.matched, false);
+  assert.equal(payload.match.confidence, 0);
+  assert.equal(payload.row, undefined);
+});
+
+test('bestMatch does not promote a below-floor Fuse hit to winner', () => {
+  const rows = [
+    { rowId: '124', data: { 'Clip Name': 'Regular Priority', Aliases: '' } },
+  ];
+  const payload = matchBestOfTracks(
+    [
+      { trackIndex: 14, trackName: 'DECK D', clipName: 'LORDE thrillofit', slotIndex: 34 },
+      { trackIndex: 11, trackName: 'DECK A', clipName: 'Am_87cpm_Always All Ways _ORIGINAL_ENTIRE SONG', slotIndex: 31 },
+    ],
+    snapshot({ rows }),
+    testConfig({ match: { threshold: 0.5 } })
+  );
+  assert.equal(payload.match.matched, false);
+  const deckD = payload.trackMatches.find((t) => t.trackName === 'DECK D');
+  assert.equal(deckD?.matched, false);
+  assert.equal(deckD?.winner, false);
+});
+
 test('strict threshold rejects loose matches', () => {
   const config = testConfig({ match: { threshold: 0.05 } });
   const payload = matchClip('Song Z - Bridge', snapshot(), config);

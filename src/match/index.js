@@ -123,6 +123,13 @@ export function resolveClipMatch(clipName, snapshot, config) {
 
   const best = results[0];
   const confidence = scoreToConfidence(best.score);
+  // Fuse.js (ignoreLocation) can return scores worse than `threshold`.
+  // Enforce the floor ourselves so NFR-7 cannot leak a wrong row.
+  const minConfidence = 1 - threshold;
+  if (confidence < minConfidence) {
+    return { match: emptyMatch(), row: null };
+  }
+
   const { row, matchedValue, viaAlias, viaAlsFolder } = best.item;
 
   return {
