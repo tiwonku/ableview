@@ -39,4 +39,6 @@ test('aliasWouldMatchClip uses prefix rule after normalize', () => {
   assert.equal(aliasWouldMatchClip('HotRox', 'HotRox_ DRUMS'), true);
   assert.equal(aliasWouldMatchClip('HotRox', 'HotRox_ SAMPLES'), true);
   assert.equal(aliasWouldMatchClip('Hot Like Rox', 'HotRox_ DRUMS'), false);
+  assert.equal(aliasWouldMatchClip('TTY', 'TTY VOX/STRINGS*'), true);
+  assert.equal(aliasWouldMatchClip('TTY', 'TTY 2TRK DROP'), true);
 });

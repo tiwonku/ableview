@@ -63,8 +63,11 @@ function findPrefixMatch(query, items) {
 
   let best = null;
   for (const item of items) {
-    const { norm } = item;
-    if (!norm || norm.length < MIN_PREFIX_TITLE_LENGTH) continue;
+    const { norm, viaAlias } = item;
+    if (!norm) continue;
+    // Short song titles ("The") must not prefix-match every clip. Aliases are
+    // intentional stems (TTY, SA) and skip this floor.
+    if (!viaAlias && norm.length < MIN_PREFIX_TITLE_LENGTH) continue;
 
     const exact = query === norm;
     const prefix = !exact && query.startsWith(`${norm} `);

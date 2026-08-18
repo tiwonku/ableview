@@ -140,6 +140,43 @@ test('underscore role suffix matches alias stem via prefix', () => {
   assert.equal(payload.match.matchedValue, 'HotRox');
 });
 
+test('short alias stem prefix-matches deck clips', () => {
+  const rows = [
+    {
+      rowId: '156',
+      data: {
+        'Clip Name': 'Through The Years',
+        Aliases: 'TTY',
+      },
+    },
+  ];
+  const vox = matchClip('TTY VOX/STRINGS*', snapshot({ rows }), testConfig());
+  assert.equal(vox.match.matched, true);
+  assert.equal(vox.match.rowId, '156');
+  assert.equal(vox.match.viaAlias, true);
+  assert.equal(vox.match.matchedValue, 'TTY');
+
+  const drop = matchClip('TTY 2TRK DROP', snapshot({ rows }), testConfig());
+  assert.equal(drop.match.matched, true);
+  assert.equal(drop.match.rowId, '156');
+  assert.equal(drop.match.viaAlias, true);
+  assert.equal(drop.match.matchedValue, 'TTY');
+});
+
+test('short song title does not prefix-match longer clips', () => {
+  const rows = [
+    {
+      rowId: '1',
+      data: {
+        'Clip Name': 'The',
+        Aliases: '',
+      },
+    },
+  ];
+  const payload = matchClip('The Longest Night', snapshot({ rows }), testConfig());
+  assert.equal(payload.match.matched, false);
+});
+
 test('ALS bpm stem matches Song Title without needing ALS Folder column', () => {
   const rows = [
     {
