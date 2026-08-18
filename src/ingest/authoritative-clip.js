@@ -1,8 +1,11 @@
 // Resolves which clip name is authoritative for matching. When a clip is
 // fired but not yet playing (quantization gap), the fired clip wins so
-// operator views switch on launch, not on downbeat.
+// operator views switch on launch, not on downbeat. Arrangement playback
+// (playing_slot_index = -2) uses the clip under the playhead.
 
-export const NOTHING_PLAYING = -1; // AbletonOSC: -1 = stopped, -2 = no clip slots
+import { isArrangementPlaying } from './arrangement-clip.js';
+
+export const NOTHING_PLAYING = -1; // AbletonOSC: -1 = stopped, -2 = arrangement
 
 export function isValidSlot(slotIndex) {
   return slotIndex != null && slotIndex > NOTHING_PLAYING;
@@ -12,10 +15,13 @@ export function isPendingLaunch(playingSlotIndex, firedSlotIndex) {
   return isValidSlot(firedSlotIndex) && firedSlotIndex !== playingSlotIndex;
 }
 
-/** @param {{ playingSlotIndex, playingClipName, firedSlotIndex, firedClipName }} track */
+/** @param {{ playingSlotIndex, playingClipName, firedSlotIndex, firedClipName, arrangementClipName }} track */
 export function resolveAuthoritativeClip(track) {
   if (isPendingLaunch(track.playingSlotIndex, track.firedSlotIndex)) {
     return track.firedClipName ?? null;
+  }
+  if (isArrangementPlaying(track.playingSlotIndex)) {
+    return track.arrangementClipName ?? null;
   }
   return isValidSlot(track.playingSlotIndex) ? (track.playingClipName ?? null) : null;
 }

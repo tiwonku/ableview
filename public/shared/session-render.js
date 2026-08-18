@@ -7,6 +7,7 @@ import {
   matchForTrack,
   isAliasTargetTrack,
   isCreateTargetTrack,
+  isArrangementTrack,
 } from './playing-clips-strip.js';
 
 function trackRows(payload) {
@@ -157,6 +158,7 @@ export function renderSession(root, ctx) {
       const createTarget = isCreateTargetTrack(createSession, track);
 
       if (playing) row.classList.add('session-track--playing');
+      if (isArrangementTrack(track)) row.classList.add('session-track--arrangement');
       if (aliasTarget) row.classList.add('session-track--alias-target');
       else if (createTarget) row.classList.add('session-track--create-target');
       else if (tm?.winner) row.classList.add('session-track--winner');
@@ -230,12 +232,28 @@ export function renderSession(root, ctx) {
         clipText.textContent = track.clipName;
         clip.appendChild(clipText);
 
-        if (track.slotIndex != null && track.slotIndex >= 0) {
+        if (isArrangementTrack(track)) {
+          const slot = document.createElement('span');
+          slot.className = 'session-track-slot session-track-slot--arrangement';
+          slot.textContent = 'Arrangement';
+          slot.title = 'Playing from Arrangement view';
+          clip.appendChild(slot);
+        } else if (track.slotIndex != null && track.slotIndex >= 0) {
           const slot = document.createElement('span');
           slot.className = 'session-track-slot';
           slot.textContent = `Slot ${track.slotIndex + 1}`;
           clip.appendChild(slot);
         }
+      } else if (isArrangementTrack(track)) {
+        const clipText = document.createElement('span');
+        clipText.className = 'session-track-clip-name';
+        clipText.textContent = '—';
+        clip.appendChild(clipText);
+        const slot = document.createElement('span');
+        slot.className = 'session-track-slot session-track-slot--arrangement';
+        slot.textContent = 'Arrangement';
+        slot.title = 'Arrangement view — no clip under the playhead';
+        clip.appendChild(slot);
       } else {
         clip.textContent = '—';
       }

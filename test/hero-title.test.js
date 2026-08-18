@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   resolveHeroDisplay,
   resolveMatchedTitle,
+  hasArrangementPlayback,
+  isArrangementTrack,
 } from '../public/shared/playing-clips-strip.js';
 
 const yellowBirdPayload = {
@@ -35,4 +37,21 @@ test('resolveHeroDisplay uses sheet title on a read-only operator view', () => {
   assert.equal(hero.showHero, true);
   assert.equal(hero.text, 'Yellow Bird');
   assert.equal(hero.empty, false);
+});
+
+test('hasArrangementPlayback is true when any watched track is from arrangement', () => {
+  assert.equal(isArrangementTrack({ source: 'arrangement' }), true);
+  assert.equal(isArrangementTrack({ source: 'session' }), false);
+  assert.equal(hasArrangementPlayback({
+    tracks: [
+      { trackIndex: 0, trackName: 'Cue', clipName: 'Still Night', source: 'session' },
+      { trackIndex: 1, trackName: 'DECK A', clipName: 'Drums', source: 'arrangement' },
+    ],
+  }), true);
+  assert.equal(hasArrangementPlayback({
+    tracks: [
+      { trackIndex: 0, trackName: 'Cue', clipName: 'Still Night', source: 'session' },
+    ],
+  }), false);
+  assert.equal(hasArrangementPlayback({ tracks: [] }), false);
 });

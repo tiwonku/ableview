@@ -82,6 +82,36 @@ test('stopped track yields null', () => {
   assert.equal(resolveAuthoritativeClip(state), null);
 });
 
+test('arrangement playback uses arrangement clip name', () => {
+  const state = track({
+    playingSlotIndex: -2,
+    playingClipName: null,
+    firedSlotIndex: NOTHING_PLAYING,
+    firedClipName: null,
+    arrangementClipName: 'Still Night',
+  });
+  assert.equal(resolveAuthoritativeClip(state), 'Still Night');
+});
+
+test('session fire still wins over arrangement clip', () => {
+  const state = track({
+    playingSlotIndex: -2,
+    playingClipName: null,
+    firedSlotIndex: 3,
+    firedClipName: 'Song B',
+    arrangementClipName: 'Still Night',
+  });
+  assert.equal(resolveAuthoritativeClip(state), 'Song B');
+});
+
+test('arrangement without a clip under the playhead yields null', () => {
+  const state = track({
+    playingSlotIndex: -2,
+    arrangementClipName: null,
+  });
+  assert.equal(resolveAuthoritativeClip(state), null);
+});
+
 test('pending launch with unresolved fired name yields null', () => {
   const state = track({
     playingSlotIndex: 0,

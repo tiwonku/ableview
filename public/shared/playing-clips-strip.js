@@ -12,6 +12,14 @@ export function hasPlayingClips(payload) {
   return playingTracks(payload).length > 0;
 }
 
+export function isArrangementTrack(track) {
+  return track?.source === 'arrangement';
+}
+
+export function hasArrangementPlayback(payload) {
+  return (payload?.tracks ?? []).some((t) => isArrangementTrack(t));
+}
+
 export function matchForTrack(payload, track) {
   const list = Array.isArray(payload?.trackMatches) ? payload.trackMatches : [];
   return list.find(

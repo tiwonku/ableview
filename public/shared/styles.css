@@ -121,6 +121,12 @@ body {
   box-shadow: inset 3px 0 0 #ffb366;
 }
 
+.status-pill.arrangement {
+  background: #122033;
+  color: #8ec8ff;
+  box-shadow: inset 3px 0 0 #5b8def;
+}
+
 .status-sep {
   color: var(--border);
   user-select: none;
@@ -2736,6 +2742,13 @@ body.layout-session .session-main {
   font-size: clamp(0.72rem, 2.4cqh, 0.95rem);
   font-weight: 500;
   color: var(--muted);
+}
+
+.session-track-slot--arrangement {
+  color: #8ec8ff;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* Prefer 6-across; drop columns only when cards would be too narrow. */

@@ -3,6 +3,11 @@ import { EVENTS } from '../../core/bus.js';
 import { makeNowPlaying, SOURCES } from '../../core/now-playing.js';
 import { assertReadOnlyAddress } from '../osc-addresses.js';
 import { isValidSlot, isPendingLaunch, resolveAuthoritativeClipWithLatch } from '../authoritative-clip.js';
+import {
+  isArrangementPlaying,
+  zipArrangementClips,
+  applyArrangementClipName,
+} from '../arrangement-clip.js';
 import { makeIngestStatus } from '../ableton-session.js';
 import {
   classifySlotChanges,
@@ -14,7 +19,9 @@ import {
 // Read-only AbletonOSC listener (spec §6). Registers listeners for playing
 // and fired slots on each watched track, resolves clip names on change, and
 // emits NowPlaying events. Fired slots switch the authoritative clip before
-// quantization so operator views anticipate scene launches.
+// quantization so operator views anticipate scene launches. When a track
+// reports playing_slot_index = -2, resolve the Arrangement clip under the
+// playhead from arrangement_clips + song time.
 export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   const getIngest = getIngestConfig ?? (() => config.ingest);
   const { oscListenPort } = getIngest();
@@ -27,10 +34,13 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
   let sessionTrackNames = null;
 
   // trackIndex -> { trackName, playingSlotIndex, playingClipName, firedSlotIndex,
-  //   firedClipName, latchedClipName?, latchedSlotIndex? }
+  //   firedClipName, latchedClipName?, latchedSlotIndex?, arrangementClipName?,
+  //   arrangementNames?, arrangementStartTimes?, arrangementLengths?, arrangementClips? }
   const trackState = new Map();
   let tempo = null;
   let beat = null;
+  /** beats; from /live/song/get/current_song_time, else integer beat */
+  let songTime = null;
   let signatureNumerator = null;
   let signatureDenominator = null;
   /** @type {boolean|null} null until Ableton replies to is_playing */
@@ -154,6 +164,60 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     }
     scheduleLaunchClassification();
   }
+
+  function songTimeOf() {
+    if (songTime != null && Number.isFinite(Number(songTime))) return Number(songTime);
+    if (beat != null && Number.isFinite(Number(beat))) return Number(beat);
+    return null;
+  }
+
+  function anyArrangementPlaying() {
+    for (const state of trackState.values()) {
+      if (isArrangementPlaying(state.playingSlotIndex)) return true;
+    }
+    return false;
+  }
+
+  function requestSongTime() {
+    send('/live/song/get/current_song_time');
+  }
+
+  function requestArrangementClips(trackIndex) {
+    send('/live/track/get/arrangement_clips/name', [trackIndex]);
+    send('/live/track/get/arrangement_clips/start_time', [trackIndex]);
+    send('/live/track/get/arrangement_clips/length', [trackIndex]);
+  }
+
+  function refreshArrangementSources() {
+    if (!anyArrangementPlaying()) return;
+    requestSongTime();
+    for (const [index, state] of trackState) {
+      if (isArrangementPlaying(state.playingSlotIndex)) {
+        requestArrangementClips(index);
+      }
+    }
+  }
+
+  function rebuildArrangementClips(state) {
+    if (!state.arrangementNames || !state.arrangementStartTimes || !state.arrangementLengths) {
+      return false;
+    }
+    state.arrangementClips = zipArrangementClips(
+      state.arrangementNames,
+      state.arrangementStartTimes,
+      state.arrangementLengths
+    );
+    return applyArrangementClipName(state, songTimeOf());
+  }
+
+  function resolveArrangementTracks() {
+    let changed = false;
+    for (const state of trackState.values()) {
+      if (applyArrangementClipName(state, songTimeOf())) changed = true;
+    }
+    return changed;
+  }
+
   function emitNowPlaying() {
     // All watched tracks (including stopped) so Session / ops can see the full
     // candidate set. Prefer fired-or-playing (latched) so bestMatch can
@@ -163,6 +227,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       .map(([trackIndex, s]) => {
         const clipName = resolveAuthoritativeClipWithLatch(s);
         const pending = isPendingLaunch(s.playingSlotIndex, s.firedSlotIndex);
+        const arrangement = isArrangementPlaying(s.playingSlotIndex);
         const slotIndex = pending && isValidSlot(s.firedSlotIndex)
           ? s.firedSlotIndex
           : (isValidSlot(s.playingSlotIndex) ? s.playingSlotIndex : null);
@@ -171,6 +236,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
           trackName: s.trackName,
           clipName: clipName ?? null,
           slotIndex,
+          source: arrangement ? 'arrangement' : 'session',
         };
       });
 
@@ -251,6 +317,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       send('/live/track/get/playing_slot_index', [index]);
       send('/live/track/get/fired_slot_index', [index]);
     }
+    refreshArrangementSources();
   }
 
   function registerListeners() {
@@ -285,6 +352,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
           playingClipName: null,
           firedSlotIndex: null,
           firedClipName: null,
+          arrangementClipName: null,
         });
       } else {
         trackState.get(index).trackName = name;
@@ -350,12 +418,54 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
     if (!state) return;
     state.playingSlotIndex = slotIndex;
     noteSlotActivity(trackIndex);
-    if (!isValidSlot(slotIndex)) {
+    if (isArrangementPlaying(slotIndex)) {
       state.playingClipName = null;
+      requestArrangementClips(trackIndex);
+      requestSongTime();
+      applyArrangementClipName(state, songTimeOf());
+      emitNowPlaying();
+    } else if (!isValidSlot(slotIndex)) {
+      state.playingClipName = null;
+      applyArrangementClipName(state, songTimeOf());
       emitNowPlaying();
     } else {
       send('/live/clip/get/name', [trackIndex, slotIndex]);
     }
+  }
+
+  function onArrangementClipNames(args) {
+    const [trackIndex, ...names] = args;
+    const state = trackState.get(trackIndex);
+    if (!state) return;
+    state.arrangementNames = names;
+    rebuildArrangementClips(state);
+    emitNowPlaying();
+  }
+
+  function onArrangementClipStartTimes(args) {
+    const [trackIndex, ...times] = args;
+    const state = trackState.get(trackIndex);
+    if (!state) return;
+    state.arrangementStartTimes = times;
+    rebuildArrangementClips(state);
+    emitNowPlaying();
+  }
+
+  function onArrangementClipLengths(args) {
+    const [trackIndex, ...lengths] = args;
+    const state = trackState.get(trackIndex);
+    if (!state) return;
+    state.arrangementLengths = lengths;
+    rebuildArrangementClips(state);
+    emitNowPlaying();
+  }
+
+  function onCurrentSongTime(args) {
+    const t = args[0];
+    if (t == null || !Number.isFinite(Number(t))) return;
+    songTime = Number(t);
+    resolveArrangementTracks();
+    emitNowPlaying();
   }
 
   function onFiredSlotIndex(args) {
@@ -396,6 +506,10 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       case '/live/track/get/playing_slot_index': return onPlayingSlotIndex(msg.args);
       case '/live/track/get/fired_slot_index': return onFiredSlotIndex(msg.args);
       case '/live/clip/get/name': return onClipName(msg.args);
+      case '/live/track/get/arrangement_clips/name': return onArrangementClipNames(msg.args);
+      case '/live/track/get/arrangement_clips/start_time': return onArrangementClipStartTimes(msg.args);
+      case '/live/track/get/arrangement_clips/length': return onArrangementClipLengths(msg.args);
+      case '/live/song/get/current_song_time': return onCurrentSongTime(msg.args);
       case '/live/view/get/selected_scene': return onSelectedScene(msg.args);
       case '/live/scene/get/name': return onSceneName(msg.args);
       case '/live/scene/get/is_triggered': return onSceneTriggered(msg.args);
@@ -404,9 +518,14 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
         return emitNowPlaying();
       case '/live/song/get/is_playing':
         isPlaying = msg.args[0] === 1 || msg.args[0] === true;
+        if (anyArrangementPlaying()) requestSongTime();
         return emitNowPlaying();
       case '/live/song/get/beat':
         beat = msg.args[0];
+        if (songTime == null || Math.floor(Number(songTime)) < Number(beat)) {
+          songTime = beat;
+        }
+        if (anyArrangementPlaying()) resolveArrangementTracks();
         return emitNowPlaying();
       case '/live/song/get/signature_numerator':
         signatureNumerator = msg.args[0];

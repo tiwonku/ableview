@@ -20,6 +20,7 @@ import {
 import { renderAliasPanel } from './alias-panel.js';
 import {
   hasPlayingClips,
+  hasArrangementPlayback,
   resolveHeroDisplay,
   renderPlayingClipsStrip,
 } from './playing-clips-strip.js';
@@ -607,9 +608,12 @@ function updateStatusBar({ connected, lastUpdate, payload, simulated = null, ses
 
   const simPill = document.getElementById('sim-pill');
   const stalePill = document.getElementById('stale-pill');
+  const arrPill = document.getElementById('arr-pill');
   const staleOn = Boolean(payload?.stale);
+  const arrOn = hasArrangementPlayback(payload);
   if (simPill) simPill.hidden = !simOn;
   if (stalePill) stalePill.hidden = !staleOn;
+  if (arrPill) arrPill.hidden = !arrOn;
   bar.classList.toggle('status-bar--alert', simOn || staleOn || mode === 'ingest-stale');
 
   const sessionLogEl = bar.querySelector('[data-role="session-log"]');
@@ -858,6 +862,9 @@ function renderAdminStats(parent, payload, status) {
   addStat(parent, 'Via alias', payload?.match?.viaAlias ? 'Yes' : 'No');
   addStat(parent, 'Tempo', formatTempo(payload?.tempo));
   addStat(parent, 'Beat', formatBeat(payload?.beat));
+  if (Array.isArray(payload?.tracks) && payload.tracks.length) {
+    addStat(parent, 'Playback', hasArrangementPlayback(payload) ? 'Arrangement' : 'Session');
+  }
   addStat(parent, 'Last sync', formatTimestamp(payload?.syncedAt));
   addStat(parent, 'Cache', payload?.stale ? 'Stale (offline)' : 'Fresh', { warn: payload?.stale });
   {
