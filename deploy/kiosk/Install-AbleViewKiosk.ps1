@@ -5,7 +5,8 @@
 
 .DESCRIPTION
   Run from a USB stick on an operator mini PC (not the show box). Does not install Node or
-  AbleView. The shortcut targets Edge on this machine, so the USB is not needed after setup.
+  AbleView. Copies Launch-AbleViewKiosk.ps1 into the local AbleViewKiosk profile and points
+  desktop + Startup shortcuts at it, so the USB is not needed after setup.
 
 .PARAMETER Station
   Operator view: band, visuals, lighting, or admin.
@@ -65,23 +66,23 @@ $map = @{
 
 $info = $map[$Station]
 $url = "http://${ShowBoxHost}:${HttpPort}$($info.Path)?kiosk=1"
-$profileDir = Join-Path $env:LOCALAPPDATA 'AbleViewKiosk'
-$edgeArgs = @(
-    "--user-data-dir=`"$profileDir`""
-    '--start-maximized'
-    "--app=`"$url`""
-    '--no-first-run'
-    '--no-default-browser-check'
-    '--disable-features=Translate'
-) -join ' '
+$kioskDir = Join-Path $env:LOCALAPPDATA 'AbleViewKiosk'
+New-Item -ItemType Directory -Force -Path $kioskDir | Out-Null
+
+$launchSrc = Join-Path $PSScriptRoot 'Launch-AbleViewKiosk.ps1'
+$launchPs1 = Join-Path $kioskDir 'Launch-AbleViewKiosk.ps1'
+Copy-Item -Force $launchSrc $launchPs1
+
+$powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$launchArgs = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$launchPs1`" -Url `"$url`""
 
 function Write-Shortcut([string]$Path) {
     $w = New-Object -ComObject WScript.Shell
     $s = $w.CreateShortcut($Path)
-    $s.TargetPath = $edge
-    $s.Arguments = $edgeArgs
-    $s.WorkingDirectory = Split-Path $edge
-    $s.WindowStyle = 1
+    $s.TargetPath = $powershell
+    $s.Arguments = $launchArgs
+    $s.WorkingDirectory = $kioskDir
+    $s.WindowStyle = 7
     $s.Description = $info.Name
     $s.IconLocation = $info.Icon
     $s.Save()

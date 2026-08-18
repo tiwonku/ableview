@@ -20,11 +20,13 @@ that IP changes.
    | Admin | `Install-Admin.cmd` |
 
 4. SmartScreen: **More info → Run anyway**.
-5. Edge should open maximized on that view (**Connected**). Tap **Fullscreen**.
+5. Edge should open fullscreen on that view (**Connected**). If the taskbar is still visible, tap once.
 6. Unplug the USB. Reboot — the same shortcut should start on login.
 
-The installer writes a desktop shortcut **and** a copy in the Startup folder. Both target
-Edge on `C:`, so they keep working after the stick is removed.
+The installer copies a launcher into `%LOCALAPPDATA%\AbleViewKiosk` and points the desktop
++ Startup shortcuts at it, so they keep working after the stick is removed. The launcher
+opens Edge app mode and fullscreens the window (F11 only if it is not already covering
+the screen).
 
 Icons come from built-in Windows DLLs (music / photos / sun / shield). To change one:
 right-click the desktop shortcut → Properties → **Change Icon…**, then copy it over the
@@ -32,3 +34,9 @@ Startup copy (`Win+R` → `shell:startup`).
 
 Close every normal Edge window once before the first launch from this shortcut, so Exit
 can close the app-mode window. Do not use Edge `--kiosk` — it blocks in-app Exit.
+
+## Uninstall
+
+On the mini PC, double-click `Uninstall-AbleView.cmd`. That removes the desktop and Startup
+shortcuts, the launcher, and the kiosk Edge profile (`%LOCALAPPDATA%\AbleViewKiosk`). It
+does not change sleep settings or uninstall Edge.

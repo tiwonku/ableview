@@ -16,4 +16,4 @@ if "%URL%"=="" (
   echo Usage: ableview-kiosk.cmd http://SHOW_BOX_IP:8080/views/band?kiosk=1
   exit /b 1
 )
-start "" "%EDGE%" --user-data-dir="%LOCALAPPDATA%\AbleViewKiosk" --start-maximized --app="%URL%" --no-first-run --no-default-browser-check --disable-features=Translate
+start "" "%EDGE%" --user-data-dir="%LOCALAPPDATA%\AbleViewKiosk" --start-fullscreen --start-maximized --app="%URL%" --no-first-run --no-default-browser-check --disable-features=Translate

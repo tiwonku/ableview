@@ -153,16 +153,16 @@ Use the same codebase; follow the path for your OS. Full step-by-step instructio
 On a Windows operator panel, create a desktop shortcut whose **Target** is:
 
 ```
-"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --user-data-dir="%LOCALAPPDATA%\AbleViewKiosk" --start-maximized --app="http://<SHOW_BOX_IP>:8080/views/band?kiosk=1" --no-first-run --no-default-browser-check --disable-features=Translate
+"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --user-data-dir="%LOCALAPPDATA%\AbleViewKiosk" --start-fullscreen --start-maximized --app="http://<SHOW_BOX_IP>:8080/views/band?kiosk=1" --no-first-run --no-default-browser-check --disable-features=Translate
 ```
 
 Replace `<SHOW_BOX_IP>` with the show box IP on the operator VLAN, and `/views/band` with `/views/visuals` or `/views/lighting` as needed. Copy the shortcut into the Startup folder (`shell:startup`) for auto-launch.
 
 `--user-data-dir` is required so this is its own Edge profile. Without it, an already-running Edge often swallows `--app=` as a normal window, and hold-to-**Exit** cannot close it. Close every everyday Edge window once, then launch from this shortcut. `deploy/ableview-kiosk.cmd` wraps the same flags if you prefer a `.cmd` shortcut.
 
-`?kiosk=1` shows **Fullscreen**, **Reload**, and hold-to-**Exit**. Tap Fullscreen after launch to hide the Windows title bar. Do not use Edge `--kiosk` — it blocks Exit.
+`?kiosk=1` shows **Fullscreen**, **Reload**, and hold-to-**Exit**. The view requests fullscreen on load (and again on the first tap if the browser blocked it). Do not use Edge `--kiosk` — it blocks Exit.
 
-Full kiosk notes: [`deploy/RUNBOOK.md`](./deploy/RUNBOOK.md#touch-display-manual-kiosk).
+Full kiosk notes: [`deploy/RUNBOOK.md`](./deploy/RUNBOOK.md#touch-display-operator-mini-pc).
 
 Do **not** enable systemd, NSSM, or Task Scheduler on your day-to-day development machine
 unless you explicitly want that behavior.

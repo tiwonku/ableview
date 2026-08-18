@@ -60,6 +60,65 @@ export function enterKioskFullscreen({
     .catch(() => false);
 }
 
+const AUTO_FULLSCREEN_EVENTS = ['pointerdown', 'keydown'];
+
+/**
+ * Request fullscreen on kiosk load. Browsers often block that until a user
+ * gesture, so retry on the first click/key until the Fullscreen API takes over.
+ * Returns a disarm function.
+ */
+export function armKioskAutoFullscreen({
+  doc = typeof document !== 'undefined' ? document : null,
+  target = doc,
+  enter,
+} = {}) {
+  if (!doc) return () => {};
+  if (isDocumentFullscreen(doc)) return () => {};
+
+  const requestEnter = () => (enter ?? ((opts) => enterKioskFullscreen(opts)))({ doc });
+  let armed = false;
+  let done = false;
+
+  function disarm() {
+    if (done) return;
+    done = true;
+    if (!armed) return;
+    armed = false;
+    for (const type of AUTO_FULLSCREEN_EVENTS) {
+      target?.removeEventListener?.(type, onActivate, true);
+    }
+    doc.removeEventListener?.('fullscreenchange', onFs);
+  }
+
+  function onFs() {
+    if (isDocumentFullscreen(doc)) disarm();
+  }
+
+  function onActivate() {
+    if (done) return;
+    requestEnter();
+  }
+
+  function arm() {
+    if (done || armed || !target?.addEventListener) return;
+    armed = true;
+    for (const type of AUTO_FULLSCREEN_EVENTS) {
+      target.addEventListener(type, onActivate, true);
+    }
+    doc.addEventListener?.('fullscreenchange', onFs);
+  }
+
+  requestEnter().finally(() => {
+    if (isDocumentFullscreen(doc)) {
+      disarm();
+      return;
+    }
+    arm();
+  });
+
+  return disarm;
+}
+
 export function isDocumentFullscreen(doc = typeof document !== 'undefined' ? document : null) {
   return Boolean(doc?.fullscreenElement);
 }
@@ -386,5 +445,6 @@ export function mountKioskControls({
   controls.appendChild(exitBtn);
 
   statusBar.appendChild(controls);
+  armKioskAutoFullscreen();
   return controls;
 }

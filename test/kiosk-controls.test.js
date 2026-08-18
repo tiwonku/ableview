@@ -8,6 +8,7 @@ import {
   withKioskQuery,
   exitToDesktop,
   enterKioskFullscreen,
+  armKioskAutoFullscreen,
   toggleKioskFullscreen,
   isDocumentFullscreen,
   createHoldTracker,
@@ -65,6 +66,47 @@ test('enterKioskFullscreen skips when already fullscreen', async () => {
     request: () => { requested += 1; },
   });
   assert.equal(requested, 0);
+});
+
+test('armKioskAutoFullscreen skips when already fullscreen', () => {
+  let requested = 0;
+  let added = 0;
+  armKioskAutoFullscreen({
+    doc: { fullscreenElement: {}, documentElement: {} },
+    target: { addEventListener() { added += 1; } },
+    enter: () => { requested += 1; return Promise.resolve(true); },
+  });
+  assert.equal(requested, 0);
+  assert.equal(added, 0);
+});
+
+test('armKioskAutoFullscreen requests fullscreen then retries on pointerdown', async () => {
+  let requested = 0;
+  const listeners = {};
+  const doc = {
+    fullscreenElement: null,
+    documentElement: {},
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  const target = {
+    addEventListener(type, fn) { listeners[type] = fn; },
+    removeEventListener(type) { delete listeners[type]; },
+  };
+  armKioskAutoFullscreen({
+    doc,
+    target,
+    enter: () => {
+      requested += 1;
+      return Promise.resolve(false);
+    },
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(requested, 1);
+  assert.equal(typeof listeners.pointerdown, 'function');
+  listeners.pointerdown();
+  assert.equal(requested, 2);
 });
 
 test('isDocumentFullscreen follows fullscreenElement', () => {

@@ -175,18 +175,18 @@ Copy [`deploy/kiosk/`](./kiosk/) onto a USB stick and double-click `Install-Band
 Manual fallback on the NUC connected to the operator panel:
 
 1. Create a **show user** with auto-login (optional but recommended).
-2. Add browser startup: Edge **app mode** (not `--kiosk`) so Exit can close back to the desktop. Include **`?kiosk=1`** for Fullscreen / Reload / Exit. Use **`--start-maximized`** so the window fills the panel immediately (title bar stays until the operator taps **Fullscreen**).
+2. Add browser startup: Edge **app mode** (not `--kiosk`) so Exit can close back to the desktop. Include **`?kiosk=1`** for Fullscreen / Reload / Exit. Use **`--start-fullscreen`** (and `--start-maximized` as fallback) so the window covers the taskbar at launch.
 
    ```
-   "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --user-data-dir="%LOCALAPPDATA%\AbleViewKiosk" --start-maximized --app="http://__SHOW_BOX_IP__:8080/views/band?kiosk=1" --no-first-run --no-default-browser-check --disable-features=Translate
+   "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --user-data-dir="%LOCALAPPDATA%\AbleViewKiosk" --start-fullscreen --start-maximized --app="http://__SHOW_BOX_IP__:8080/views/band?kiosk=1" --no-first-run --no-default-browser-check --disable-features=Translate
    ```
 
    `--user-data-dir` keeps this off the everyday Edge profile. If Edge is already running without that flag, `--app=` is often treated as a normal window and in-app Exit cannot close it. Close all Edge windows once before the first launch from this shortcut. `deploy/ableview-kiosk.cmd` wraps the same flags.
 
-   Avoid `--kiosk` / `--edge-kiosk-type=fullscreen` on operator NUCs: that hides Windows chrome but **blocks** in-app Exit (`window.close()` is ignored). Do **not** use `--start-fullscreen` — it is slow and inconsistent with `--app=`.
+   Avoid `--kiosk` / `--edge-kiosk-type=fullscreen` on operator NUCs: that hides Windows chrome but **blocks** in-app Exit (`window.close()` is ignored). `--start-fullscreen` is F11-style fullscreen on the `--app=` window and still allows Exit. If a panel still shows the taskbar, tap anywhere once — kiosk mode retries the Fullscreen API on the first click.
 
    Put that shortcut on the desktop and in the Startup folder (`shell:startup`).
-3. **Fullscreen** is a single tap (hides the Windows title bar). **Window** (same button, while fullscreen) brings the title bar back. **Reload** is a single tap. **Exit** is hold (~1.5 s) — it leaves fullscreen and closes the browser so the operator can reach Windows. If the browser blocks close, use Alt+F4 (keep a USB keyboard in the kit) or the window **X**.
+3. Launch should cover the taskbar. **Fullscreen** / **Window** still toggles the title bar if you need it. **Reload** is a single tap. **Exit** is hold (~1.5 s) — it leaves fullscreen and closes the browser so the operator can reach Windows. If the browser blocks close, use Alt+F4 (keep a USB keyboard in the kit) or the window **X**.
 4. Disable screen sleep and Windows Update forced reboot during show hours.
 5. If the browser crashes, restart it — AbleView keeps running as a separate service.
 
