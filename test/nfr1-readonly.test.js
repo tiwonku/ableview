@@ -57,6 +57,8 @@ test('clock OSC output never uses Ableton /live addresses', () => {
   assert.match(source, /\/ableview\/clock\/tempo/);
   assert.match(source, /\/ableview\/clock\/beat/);
   assert.match(source, /\/ableview\/clock\/bar/);
+  assert.match(source, /\/ableview\/clock\/beat_pulse/);
+  assert.match(source, /\/ableview\/clock\/bar_pulse/);
   assert.match(source, /\/ableview\/clock\/is_playing/);
   assert.match(source, /\/ableview\/clock\/signature/);
 });

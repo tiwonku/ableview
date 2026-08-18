@@ -90,6 +90,7 @@ test('clockPackets snapshot sends is_playing, tempo, signature, bar, then beat',
   assert.deepEqual(packets[2].args.map((a) => a.value), [4, 4]);
   assert.equal(packets[3].args[0].value, 2); // songBeat 4 → bar 2
   assert.equal(packets[4].args[0].value, 1); // beat-in-bar 1
+  assert.deepEqual(packets.filter((p) => p.address.endsWith('_pulse')), []);
 });
 
 test('clockPackets sends bar before beat on downbeat and beat-only otherwise', () => {
@@ -113,8 +114,13 @@ test('clockPackets sends bar before beat on downbeat and beat-only otherwise', (
     signatureNumerator: 4,
     signatureDenominator: 4,
   }, first.sent);
-  assert.deepEqual(mid.packets.map((p) => p.address), [OSC_OUT_ADDRESSES.BEAT]);
+  assert.deepEqual(mid.packets.map((p) => p.address), [
+    OSC_OUT_ADDRESSES.BEAT,
+    OSC_OUT_ADDRESSES.BEAT_PULSE,
+  ]);
   assert.equal(mid.packets[0].args[0].value, 2);
+  assert.equal(mid.packets[1].args[0].value, 1);
+  assert.deepEqual(mid.pulses, { beat: true, bar: false });
 
   const nextBar = clockPackets({
     tempo: 120,
@@ -125,14 +131,48 @@ test('clockPackets sends bar before beat on downbeat and beat-only otherwise', (
   }, mid.sent);
   assert.deepEqual(
     nextBar.packets.map((p) => [p.address, p.args[0].value]),
-    [[OSC_OUT_ADDRESSES.BAR, 2], [OSC_OUT_ADDRESSES.BEAT, 1]],
+    [
+      [OSC_OUT_ADDRESSES.BAR, 2],
+      [OSC_OUT_ADDRESSES.BAR_PULSE, 1],
+      [OSC_OUT_ADDRESSES.BEAT, 1],
+      [OSC_OUT_ADDRESSES.BEAT_PULSE, 1],
+    ],
   );
+  assert.deepEqual(nextBar.pulses, { beat: true, bar: true });
 });
 
 test('clockPackets tempo-only change does not pulse beat', () => {
   const first = clockPackets({ tempo: 120, beat: 2, isPlaying: true });
   const next = clockPackets({ tempo: 128, beat: 2, isPlaying: true }, first.sent);
   assert.deepEqual(next.packets.map((p) => p.address), [OSC_OUT_ADDRESSES.TEMPO]);
+});
+
+test('clockPackets pulses 1 on real ticks, not on snapshot', () => {
+  const first = clockPackets({
+    tempo: 120,
+    beat: 0,
+    isPlaying: true,
+    signatureNumerator: 4,
+    signatureDenominator: 4,
+  });
+  assert.deepEqual(
+    first.packets.filter((p) => p.address.endsWith('_pulse')).map((p) => [p.address, p.args[0].value]),
+    [
+      [OSC_OUT_ADDRESSES.BAR_PULSE, 1],
+      [OSC_OUT_ADDRESSES.BEAT_PULSE, 1],
+    ],
+  );
+
+  const snap = clockPackets({
+    tempo: 120,
+    beat: 0,
+    isPlaying: true,
+    signatureNumerator: 4,
+    signatureDenominator: 4,
+  }, null, { snapshot: true });
+  assert.equal(snap.pulses.beat, false);
+  assert.equal(snap.pulses.bar, false);
+  assert.equal(snap.packets.some((p) => p.address.endsWith('_pulse')), false);
 });
 
 test('createOscOutput fans out to every destination and skips Ableton', async () => {
@@ -171,6 +211,48 @@ test('createOscOutput fans out to every destination and skips Ableton', async ()
   assert.ok(sent.some((p) => p.address === OSC_OUT_ADDRESSES.BEAT && p.args[0].value === 1));
   assert.ok(sent.some((p) => p.address === OSC_OUT_ADDRESSES.BAR && p.args[0].value === 1));
   assert.ok(sent.every((p) => p.address.startsWith('/ableview/clock/')));
+
+  out.stop();
+});
+
+test('createOscOutput resets beat and bar pulses to 0 after the hold', async () => {
+  const bus = createBus();
+  const sent = [];
+  const config = {
+    oscOut: {
+      enabled: true,
+      pulseResetMs: 20,
+      destinations: [{ host: '192.168.1.10', port: 9000 }],
+    },
+    ingest: { abletonHost: '127.0.0.1', oscSendPort: 11000 },
+  };
+  const out = createOscOutput({
+    getConfig: () => config,
+    bus,
+    log: silentLog,
+    sendPacket: (packet) => sent.push(packet),
+  });
+  await out.start();
+
+  bus.emit(EVENTS.NOW_PLAYING, makeNowPlaying({
+    source: SOURCES.ABLETONOSC,
+    tempo: 100,
+    beat: 0,
+    isPlaying: true,
+    signatureNumerator: 4,
+    signatureDenominator: 4,
+  }));
+
+  const highs = sent.filter((p) => p.address.endsWith('_pulse') && p.args[0].value === 1);
+  assert.equal(highs.filter((p) => p.address === OSC_OUT_ADDRESSES.BAR_PULSE).length, 1);
+  assert.equal(highs.filter((p) => p.address === OSC_OUT_ADDRESSES.BEAT_PULSE).length, 1);
+  assert.equal(sent.filter((p) => p.address.endsWith('_pulse') && p.args[0].value === 0).length, 0);
+
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  const lows = sent.filter((p) => p.address.endsWith('_pulse') && p.args[0].value === 0);
+  assert.ok(lows.some((p) => p.address === OSC_OUT_ADDRESSES.BAR_PULSE));
+  assert.ok(lows.some((p) => p.address === OSC_OUT_ADDRESSES.BEAT_PULSE));
 
   out.stop();
 });

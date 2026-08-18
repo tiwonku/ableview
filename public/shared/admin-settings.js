@@ -283,7 +283,7 @@ function renderOscOutGroup(settings) {
   group.appendChild(hint);
 
   const map = el('p', 'settings-field-hint oscout-addresses');
-  map.textContent = '/ableview/clock/tempo  f   ·  /ableview/clock/beat  i (1-based in-bar)  ·  /ableview/clock/bar  i  ·  /ableview/clock/is_playing  i  ·  /ableview/clock/signature  i i';
+  map.textContent = '/ableview/clock/tempo  f   ·  /ableview/clock/beat  i (1-based in-bar)  ·  /ableview/clock/bar  i  ·  /ableview/clock/beat_pulse  i (1 then 0)  ·  /ableview/clock/bar_pulse  i (1 then 0)  ·  /ableview/clock/is_playing  i  ·  /ableview/clock/signature  i i';
   group.appendChild(map);
 
   return group;

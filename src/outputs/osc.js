@@ -9,9 +9,17 @@ export const OSC_OUT_ADDRESSES = Object.freeze({
   TEMPO: '/ableview/clock/tempo',
   BEAT: '/ableview/clock/beat',
   BAR: '/ableview/clock/bar',
+  BEAT_PULSE: '/ableview/clock/beat_pulse',
+  BAR_PULSE: '/ableview/clock/bar_pulse',
   IS_PLAYING: '/ableview/clock/is_playing',
   SIGNATURE: '/ableview/clock/signature',
 });
+
+export const OSC_OUT_PULSE_RESET_MS = 30;
+
+function intArg(value) {
+  return [{ type: 'i', value }];
+}
 
 function finiteOrNull(value) {
   if (value == null || value === '') return null;
@@ -57,6 +65,7 @@ export function resolveDestinations(oscOut, ingest) {
 /**
  * Diff previous clock state vs a NowPlaying event and return OSC packets.
  * On downbeat (beat-in-bar === 1), bar is sent before beat.
+ * Pulse addresses (1) fire only on real ticks, never on snapshot.
  */
 export function clockPackets(event, prev = null, { snapshot = false } = {}) {
   const prevSent = prev ?? {};
@@ -107,45 +116,57 @@ export function clockPackets(event, prev = null, { snapshot = false } = {}) {
   }
 
   const beatTick = next.songBeat != null && (snapshot || prevSent.songBeat !== next.songBeat);
+  const realBeatTick = !snapshot && next.songBeat != null && prevSent.songBeat !== next.songBeat;
   const barTick = next.bar != null && changed('bar');
   const beatInBarTick = next.beatInBar != null && (snapshot || prevSent.beatInBar !== next.beatInBar || beatTick);
+  const pulses = { beat: false, bar: false };
+
+  function pushBarNumber() {
+    packets.push({ address: OSC_OUT_ADDRESSES.BAR, args: intArg(next.bar) });
+  }
+  function pushBeatNumber() {
+    packets.push({ address: OSC_OUT_ADDRESSES.BEAT, args: intArg(next.beatInBar) });
+  }
+  function pushBarPulse() {
+    packets.push({ address: OSC_OUT_ADDRESSES.BAR_PULSE, args: intArg(1) });
+    pulses.bar = true;
+  }
+  function pushBeatPulse() {
+    packets.push({ address: OSC_OUT_ADDRESSES.BEAT_PULSE, args: intArg(1) });
+    pulses.beat = true;
+  }
 
   if (beatTick && next.beatInBar === 1) {
     if (next.bar != null) {
-      packets.push({
-        address: OSC_OUT_ADDRESSES.BAR,
-        args: [{ type: 'i', value: next.bar }],
-      });
+      pushBarNumber();
+      if (realBeatTick) pushBarPulse();
     }
-    packets.push({
-      address: OSC_OUT_ADDRESSES.BEAT,
-      args: [{ type: 'i', value: next.beatInBar }],
-    });
+    pushBeatNumber();
+    if (realBeatTick) pushBeatPulse();
   } else {
-    if (barTick) {
-      packets.push({
-        address: OSC_OUT_ADDRESSES.BAR,
-        args: [{ type: 'i', value: next.bar }],
-      });
-    }
+    if (barTick) pushBarNumber();
     if (beatInBarTick) {
-      packets.push({
-        address: OSC_OUT_ADDRESSES.BEAT,
-        args: [{ type: 'i', value: next.beatInBar }],
-      });
+      pushBeatNumber();
+      if (realBeatTick) pushBeatPulse();
     }
   }
 
-  return { packets, sent: next };
+  return { packets, sent: next, pulses };
 }
 
 export function createOscOutput({ getConfig, bus, log, sendPacket = null }) {
   let udp = null;
   let lastEvent = null;
   let lastSent = null;
+  const pulseTimers = { beat: null, bar: null };
 
   function enabled() {
     return getConfig().oscOut?.enabled === true;
+  }
+
+  function pulseResetMs() {
+    const n = getConfig().oscOut?.pulseResetMs;
+    return Number.isFinite(n) && n >= 0 ? n : OSC_OUT_PULSE_RESET_MS;
   }
 
   function dispatch(packets) {
@@ -170,12 +191,40 @@ export function createOscOutput({ getConfig, bus, log, sendPacket = null }) {
     }
   }
 
+  function pulseAddress(kind) {
+    return kind === 'bar' ? OSC_OUT_ADDRESSES.BAR_PULSE : OSC_OUT_ADDRESSES.BEAT_PULSE;
+  }
+
+  function clearPulseTimer(kind, { reset = false } = {}) {
+    if (!pulseTimers[kind]) return;
+    clearTimeout(pulseTimers[kind]);
+    pulseTimers[kind] = null;
+    if (reset) dispatch([{ address: pulseAddress(kind), args: intArg(0) }]);
+  }
+
+  function clearPulseTimers({ reset = false } = {}) {
+    clearPulseTimer('bar', { reset });
+    clearPulseTimer('beat', { reset });
+  }
+
+  function schedulePulseReset(kind) {
+    clearPulseTimer(kind);
+    const timer = setTimeout(() => {
+      pulseTimers[kind] = null;
+      dispatch([{ address: pulseAddress(kind), args: intArg(0) }]);
+    }, pulseResetMs());
+    timer.unref?.();
+    pulseTimers[kind] = timer;
+  }
+
   function emitFromEvent(event, { snapshot = false } = {}) {
     if (!enabled()) return;
     if (!sendPacket && !udp) return;
-    const { packets, sent } = clockPackets(event, snapshot ? null : lastSent, { snapshot });
+    const { packets, sent, pulses } = clockPackets(event, snapshot ? null : lastSent, { snapshot });
     lastSent = sent;
     dispatch(packets);
+    if (pulses.bar) schedulePulseReset('bar');
+    if (pulses.beat) schedulePulseReset('beat');
   }
 
   function onNowPlaying(event) {
@@ -214,6 +263,7 @@ export function createOscOutput({ getConfig, bus, log, sendPacket = null }) {
   }
 
   async function start() {
+    clearPulseTimers({ reset: true });
     closeUdp();
     lastSent = null;
     if (!enabled()) {
@@ -230,6 +280,7 @@ export function createOscOutput({ getConfig, bus, log, sendPacket = null }) {
 
   function stop() {
     bus.off(EVENTS.NOW_PLAYING, onNowPlaying);
+    clearPulseTimers({ reset: true });
     closeUdp();
   }
 
