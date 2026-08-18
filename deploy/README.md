@@ -94,7 +94,7 @@ Stop with Ctrl+C, then run the install script for your OS.
     curl http://localhost:8080/health
     ```
 11. **Install the OS service** (Quick install above) and enable start on boot.
-12. **Open operator URLs** on the LAN, e.g. `http://<show-box-ip>:8080/views/band`. Fill in [`RUNBOOK.md`](./RUNBOOK.md).
+12. **Open operator URLs** on the LAN, e.g. `http://<show-box-ip>:8080/views/band`. Fill in [`RUNBOOK.md`](./RUNBOOK.md). For Windows operator mini PCs, copy [`kiosk/`](./kiosk/) onto a USB stick and run the matching `Install-*.cmd`.
 
 Nothing in steps 11–12 runs automatically on a development machine unless you explicitly
 install and enable a service there.

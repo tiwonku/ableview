@@ -22,7 +22,7 @@ Replace `__SHOW_BOX_IP__` with the show box IP **on the VLAN where operator brow
 | Lighting | `http://__SHOW_BOX_IP__:8080/views/lighting` |
 | Admin | `http://__SHOW_BOX_IP__:8080/views/admin` |
 | Health (JSON) | `http://__SHOW_BOX_IP__:8080/health` |
-| Touch NUC (kiosk chrome) | same view URL + `?kiosk=1` — see [Touch display](#touch-display-manual-kiosk) |
+| Touch NUC (kiosk chrome) | same view URL + `?kiosk=1` — see [Touch display](#touch-display-operator-mini-pc) |
 
 **Backup MacBook IP (if used):** _______________
 
@@ -168,9 +168,11 @@ Symptoms: **Disconnected** in the browser while the service is up — operators 
 
 ---
 
-## Touch display (manual kiosk)
+## Touch display (operator mini PC)
 
-No automated kiosk script in v1. On the NUC connected to the operator panel:
+Copy [`deploy/kiosk/`](./kiosk/) onto a USB stick and double-click `Install-Band.cmd` (or Visuals / Lighting / Admin) on each Windows mini PC. That writes a desktop shortcut and a Startup copy. Details: [`deploy/kiosk/README.md`](./kiosk/README.md).
+
+Manual fallback on the NUC connected to the operator panel:
 
 1. Create a **show user** with auto-login (optional but recommended).
 2. Add browser startup: Edge **app mode** (not `--kiosk`) so Exit can close back to the desktop. Include **`?kiosk=1`** for Fullscreen / Reload / Exit. Use **`--start-maximized`** so the window fills the panel immediately (title bar stays until the operator taps **Fullscreen**).
