@@ -77,12 +77,12 @@ export function aliasFromTokenPrefix(tokens, endIndex) {
 }
 
 /**
- * Whether an alias would match a clip under AbleView's prefix rule
- * (exact or clip starts with "alias " after normalize).
+ * Whether an alias would match a clip as a whole-word stem (exact, prefix, or
+ * mid-clip — e.g. TTT in "Vocals TTT INTRO").
  */
 export function aliasWouldMatchClip(alias, clipName) {
   const query = normalizeForPrefix(clipName);
   const stem = normalizeForPrefix(alias);
   if (!query || !stem) return false;
-  return query === stem || query.startsWith(`${stem} `);
+  return query === stem || ` ${query} `.includes(` ${stem} `);
 }

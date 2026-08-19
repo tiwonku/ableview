@@ -227,7 +227,7 @@ export function renderAliasPanel(parent, opts) {
     el(
       'p',
       'alias-help',
-      'Clips that start with this alias (after ignoring punctuation) match this row — e.g. HotRox_ DRUMS and HotRox_ SAMPLES both match alias HotRox.'
+      'Clips that contain this alias as a whole word (after ignoring punctuation) match this row — e.g. Vocals TTT INTRO and TTT DROP both match alias TTT.'
     )
   );
 
@@ -241,7 +241,7 @@ export function renderAliasPanel(parent, opts) {
     preview.classList.add('is-ok');
   } else {
     preview.textContent =
-      'Will match this clip: Maybe (fuzzy only) — prefer a shorter stem that the clip starts with.';
+      'Will match this clip: Maybe (fuzzy only) — prefer a shorter stem that appears as a whole word in the clip.';
     preview.classList.add('is-warn');
   }
   stepAlias.appendChild(preview);

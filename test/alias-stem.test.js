@@ -42,3 +42,11 @@ test('aliasWouldMatchClip uses prefix rule after normalize', () => {
   assert.equal(aliasWouldMatchClip('TTY', 'TTY VOX/STRINGS*'), true);
   assert.equal(aliasWouldMatchClip('TTY', 'TTY 2TRK DROP'), true);
 });
+
+test('aliasWouldMatchClip matches a whole-word stem mid-clip', () => {
+  assert.equal(
+    aliasWouldMatchClip('TTT', 'Vocals TTT INTRO VOCAL [2026-08-09 155900]'),
+    true
+  );
+  assert.equal(aliasWouldMatchClip('TT', 'Vocals TTT INTRO VOCAL'), false);
+});

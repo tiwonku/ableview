@@ -58,6 +58,11 @@ function scoreToConfidence(score) {
 const MIN_PREFIX_TITLE_LENGTH = 4;
 const PREFIX_MATCH_CONFIDENCE = 0.9;
 
+/** Exact or whole-word sequence (e.g. alias TTT in "Vocals TTT INTRO"). */
+function hasWholeTokenStem(query, stem) {
+  return query === stem || ` ${query} `.includes(` ${stem} `);
+}
+
 function findPrefixMatch(query, items) {
   if (!query) return null;
 
@@ -71,7 +76,10 @@ function findPrefixMatch(query, items) {
 
     const exact = query === norm;
     const prefix = !exact && query.startsWith(`${norm} `);
-    if (!exact && !prefix) continue;
+    // Aliases may sit after a role/deck word ("Vocals TTT INTRO"). Song titles
+    // stay prefix-only so "Still Night" does not match "Intro - Still Night".
+    const contained = viaAlias && !exact && !prefix && hasWholeTokenStem(query, norm);
+    if (!exact && !prefix && !contained) continue;
 
     if (!best || norm.length > best.item.norm.length) {
       best = { item, exact };

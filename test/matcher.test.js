@@ -140,6 +140,96 @@ test('underscore role suffix matches alias stem via prefix', () => {
   assert.equal(payload.match.matchedValue, 'HotRox');
 });
 
+test('alias stem matches as a whole word mid-clip', () => {
+  const rows = [
+    {
+      rowId: '188',
+      data: {
+        'Clip Name': 'Trip Thru Time',
+        Aliases: 'TTT',
+      },
+    },
+  ];
+  const payload = matchClip(
+    'Vocals TTT INTRO VOCAL [2026-08-09 155900]',
+    snapshot({ rows }),
+    testConfig()
+  );
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '188');
+  assert.equal(payload.match.viaAlias, true);
+  assert.equal(payload.match.matchedValue, 'TTT');
+  assert.equal(payload.match.confidence, 0.9);
+});
+
+test('partial token does not alias-match a longer stem', () => {
+  const rows = [
+    {
+      rowId: '188',
+      data: {
+        'Clip Name': 'Trip Thru Time',
+        Aliases: 'TT',
+      },
+    },
+  ];
+  const payload = matchClip(
+    'Vocals TTT INTRO VOCAL [2026-08-09 155900]',
+    snapshot({ rows }),
+    testConfig()
+  );
+  assert.equal(payload.match.matched, false);
+});
+
+test('mid-clip alias beats a weaker Fuse hit on another deck', () => {
+  const rows = [
+    {
+      rowId: '188',
+      data: {
+        'Clip Name': 'Trip Thru Time',
+        Aliases: 'TTT',
+      },
+    },
+    {
+      rowId: '43',
+      data: {
+        'Clip Name': 'Double Love',
+        Aliases: '',
+        'ALS Folder': 'Cm_88.70_DoubleLove_24',
+      },
+    },
+  ];
+  const payload = matchBestOfTracks(
+    [
+      {
+        trackIndex: 12,
+        trackName: 'DECK B',
+        clipName: 'Vocals TTT INTRO VOCAL [2026-08-09 155900]',
+        slotIndex: 276,
+      },
+      { trackIndex: 13, trackName: 'DECK C', clipName: 'LIME LO', slotIndex: 283 },
+    ],
+    snapshot({ rows }),
+    testConfig({
+      match: { ...DEFAULTS.match, threshold: 0.5 },
+      sheets: {
+        ...DEFAULTS.sheets,
+        matchColumn: 'Clip Name',
+        aliasColumn: 'Aliases',
+        alsFolderColumn: 'ALS Folder',
+      },
+    })
+  );
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '188');
+  assert.equal(payload.match.viaAlias, true);
+  assert.equal(payload.clipName, 'Vocals TTT INTRO VOCAL [2026-08-09 155900]');
+  const deckB = payload.trackMatches.find((t) => t.trackName === 'DECK B');
+  const deckC = payload.trackMatches.find((t) => t.trackName === 'DECK C');
+  assert.equal(deckB?.winner, true);
+  assert.equal(deckB?.matchedValue, 'TTT');
+  assert.equal(deckC?.winner, false);
+});
+
 test('short alias stem prefix-matches deck clips', () => {
   const rows = [
     {
