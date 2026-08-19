@@ -41,6 +41,25 @@ test('resolveHeroDisplay uses sheet title on a read-only operator view', () => {
   assert.equal(hero.empty, false);
 });
 
+test('resolveHeroDisplay shows No Match as operator hero when clips play unmatched', () => {
+  const hero = resolveHeroDisplay({
+    match: { matched: false },
+    tracks: [{ trackIndex: 1, trackName: 'DECK A', clipName: 'Drums InTheName_DRMS' }],
+  }, 'Song Title', { noMatchHero: true });
+  assert.equal(hero.showHero, true);
+  assert.equal(hero.text, 'No Match');
+  assert.equal(hero.noMatch, true);
+  assert.equal(hero.empty, false);
+});
+
+test('resolveHeroDisplay hides admin hero when clips play unmatched', () => {
+  const hero = resolveHeroDisplay({
+    match: { matched: false },
+    tracks: [{ trackIndex: 1, trackName: 'DECK A', clipName: 'Drums InTheName_DRMS' }],
+  }, 'Song Title');
+  assert.equal(hero.showHero, false);
+});
+
 test('hasArrangementPlayback is true when any watched track is from arrangement', () => {
   assert.equal(isArrangementTrack({ source: 'arrangement' }), true);
   assert.equal(isArrangementTrack({ source: 'session' }), false);

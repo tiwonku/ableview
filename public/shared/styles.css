@@ -369,6 +369,14 @@ main {
   min-width: 0;
 }
 
+.clip-name--nomatch {
+  color: #ffd591;
+}
+
+body.layout-operator .clip-name--nomatch {
+  font-size: clamp(1.6rem, 4dvh + 2.2vmin, 4rem);
+}
+
 .clip-launching-badge {
   display: inline-block;
   flex-shrink: 0;
@@ -1811,6 +1819,65 @@ body.layout-operator .no-match-panel,
 body.layout-operator .view-edit-bar,
 body.layout-operator .operator-editor-context {
   flex-shrink: 0;
+}
+
+body.layout-operator .no-match--clips {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+}
+
+body.layout-operator .no-match-panel.no-match--clips {
+  flex: 1 1 auto;
+}
+
+body.layout-operator .playing-clips-strip {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+  gap: var(--op-gap);
+  margin: 0;
+}
+
+body.layout-operator .playing-clip-chip {
+  flex: unset;
+  min-width: 0;
+  max-width: none;
+  min-height: 0;
+  height: 100%;
+  justify-content: center;
+  gap: clamp(0.4rem, 1.4dvh, 0.9rem);
+  padding: var(--op-pad);
+  container-type: size;
+}
+
+body.layout-operator .playing-clip-chip-deck {
+  font-size: clamp(0.75rem, 7cqmin, 1.35rem);
+}
+
+body.layout-operator .playing-clip-chip-name {
+  font-size: clamp(1.35rem, 14cqmin, 4rem);
+  font-weight: 700;
+  line-height: 1.12;
+}
+
+body.layout-operator .playing-clip-chip-meta {
+  font-size: clamp(0.85rem, 5.5cqmin, 1.35rem);
+}
+
+body.layout-operator .playing-clip-chip-actions {
+  margin-top: 0.25rem;
+}
+
+body.layout-operator .playing-clip-chip-alias-btn,
+body.layout-operator .playing-clip-chip-create-btn {
+  padding: 0.45rem 0.75rem;
+  font-size: clamp(0.8rem, 2.2dvh, 1rem);
 }
 
 body.layout-operator .operator-editor {

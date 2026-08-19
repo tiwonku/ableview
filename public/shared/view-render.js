@@ -134,12 +134,14 @@ function isLaunching(payload) {
   return Boolean(payload?.pendingLaunch) && !payload?.simulated;
 }
 
-function renderHeroRow(parent, heroText, payload, { empty = false } = {}) {
+function renderHeroRow(parent, heroText, payload, { empty = false, noMatch = false } = {}) {
   const row = document.createElement('div');
   row.className = 'clip-head' + (isLaunching(payload) ? ' clip-head--launching' : '');
 
   const clipEl = document.createElement('p');
-  clipEl.className = 'clip-name' + (empty ? ' empty-clip' : '');
+  clipEl.className = 'clip-name'
+    + (empty ? ' empty-clip' : '')
+    + (noMatch ? ' clip-name--nomatch' : '');
 
   if (heroText && !empty) {
     const text = document.createElement('span');
@@ -174,17 +176,19 @@ function renderNoMatchPanel(root, {
   const playing = hasPlayingClips(payload);
   const noMatch = document.createElement('div');
   noMatch.className = editable ? 'no-match-panel' : 'no-match';
+  if (playing) noMatch.classList.add('no-match--clips');
 
-  const message = document.createElement('p');
-  message.className = 'no-match';
-  if (playing) {
-    message.textContent = editable
-      ? 'No confident match — link a playing clip to the cue sheet below.'
-      : 'No confident match — link a playing clip to the cue sheet on the admin view.';
-  } else {
-    message.textContent = 'No confident match — check the cue sheet or clip name.';
+  // Operator views already show a hero "No Match"; keep the longer prompt on admin.
+  if (editable || !playing) {
+    const message = document.createElement('p');
+    message.className = 'no-match';
+    if (playing) {
+      message.textContent = 'No confident match — link a playing clip to the cue sheet below.';
+    } else {
+      message.textContent = 'No confident match — check the cue sheet or clip name.';
+    }
+    noMatch.appendChild(message);
   }
-  noMatch.appendChild(message);
 
   if (playing) {
     renderPlayingClipsStrip(noMatch, payload, {
@@ -321,9 +325,9 @@ export function updateViewLiveChrome(root, { payload, connected, lastUpdate, edi
 
 function renderViewClipHead(parent, payload, matchColumn = null, { busy = false } = {}) {
   parent.innerHTML = '';
-  const hero = resolveHeroDisplay(payload, matchColumn, { busy });
+  const hero = resolveHeroDisplay(payload, matchColumn, { busy, noMatchHero: true });
   if (!hero.showHero) return;
-  renderHeroRow(parent, hero.text, payload, { empty: hero.empty });
+  renderHeroRow(parent, hero.text, payload, { empty: hero.empty, noMatch: hero.noMatch });
 }
 
 function renderFieldsGrid(fields, payload) {

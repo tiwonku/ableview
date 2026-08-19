@@ -88,9 +88,9 @@ export function canStartCreate(payload, clipNameOverride = null) {
 
 /**
  * Hero line for operator views.
- * @returns {{ text?: string, empty?: boolean, showHero: boolean }}
+ * @returns {{ text?: string, empty?: boolean, showHero: boolean, noMatch?: boolean }}
  */
-export function resolveHeroDisplay(payload, matchColumn = null, { busy = false } = {}) {
+export function resolveHeroDisplay(payload, matchColumn = null, { busy = false, noMatchHero = false } = {}) {
   if (busy) return { showHero: false };
 
   const matchedTitle = resolveMatchedTitle(payload, matchColumn);
@@ -98,6 +98,9 @@ export function resolveHeroDisplay(payload, matchColumn = null, { busy = false }
     return { text: matchedTitle, empty: false, showHero: true };
   }
   if (hasPlayingClips(payload)) {
+    if (noMatchHero) {
+      return { text: 'No Match', empty: false, showHero: true, noMatch: true };
+    }
     return { showHero: false };
   }
   return { text: 'Nothing playing', empty: true, showHero: true };
@@ -116,7 +119,7 @@ export function operatorCreateColumns(viewFields, matchColumn, aliasColumn) {
 }
 
 /**
- * Compact horizontal strip of playing clips (no-match remediation).
+ * Playing-clip cards for the no-match state (operator views scale these up).
  * @param {HTMLElement} parent
  * @param {object} payload
  * @param {{
