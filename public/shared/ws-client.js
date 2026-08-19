@@ -16,7 +16,11 @@ import {
   viewFieldColumns,
 } from './admin-row-editor.js';
 import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
-import { playingTracks, operatorCreateColumns } from './playing-clips-strip.js';
+import {
+  operatorCreateColumns,
+  resolveCreateClipName,
+  canStartCreate,
+} from './playing-clips-strip.js';
 import { mountViewNav, viewIdFromPath } from './view-nav.js';
 import { isKioskMode, kioskLinkAction, mountKioskControls } from './kiosk-controls.js';
 
@@ -206,9 +210,8 @@ export function connectView({
   }
 
   function startCreate(clipNameOverride, track = null) {
-    const clipName = (clipNameOverride ?? lastPayload?.clipName)?.trim()
-      || playingTracks(lastPayload)[0]?.clipName?.trim();
-    if (!clipName || lastPayload?.match?.matched === true) return;
+    const clipName = resolveCreateClipName(lastPayload, clipNameOverride);
+    if (!canStartCreate(lastPayload, clipNameOverride)) return;
     if (!matchColumn) return;
     if (aliasSession) cancelAlias();
 
@@ -233,9 +236,11 @@ export function connectView({
   }
 
   function startAlias(clipNameOverride, track = null) {
-    const clipName = (clipNameOverride ?? lastPayload?.clipName)?.trim();
+    const clipName = typeof clipNameOverride === 'string'
+      ? clipNameOverride.trim()
+      : (lastPayload?.clipName?.trim() ?? '');
     if (!clipName) return;
-    if (!clipNameOverride && lastPayload?.match?.matched === true) return;
+    if (typeof clipNameOverride !== 'string' && lastPayload?.match?.matched === true) return;
     if (editSession) cancelEdit();
 
     aliasSession = createAliasSession(clipName, {

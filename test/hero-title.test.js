@@ -5,6 +5,8 @@ import {
   resolveMatchedTitle,
   hasArrangementPlayback,
   isArrangementTrack,
+  canStartCreate,
+  resolveCreateClipName,
 } from '../public/shared/playing-clips-strip.js';
 
 const yellowBirdPayload = {
@@ -54,4 +56,48 @@ test('hasArrangementPlayback is true when any watched track is from arrangement'
     ],
   }), false);
   assert.equal(hasArrangementPlayback({ tracks: [] }), false);
+});
+
+const scenePayload = {
+  clipName: 'Mickman INTRO',
+  match: {
+    matched: true,
+    confidence: 0.57,
+    rowId: '12',
+    matchedValue: 'Spaceman Intro',
+  },
+  tracks: [
+    { trackIndex: 12, trackName: 'DECK B', clipName: 'Mickman INTRO' },
+    {
+      trackIndex: 13,
+      trackName: 'DECK C',
+      clipName: 'Funnel Of Love_gaudiolab_vocal_high_quality (Freeze)',
+    },
+  ],
+};
+
+test('canStartCreate blocks generic create when another clip already matched', () => {
+  assert.equal(canStartCreate(scenePayload), false);
+  assert.equal(canStartCreate(scenePayload, null), false);
+});
+
+test('canStartCreate allows per-deck create for an unmatched clip while another deck won', () => {
+  const funnel = 'Funnel Of Love_gaudiolab_vocal_high_quality (Freeze)';
+  assert.equal(canStartCreate(scenePayload, funnel), true);
+  assert.equal(resolveCreateClipName(scenePayload, funnel), funnel);
+});
+
+test('canStartCreate ignores click-event objects passed as the override', () => {
+  assert.equal(canStartCreate(scenePayload, { type: 'click' }), false);
+  assert.equal(resolveCreateClipName(scenePayload, { type: 'click' }), 'Mickman INTRO');
+});
+
+test('canStartCreate allows generic create when nothing has matched', () => {
+  const unmatched = {
+    clipName: 'Funnel Of Love',
+    match: { matched: false },
+    tracks: [{ trackIndex: 13, trackName: 'DECK C', clipName: 'Funnel Of Love' }],
+  };
+  assert.equal(canStartCreate(unmatched), true);
+  assert.equal(resolveCreateClipName(unmatched), 'Funnel Of Love');
 });

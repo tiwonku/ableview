@@ -2549,9 +2549,9 @@ body.layout-session .session-main {
 
 .session-main > .alias-panel,
 .session-main > .admin-editor {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
-  max-height: min(42dvh, 24rem);
+  max-height: min(50dvh, 32rem);
   overflow: auto;
   margin-bottom: var(--sess-gap);
 }

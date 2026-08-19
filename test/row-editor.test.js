@@ -67,6 +67,19 @@ test('ws-client imports viewFieldColumns for operator Edit', () => {
   );
 });
 
+test('ws-client uses canStartCreate so unmatched decks can add a row after a winner', () => {
+  const src = readFileSync(
+    fileURLToPath(new URL('../public/shared/ws-client.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(src, /\bcanStartCreate\b/);
+  assert.match(src, /if \(!canStartCreate\(lastPayload, clipNameOverride\)\) return;/);
+  assert.doesNotMatch(
+    src,
+    /if \(!clipName \|\| lastPayload\?\.match\?\.matched === true\) return;/,
+  );
+});
+
 test('buildFieldLabels uses view labels', () => {
   const fields = [
     { column: 'RGB_1', label: 'Color 1', type: 'color' },

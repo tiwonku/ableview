@@ -125,6 +125,7 @@ export function renderSession(root, ctx) {
       saveError,
       panelId: 'session-row-panel',
     });
+    root.querySelector('#session-row-panel')?.scrollIntoView({ block: 'nearest' });
   }
 
   const createSession = editSession?.mode === 'create' ? editSession : null;

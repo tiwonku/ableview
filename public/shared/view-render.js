@@ -42,7 +42,7 @@ function renderNoMatchActions(parent, { onStartCreate, onStartAlias, hideAlias =
     addBtn.type = 'button';
     addBtn.className = 'admin-editor-btn admin-editor-btn--primary';
     addBtn.textContent = 'Add cue row';
-    addBtn.addEventListener('click', onStartCreate);
+    addBtn.addEventListener('click', () => onStartCreate());
     actions.appendChild(addBtn);
   }
 
@@ -51,7 +51,7 @@ function renderNoMatchActions(parent, { onStartCreate, onStartAlias, hideAlias =
     aliasBtn.type = 'button';
     aliasBtn.className = 'admin-editor-btn';
     aliasBtn.textContent = 'Add as alias';
-    aliasBtn.addEventListener('click', onStartAlias);
+    aliasBtn.addEventListener('click', () => onStartAlias());
     actions.appendChild(aliasBtn);
   }
 

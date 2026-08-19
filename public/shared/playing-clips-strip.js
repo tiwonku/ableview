@@ -64,6 +64,28 @@ export function isCreateTargetTrack(createSession, track) {
   return createSession.clipNameAtEdit === track.clipName;
 }
 
+function clipOverride(clipNameOverride) {
+  return typeof clipNameOverride === 'string' ? clipNameOverride.trim() : '';
+}
+
+/** Clip name to pre-fill on "Add cue row" (per-deck override, else payload / first playing). */
+export function resolveCreateClipName(payload, clipNameOverride = null) {
+  return clipOverride(clipNameOverride)
+    || payload?.clipName?.trim()
+    || playingTracks(payload)[0]?.clipName?.trim()
+    || '';
+}
+
+/**
+ * Whether "Add cue row" should open the editor.
+ * Per-deck create is allowed even when another watched track already won the match.
+ */
+export function canStartCreate(payload, clipNameOverride = null) {
+  if (!resolveCreateClipName(payload, clipNameOverride)) return false;
+  if (clipOverride(clipNameOverride)) return true;
+  return payload?.match?.matched !== true;
+}
+
 /**
  * Hero line for operator views.
  * @returns {{ text?: string, empty?: boolean, showHero: boolean }}
