@@ -69,12 +69,18 @@ function hasWholeTokenStem(query, stem) {
   return query === stem || ` ${query} `.includes(` ${stem} `);
 }
 
+/** Long titles may sit after a BPM/role word; short ones stay prefix-only. */
+function isDistinctiveTitle(norm) {
+  const tokens = norm.split(/\s+/).filter(Boolean);
+  return tokens.length >= 3 && tokens.filter((t) => t.length >= 4).length >= 2;
+}
+
 function findPrefixMatch(query, items) {
   if (!query) return null;
 
   let best = null;
   for (const item of items) {
-    const { norm, viaAlias } = item;
+    const { norm, viaAlias, viaAlsFolder } = item;
     if (!norm) continue;
     // Short song titles ("The") must not prefix-match every clip. Aliases are
     // intentional stems (TTY, SA) and skip this floor.
@@ -82,9 +88,11 @@ function findPrefixMatch(query, items) {
 
     const exact = query === norm;
     const prefix = !exact && query.startsWith(`${norm} `);
-    // Aliases may sit after a role/deck word ("Vocals TTT INTRO"). Song titles
-    // stay prefix-only so "Still Night" does not match "Intro - Still Night".
-    const contained = viaAlias && !exact && !prefix && hasWholeTokenStem(query, norm);
+    // Aliases / ALS stems / distinctive titles may sit after a BPM or role
+    // word. Short titles stay prefix-only so "Still Night" does not match
+    // "Intro - Still Night".
+    const allowContained = viaAlias || viaAlsFolder || isDistinctiveTitle(norm);
+    const contained = allowContained && !exact && !prefix && hasWholeTokenStem(query, norm);
     if (!exact && !prefix && !contained) continue;
 
     if (!best || norm.length > best.item.norm.length) {

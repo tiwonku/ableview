@@ -99,6 +99,19 @@ test('normalizeClipName strips ALS bpm prefix without parsing musical keys', () 
   );
 });
 
+test('normalizeClipName strips leading BPM and parentheticals', () => {
+  const opts = { lowercase: true, stripPunctuation: true, stripVersionTags: true };
+  assert.equal(
+    normalizeClipName('144 I Know The Truth griz flip jun 24 v1', opts),
+    'i know the truth griz flip jun 24'
+  );
+  assert.equal(
+    normalizeClipName('I Know The Truth (No Mercy)', opts),
+    'i know the truth'
+  );
+  assert.equal(normalizeClipName('99 Problems', opts), '99 problems');
+});
+
 test('parseAliases splits on pipe and comma', () => {
   assert.deepEqual(parseAliases('a|b, c'), ['a', 'b', 'c']);
   assert.deepEqual(parseAliases(''), []);
@@ -458,6 +471,35 @@ test('prefix match requires title at start of clip name', () => {
     testConfig({ match: { threshold: 0.4 } })
   );
   assert.equal(payload.match.matched, false);
+});
+
+test('BPM-prefixed remix clip matches distinctive song title', () => {
+  const rows = [
+    {
+      rowId: '77',
+      data: {
+        'Clip Name': 'I Know The Truth (No Mercy)',
+        Aliases: '',
+        'ALS Folder': 'Abm_70bpm_IKnowTheTruth_24',
+      },
+    },
+  ];
+  const payload = matchClip(
+    '144 I Know The Truth griz flip jun 24 v1',
+    snapshot({ rows }),
+    testConfig({
+      match: { ...DEFAULTS.match, threshold: 0.5 },
+      sheets: {
+        ...DEFAULTS.sheets,
+        matchColumn: 'Clip Name',
+        aliasColumn: 'Aliases',
+        alsFolderColumn: 'ALS Folder',
+      },
+    })
+  );
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '77');
+  assert.equal(payload.match.matchedValue, 'I Know The Truth (No Mercy)');
 });
 
 test('below-threshold clip returns matched false (NFR-7)', () => {

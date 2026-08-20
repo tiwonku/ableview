@@ -44,6 +44,8 @@ export function normalizeClipName(name, options = {}) {
     s = s.replace(/([a-z])([A-Z])/g, '$1 $2');
   }
   s = s.replace(/_/g, ' ');
+  // "(No Mercy)" is a sheet qualifier, not part of the Ableton clip name.
+  s = s.replace(/\([^)]*\)/g, ' ');
 
   if (options.lowercase) s = s.toLowerCase();
 
@@ -60,6 +62,9 @@ export function normalizeClipName(name, options = {}) {
   } else {
     s = s.replace(/\s+/g, ' ').trim();
   }
+
+  // Leading session BPM ("144 I Know The Truth …") — keep "99 Problems".
+  s = s.replace(/^\d{2,3}\s+(?=\S+\s+\S+)/, '').trim();
 
   return s;
 }
