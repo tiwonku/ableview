@@ -188,3 +188,55 @@ test('buildViewEditorColumns merges editorColumns and field types', () => {
     'Video World': { type: 'text' },
   });
 });
+
+test('operator Edit sits in the clip-head row, not a separate bar', () => {
+  const viewSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)),
+    'utf8',
+  );
+  const editorSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/admin-row-editor.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(viewSrc, /clip-head-row/);
+  assert.match(viewSrc, /view-edit-actions/);
+  assert.match(viewSrc, /view-edit-btn--edit/);
+  assert.doesNotMatch(viewSrc, /view-edit-bar/);
+  assert.doesNotMatch(editorSrc, /view-edit-bar/);
+});
+
+test('read-mode color swatches start edit and open the picker', () => {
+  const viewSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)),
+    'utf8',
+  );
+  const clientSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/ws-client.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(viewSrc, /onPickColor/);
+  assert.match(viewSrc, /makeColorPickButton/);
+  assert.match(clientSrc, /openOperatorColorField\(root, column\)/);
+  assert.match(clientSrc, /typeof openColorColumn === 'string'/);
+});
+
+test('operator color fields open the custom picker instead of a native overlay', () => {
+  const editorSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/admin-row-editor.js', import.meta.url)),
+    'utf8',
+  );
+  const pickerSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/color-picker.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(
+    editorSrc,
+    /import\s*\{\s*openColorPicker\s*\}\s*from\s*['"]\.\/color-picker\.js['"]/,
+  );
+  assert.match(editorSrc, /color-swatch-open/);
+  assert.match(editorSrc, /openColorPicker\(/);
+  assert.match(editorSrc, /export function openOperatorColorField/);
+  assert.doesNotMatch(editorSrc, /row-editor-color-picker-overlay/);
+  assert.match(pickerSrc, /color-picker-sv/);
+  assert.match(pickerSrc, /hsvToRgb/);
+});

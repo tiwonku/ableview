@@ -1,6 +1,7 @@
 // Shared view rendering (spec §9.4). Maps CuePayload + field config → DOM.
 
 import { parseRgbCell } from './color-parse.js';
+import { closeColorPicker } from './color-picker.js';
 import {
   getFieldValue,
   fieldLabel,
@@ -27,6 +28,7 @@ import {
 
 const TRANSPORT_PLAY_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5.5v13l11-6.5L8 5.5z"/></svg>`;
 const TRANSPORT_PAUSE_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M7 5h3.5v14H7V5zm6.5 0H17v14h-3.5V5z"/></svg>`;
+const EDIT_ICON = `<svg class="view-edit-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
 
 /** @type {HTMLElement | null} */
 let fieldExpandOverlay = null;
@@ -134,9 +136,9 @@ function isLaunching(payload) {
   return Boolean(payload?.pendingLaunch) && !payload?.simulated;
 }
 
-function renderHeroRow(parent, heroText, payload, { empty = false, noMatch = false } = {}) {
+function renderHeroRow(parent, heroText, payload, { empty = false, noMatch = false, launching = isLaunching(payload) } = {}) {
   const row = document.createElement('div');
-  row.className = 'clip-head' + (isLaunching(payload) ? ' clip-head--launching' : '');
+  row.className = 'clip-head' + (launching ? ' clip-head--launching' : '');
 
   const clipEl = document.createElement('p');
   clipEl.className = 'clip-name'
@@ -149,7 +151,7 @@ function renderHeroRow(parent, heroText, payload, { empty = false, noMatch = fal
     text.textContent = heroText;
     clipEl.appendChild(text);
 
-    if (isLaunching(payload)) {
+    if (launching) {
       const badge = document.createElement('span');
       badge.className = 'clip-launching-badge';
       badge.textContent = 'LAUNCHING';
@@ -229,6 +231,7 @@ export function renderView(root, {
   onCancelEdit,
   onSaveEdit,
 }) {
+  closeColorPicker();
   root.innerHTML = '';
 
   const titleEl = document.createElement('h1');
@@ -239,10 +242,25 @@ export function renderView(root, {
   const matched = payload?.match?.matched === true;
   const busy = Boolean(editSession || aliasSession);
 
+  const clipRow = document.createElement('div');
+  clipRow.className = 'clip-head-row';
+
   const clipHead = document.createElement('div');
   clipHead.id = 'view-clip-head';
-  root.appendChild(clipHead);
-  renderViewClipHead(clipHead, payload, matchColumn, { busy });
+  clipRow.appendChild(clipHead);
+  renderViewClipHead(clipHead, payload, matchColumn, { busy, editSession });
+
+  const editActions = renderViewEditActions({
+    editSession,
+    matched,
+    editable,
+    saveState,
+    onStartEdit,
+    onCancelEdit,
+    onSaveEdit,
+  });
+  if (editActions) clipRow.appendChild(editActions);
+  root.appendChild(clipRow);
 
   const showNoMatch = payload && !matched && !busy
     && (hasPlayingClips(payload) || payload.clipName?.trim());
@@ -290,23 +308,12 @@ export function renderView(root, {
     });
   } else if (!busy && fields?.length) {
     const visibleFields = matched ? fields : [];
-
-    if (matched && editable && onStartEdit) {
-      const editBar = document.createElement('div');
-      editBar.className = 'view-edit-bar';
-
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.className = 'admin-editor-btn';
-      editBtn.textContent = 'Edit';
-      editBtn.addEventListener('click', onStartEdit);
-      editBar.appendChild(editBtn);
-
-      root.appendChild(editBar);
-    }
-
     if (visibleFields.length) {
-      root.appendChild(renderFieldsGrid(visibleFields, payload));
+      root.appendChild(renderFieldsGrid(visibleFields, payload, {
+        onPickColor: editable && onStartEdit
+          ? (column) => onStartEdit(column)
+          : undefined,
+      }));
     }
   }
 
@@ -316,21 +323,87 @@ export function renderView(root, {
 export function updateViewLiveChrome(root, { payload, connected, lastUpdate, editSession, matchColumn = null }) {
   const clipHead = root.querySelector('#view-clip-head');
   const busy = Boolean(editSession);
-  if (clipHead) renderViewClipHead(clipHead, payload, matchColumn, { busy });
+  if (clipHead) renderViewClipHead(clipHead, payload, matchColumn, { busy, editSession });
 
   if (editSession) updateEditContextBanner(root, editSession, payload);
 
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-function renderViewClipHead(parent, payload, matchColumn = null, { busy = false } = {}) {
+function frozenEditHeroText(editSession, matchColumn) {
+  if (matchColumn) {
+    const fromRow = String(editSession.row?.[matchColumn] ?? '').trim();
+    if (fromRow) return fromRow;
+  }
+  const matched = String(editSession.matchedValueAtEdit ?? '').trim();
+  if (matched) return matched;
+  const clip = String(editSession.clipNameAtEdit ?? '').trim();
+  if (clip) return clip;
+  return editSession.mode === 'create' ? 'New cue' : 'Editing';
+}
+
+function renderViewClipHead(parent, payload, matchColumn = null, { busy = false, editSession = null } = {}) {
   parent.innerHTML = '';
+  if (editSession) {
+    renderHeroRow(parent, frozenEditHeroText(editSession, matchColumn), payload, {
+      launching: false,
+    });
+    return;
+  }
   const hero = resolveHeroDisplay(payload, matchColumn, { busy, noMatchHero: true });
   if (!hero.showHero) return;
   renderHeroRow(parent, hero.text, payload, { empty: hero.empty, noMatch: hero.noMatch });
 }
 
-function renderFieldsGrid(fields, payload) {
+function renderViewEditActions({
+  editSession,
+  matched,
+  editable,
+  saveState = 'idle',
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+}) {
+  const showSave = Boolean(editSession && onCancelEdit && onSaveEdit);
+  const showEdit = !editSession && matched && editable && onStartEdit;
+  if (!showSave && !showEdit) return null;
+
+  const actions = document.createElement('div');
+  actions.className = 'view-edit-actions';
+
+  if (showSave) {
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'view-edit-btn';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.disabled = saveState === 'saving';
+    cancelBtn.addEventListener('click', onCancelEdit);
+    actions.appendChild(cancelBtn);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'view-edit-btn view-edit-btn--primary';
+    saveBtn.textContent = saveState === 'saving' ? 'Saving…' : 'Save';
+    saveBtn.disabled = saveState === 'saving';
+    saveBtn.addEventListener('click', () => {
+      const section = actions.closest('#app')?.querySelector('#view-row-panel')
+        ?? document.getElementById('view-row-panel');
+      if (section) onSaveEdit(section);
+    });
+    actions.appendChild(saveBtn);
+    return actions;
+  }
+
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'view-edit-btn view-edit-btn--edit';
+  editBtn.innerHTML = `${EDIT_ICON}<span>Edit</span>`;
+  editBtn.addEventListener('click', onStartEdit);
+  actions.appendChild(editBtn);
+  return actions;
+}
+
+function renderFieldsGrid(fields, payload, { onPickColor } = {}) {
   const fieldsWrap = document.createElement('div');
   fieldsWrap.className = 'view-fields-wrap';
 
@@ -342,7 +415,7 @@ function renderFieldsGrid(fields, payload) {
     grid.style.setProperty('--strip-cols', String(fields.length));
     for (const field of fields) {
       if (field.type === 'color') {
-        grid.appendChild(renderColorField(field, payload));
+        grid.appendChild(renderColorField(field, payload, { onPickColor }));
       } else {
         grid.appendChild(renderTextField(field, payload, null, layoutMode));
       }
@@ -350,7 +423,7 @@ function renderFieldsGrid(fields, payload) {
   } else {
     for (const row of groupFieldsForLayout(fields, payload)) {
       if (row.type === 'colors') {
-        grid.appendChild(renderColorGroup(row.fields, payload));
+        grid.appendChild(renderColorGroup(row.fields, payload, { onPickColor }));
       } else if (row.type === 'note') {
         grid.appendChild(renderTextField(row.field, payload, 'note'));
       } else {
@@ -414,18 +487,41 @@ function renderTextField(field, payload, displayHint, layoutMode = 'hero') {
   return card;
 }
 
-function renderColorGroup(fields, payload) {
+function renderColorGroup(fields, payload, { onPickColor } = {}) {
   const row = document.createElement('div');
   row.className = 'colors-row';
 
   for (const field of fields) {
-    row.appendChild(renderColorField(field, payload));
+    row.appendChild(renderColorField(field, payload, { onPickColor }));
   }
 
   return row;
 }
 
-function renderColorField(field, payload) {
+function makeColorPickButton(label, color, onPick) {
+  const openBtn = document.createElement('button');
+  openBtn.type = 'button';
+  openBtn.className = 'color-swatch-open';
+  openBtn.setAttribute('aria-label', `Pick ${label} color`);
+  openBtn.title = `Pick ${label} color`;
+
+  const swatch = document.createElement('div');
+  swatch.className = 'color-swatch' + (color ? '' : ' color-swatch--empty');
+  if (color) swatch.style.backgroundColor = color.css;
+  swatch.setAttribute('aria-hidden', 'true');
+  openBtn.appendChild(swatch);
+
+  const badge = document.createElement('span');
+  badge.className = 'color-swatch-edit-badge';
+  badge.textContent = 'Pick';
+  badge.setAttribute('aria-hidden', 'true');
+  openBtn.appendChild(badge);
+
+  openBtn.addEventListener('click', onPick);
+  return openBtn;
+}
+
+function renderColorField(field, payload, { onPickColor } = {}) {
   const column = field.column;
   const label = fieldLabel(field);
   const raw = payload.row?.[column];
@@ -439,7 +535,7 @@ function renderColorField(field, payload) {
   labelEl.textContent = label;
   card.appendChild(labelEl);
 
-  if (!color) {
+  if (!color && !onPickColor) {
     const empty = document.createElement('p');
     empty.className = 'field-value empty';
     empty.textContent = '—';
@@ -450,20 +546,25 @@ function renderColorField(field, payload) {
   const body = document.createElement('div');
   body.className = 'color-body';
 
-  const swatch = document.createElement('div');
-  swatch.className = 'color-swatch';
-  swatch.style.backgroundColor = color.css;
-  swatch.setAttribute('aria-label', `${label}: ${color.rgbText}`);
-  body.appendChild(swatch);
+  if (onPickColor) {
+    body.appendChild(makeColorPickButton(label, color, () => onPickColor(column)));
+  } else {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch';
+    swatch.style.backgroundColor = color.css;
+    swatch.setAttribute('aria-label', `${label}: ${color.rgbText}`);
+    body.appendChild(swatch);
+  }
 
-  const values = document.createElement('div');
-  values.className = 'color-values';
-  values.appendChild(makeCopyButton('RGB', color.rgbText));
-  values.appendChild(makeCopyButton('Hex', color.hex));
-  body.appendChild(values);
+  if (color) {
+    const values = document.createElement('div');
+    values.className = 'color-values';
+    values.appendChild(makeCopyButton('RGB', color.rgbText));
+    values.appendChild(makeCopyButton('Hex', color.hex));
+    body.appendChild(values);
+  }
 
   card.appendChild(body);
-
   return card;
 }
 

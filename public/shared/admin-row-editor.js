@@ -6,6 +6,7 @@ import {
   DEFAULT_ICON,
 } from './sheet-format.js';
 import { parseRgbCell } from './color-parse.js';
+import { openColorPicker } from './color-picker.js';
 import { suggestAliasStem } from './alias-stem.js';
 import { operatorCreateColumns } from './playing-clips-strip.js';
 
@@ -161,7 +162,7 @@ export function renderRowEditorPanel(parent, {
   parent.appendChild(section);
 }
 
-/** Operator views: card grid + edit bar (matches read-mode layout). */
+/** Operator views: card grid matching read-mode layout. Save/Cancel live in the clip-head row. */
 export function renderOperatorRowEditorPanel(parent, {
   session,
   fields = [],
@@ -171,39 +172,11 @@ export function renderOperatorRowEditorPanel(parent, {
   fieldLabels = {},
   panelId = 'view-row-panel',
   livePayload,
-  onCancel,
-  onSave,
-  saveState = 'idle',
   saveError = null,
 }) {
   const section = document.createElement('section');
   section.className = 'operator-editor';
   section.id = panelId;
-
-  const editBar = document.createElement('div');
-  editBar.className = 'view-edit-bar view-edit-bar--actions';
-
-  const actions = document.createElement('div');
-  actions.className = 'admin-editor-actions';
-
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'admin-editor-btn';
-  cancelBtn.textContent = 'Cancel';
-  cancelBtn.disabled = saveState === 'saving';
-  cancelBtn.addEventListener('click', onCancel);
-  actions.appendChild(cancelBtn);
-
-  const saveBtn = document.createElement('button');
-  saveBtn.type = 'button';
-  saveBtn.className = 'admin-editor-btn admin-editor-btn--primary';
-  saveBtn.textContent = saveState === 'saving' ? 'Saving…' : 'Save';
-  saveBtn.disabled = saveState === 'saving';
-  saveBtn.addEventListener('click', () => onSave(section));
-  actions.appendChild(saveBtn);
-
-  editBar.appendChild(actions);
-  section.appendChild(editBar);
 
   const context = document.createElement('p');
   context.className = 'admin-editor-context operator-editor-context';
@@ -382,24 +355,54 @@ function renderEditorField(column, raw, columnConfig, fieldLabel, options = {}) 
       const picker = document.createElement('input');
       picker.type = 'color';
       picker.id = inputId;
-      picker.className =
-        'row-editor-color-input' + (operatorColor ? ' row-editor-color-picker-overlay' : '');
       picker.value = normalizeHexForPicker(isEmpty ? null : state);
 
       if (operatorColor) {
+        picker.className = 'row-editor-color-input row-editor-color-input--hidden';
+        picker.tabIndex = -1;
+        picker.setAttribute('aria-hidden', 'true');
+
         const swatchHost = document.createElement('div');
         swatchHost.className = 'color-swatch-edit';
+
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'color-swatch-open';
+        openBtn.setAttribute('aria-label', `Pick ${fieldLabel ?? column} color`);
+        openBtn.title = `Pick ${fieldLabel ?? column} color`;
 
         const preview = document.createElement('div');
         preview.className = 'color-swatch color-swatch--edit';
         preview.dataset.role = 'color-preview';
         preview.setAttribute('aria-hidden', 'true');
-        swatchHost.appendChild(preview);
+        openBtn.appendChild(preview);
 
-        picker.title = `Pick ${fieldLabel ?? column} color`;
-        swatchHost.appendChild(picker);
+        const badge = document.createElement('span');
+        badge.className = 'color-swatch-edit-badge';
+        badge.textContent = 'Pick';
+        badge.setAttribute('aria-hidden', 'true');
+        openBtn.appendChild(badge);
+
+        openBtn.addEventListener('click', () => {
+          const cleared = wrap.dataset.cleared === 'true';
+          const currentHex = cleared ? null : picker.value;
+          openColorPicker({
+            title: fieldLabel ?? column,
+            hex: currentHex,
+            onInput: (hex) => setColorCleared(wrap, false, hex),
+            onCancel: () => {
+              if (cleared) setColorCleared(wrap, true);
+              else setColorCleared(wrap, false, currentHex);
+            },
+            onClear: () => setColorCleared(wrap, true),
+          });
+        });
+
+        swatchHost.appendChild(openBtn);
         wrap.appendChild(swatchHost);
+        wrap.appendChild(picker);
       } else {
+        picker.className = 'row-editor-color-input';
         wrap.appendChild(picker);
       }
 
@@ -674,6 +677,20 @@ function valuesEqual(value, original, field) {
 
 function cssEscape(value) {
   return String(value).replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+/** Open the operator color picker for a column after the edit form is mounted. */
+export function openOperatorColorField(root, column) {
+  if (!root || column == null || column === '') return false;
+  const fields = root.querySelectorAll('.row-editor-field[data-column]');
+  for (const field of fields) {
+    if (field.dataset.column !== String(column)) continue;
+    const btn = field.querySelector('.color-swatch-open');
+    if (!btn) return false;
+    btn.click();
+    return true;
+  }
+  return false;
 }
 
 export function renderReadOnlyRowPanel(parent, { payload, onStartEdit }) {

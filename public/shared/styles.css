@@ -974,6 +974,62 @@ body.layout-operator .clip-name--nomatch {
   margin: 0.35rem 0 0.85rem;
 }
 
+.view-edit-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.view-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: var(--chrome-btn-min);
+  min-width: 5.25rem;
+  padding: 0.55rem 1.05rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.45rem;
+  background: rgba(91, 141, 239, 0.18);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.view-edit-btn:hover:not(:disabled) {
+  background: rgba(91, 141, 239, 0.28);
+}
+
+.view-edit-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.view-edit-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.view-edit-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.view-edit-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.view-edit-btn-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+}
+
 .admin-editor-header {
   display: flex;
   flex-wrap: wrap;
@@ -1814,9 +1870,10 @@ body.layout-operator .view-title {
 }
 
 body.layout-operator #view-clip-head,
+body.layout-operator .clip-head-row,
 body.layout-operator .no-match,
 body.layout-operator .no-match-panel,
-body.layout-operator .view-edit-bar,
+body.layout-operator .view-edit-actions,
 body.layout-operator .operator-editor-context {
   flex-shrink: 0;
 }
@@ -1888,12 +1945,37 @@ body.layout-operator .operator-editor {
   min-height: 0;
 }
 
+body.layout-operator .clip-head-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: clamp(0.55rem, 1.6vw, 1.15rem);
+  margin-bottom: clamp(0.35rem, 1.2dvh, 1rem);
+}
+
+body.layout-operator .clip-head-row #view-clip-head {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
 body.layout-operator .clip-head {
   margin-bottom: clamp(0.35rem, 1.2dvh, 1rem);
 }
 
+body.layout-operator .clip-head-row .clip-head {
+  margin-bottom: 0;
+}
+
+body.layout-operator #app:has(.fields-many) .clip-head-row {
+  margin-bottom: clamp(0.25rem, 0.8dvh, 0.65rem);
+}
+
 body.layout-operator #app:has(.fields-many) .clip-head {
   margin-bottom: clamp(0.25rem, 0.8dvh, 0.65rem);
+}
+
+body.layout-operator #app:has(.fields-many) .clip-head-row .clip-head {
+  margin-bottom: 0;
 }
 
 body.layout-operator .no-match-panel {
@@ -1901,8 +1983,20 @@ body.layout-operator .no-match-panel {
   margin-bottom: var(--op-gap);
 }
 
-body.layout-operator .view-edit-bar {
-  margin: clamp(0.1rem, 0.4dvh, 0.25rem) 0 var(--op-gap);
+body.layout-operator .view-edit-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  align-self: stretch;
+  margin: 0 0 0 auto;
+}
+
+body.layout-operator .view-edit-btn {
+  align-self: stretch;
+  height: 100%;
+  min-height: var(--chrome-btn-min);
+  padding: 0.55rem 1.15rem;
+  font-size: clamp(0.95rem, 2dvh, 1.1rem);
 }
 
 /* The fields area is the only scroll region — scroll is a fallback when the viewport is too small; color rows stay compact so short fields remain visible. Rows are content-sized so nothing is ever clipped; spare vertical space is shared by the grid's default align-content: stretch. */
@@ -2058,6 +2152,18 @@ body.layout-operator .fields-strip .color-swatch {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
 
+body.layout-operator .fields-strip .color-swatch-open {
+  flex: 1 1 auto;
+  display: flex;
+  min-width: 0;
+  min-height: clamp(2rem, 6dvh, 2.5rem);
+}
+
+body.layout-operator .fields-strip .color-swatch-open .color-swatch {
+  flex: 1 1 auto;
+  min-height: inherit;
+}
+
 body.layout-operator .fields-strip .color-values {
   display: flex;
   flex-direction: column;
@@ -2104,6 +2210,19 @@ body.layout-operator .fields-strip .color-copy-value {
     min-height: clamp(2.5rem, 8dvh, 3rem);
     height: auto;
     align-self: stretch;
+  }
+
+  body.layout-operator .fields-strip .color-swatch-open {
+    flex: 1 1 55%;
+    min-width: 0;
+    width: auto;
+    min-height: clamp(2.5rem, 8dvh, 3rem);
+    align-self: stretch;
+  }
+
+  body.layout-operator .fields-strip .color-swatch-open .color-swatch {
+    flex: 1 1 auto;
+    width: 100%;
   }
 
   body.layout-operator .fields-strip .color-values {
@@ -2281,6 +2400,14 @@ body.layout-operator .colors-row .color-swatch {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
 
+body.layout-operator .colors-row .color-swatch-open {
+  margin: 0 0 clamp(0.3rem, 0.6dvh, 0.45rem);
+}
+
+body.layout-operator .colors-row .color-swatch-open .color-swatch {
+  margin-bottom: 0;
+}
+
 body.layout-operator .colors-row .color-values {
   flex-shrink: 0;
   min-width: 0;
@@ -2358,8 +2485,41 @@ body.layout-operator .color-swatch-edit {
   min-width: 0;
 }
 
-body.layout-operator .color-swatch-edit .color-swatch {
+body.layout-operator .color-swatch-open {
+  display: block;
+  position: relative;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 0.45rem;
+}
+
+body.layout-operator .color-swatch-open .color-swatch {
   margin-bottom: 0;
+  pointer-events: none;
+}
+
+body.layout-operator .color-swatch-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+body.layout-operator .color-swatch-edit-badge {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.4rem;
+  padding: 0.22rem 0.45rem;
+  border-radius: 0.3rem;
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
 }
 
 body.layout-operator .color-swatch--empty {
@@ -2371,30 +2531,27 @@ body.layout-operator .color-swatch--empty {
     );
 }
 
-body.layout-operator .row-editor-color-picker-overlay {
+.row-editor-color-input--hidden {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
   border: 0;
-  border-radius: inherit;
-  opacity: 0;
-  cursor: pointer;
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
+  padding: 0;
+  margin: -1px;
 }
 
 body.layout-operator .colors-row--edit .color-values--edit {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   min-width: 0;
+}
+
+body.layout-operator .colors-row--edit .color-copy {
+  min-height: 2.5rem;
 }
 
 body.layout-operator .color-copy--hex {
@@ -2541,6 +2698,267 @@ body.field-expand-open {
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.color-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(0.75rem, env(safe-area-inset-top, 0px)) max(0.75rem, env(safe-area-inset-right, 0px)) max(0.75rem, env(safe-area-inset-bottom, 0px)) max(0.75rem, env(safe-area-inset-left, 0px));
+}
+
+.color-picker-overlay[hidden] {
+  display: none !important;
+}
+
+body.color-picker-open {
+  overflow: hidden;
+}
+
+.color-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.78);
+  cursor: pointer;
+}
+
+.color-picker-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: min(36rem, 100%);
+  max-height: min(92dvh, 100%);
+  padding: 0.9rem 1rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.color-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.color-picker-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.color-picker-close {
+  flex-shrink: 0;
+  min-height: var(--chrome-btn-min);
+  padding: 0.45rem 1rem;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.color-picker-close:hover {
+  border-color: var(--accent);
+}
+
+.color-picker-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.85rem;
+  gap: 0.85rem;
+  min-height: min(52dvh, 24rem);
+  flex: 1 1 auto;
+}
+
+.color-picker-sv,
+.color-picker-hue {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.color-picker-sv {
+  min-height: 12rem;
+  background:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, #fff, var(--picker-hue, #ff0000));
+}
+
+.color-picker-hue {
+  background: linear-gradient(
+    to bottom,
+    #ff0000,
+    #ffff00,
+    #00ff00,
+    #00ffff,
+    #0000ff,
+    #ff00ff,
+    #ff0000
+  );
+}
+
+.color-picker-thumb {
+  position: absolute;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.color-picker-thumb--sv {
+  transform: translate(-50%, -50%);
+}
+
+.color-picker-thumb--hue {
+  left: 50%;
+  top: var(--hue-t, 0%);
+  transform: translate(-50%, -50%);
+  background: #fff;
+}
+
+.color-picker-meta {
+  display: flex;
+  align-items: stretch;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.color-picker-preview {
+  flex: 0 0 4.5rem;
+  min-height: 4.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.color-picker-values {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.color-picker-rgb {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.color-picker-hex-label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.color-picker-hex {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--chrome-btn-min);
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.color-picker-hex:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.color-picker-actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.color-picker-btn {
+  flex: 1 1 0;
+  min-height: var(--chrome-btn-min);
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.color-picker-btn:hover {
+  border-color: var(--accent);
+}
+
+.color-picker-btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+@media (max-width: 40rem), (orientation: portrait) and (max-height: 56rem) {
+  .color-picker-stage {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(11rem, 1fr) 2.85rem;
+    min-height: min(42dvh, 20rem);
+  }
+
+  .color-picker-hue {
+    background: linear-gradient(
+      to right,
+      #ff0000,
+      #ffff00,
+      #00ff00,
+      #00ffff,
+      #0000ff,
+      #ff00ff,
+      #ff0000
+    );
+  }
+
+  .color-picker-thumb--hue {
+    top: 50%;
+    left: var(--hue-t, 0%);
+  }
+}
+
+body.layout-operator .colors-row--edit .color-swatch {
+  height: clamp(4rem, 12dvh, 7rem);
+  max-height: 7rem;
 }
 
 /* Session view — watched tracks fill leftover viewport like operator cards */

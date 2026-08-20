@@ -14,8 +14,10 @@ import {
   collectEditorValues,
   captureCreateSession,
   viewFieldColumns,
+  openOperatorColorField,
 } from './admin-row-editor.js';
 import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
+import { closeColorPicker } from './color-picker.js';
 import {
   operatorCreateColumns,
   resolveCreateClipName,
@@ -198,8 +200,9 @@ export function connectView({
     }
   }
 
-  function startEdit() {
+  function startEdit(openColorColumn) {
     if (!lastPayload?.match?.matched || !lastPayload.row) return;
+    const column = typeof openColorColumn === 'string' ? openColorColumn : null;
     const scope = viewConfig.editable
       ? { columns: viewFieldColumns(viewConfig.fields) }
       : undefined;
@@ -207,6 +210,7 @@ export function connectView({
     saveState = 'idle';
     saveError = null;
     render();
+    if (column) openOperatorColorField(root, column);
   }
 
   function startCreate(clipNameOverride, track = null) {
@@ -427,6 +431,7 @@ export function connectView({
   }
 
   function render() {
+    closeColorPicker();
     if (!viewConfig) return;
     const ctx = {
       ...viewConfig,
@@ -601,6 +606,7 @@ export function connectView({
   async function enterSettings(href, historyMode) {
     if (showingSettings && unmountSettings) return;
     showingSettings = true;
+    closeColorPicker();
     editSession = null;
     aliasSession = null;
     saveState = 'idle';
