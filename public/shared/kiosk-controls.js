@@ -94,8 +94,11 @@ export function armKioskAutoFullscreen({
     if (isDocumentFullscreen(doc)) disarm();
   }
 
-  function onActivate() {
+  function onActivate(event) {
     if (done) return;
+    // Fullscreen / Reload / Exit must keep their own clicks. requestFullscreen()
+    // during pointerdown can swallow the following click.
+    if (event?.target?.closest?.('.kiosk-controls')) return;
     requestEnter();
   }
 
@@ -172,26 +175,21 @@ export function kioskLinkAction(nextId, {
 }
 
 /**
- * Fullscreen API exits on document unload, so Reload cannot use location.reload()
- * while fullscreen. Soft = same-document reconnect; hard = full page reload.
+ * Always a real navigation. A same-document WebSocket reconnect looks like a
+ * no-op (no Connecting flash, stale JS/CSS stay loaded). Fullscreen API will
+ * drop on unload; --start-fullscreen window chrome stays, and
+ * armKioskAutoFullscreen re-enters Fullscreen API on the next tap.
  */
-export function kioskReloadAction({ fullscreen = false } = {}) {
-  return fullscreen ? 'soft' : 'hard';
+export function kioskReloadAction() {
+  return 'hard';
 }
 
 export function performKioskReload({
-  fullscreen = false,
   reload,
-  softReload,
 } = {}) {
-  const action = kioskReloadAction({ fullscreen });
-  if (action === 'soft') {
-    softReload?.();
-    return action;
-  }
   const reloadFn = reload ?? (() => location.reload());
   reloadFn();
-  return action;
+  return 'hard';
 }
 
 function defaultClose(win = typeof window !== 'undefined' ? window : null) {
@@ -391,7 +389,6 @@ export function mountKioskControls({
   bar,
   search,
   reload,
-  softReload,
   close,
   afterCloseMs = 250,
 } = {}) {
@@ -427,11 +424,7 @@ export function mountKioskControls({
     html: RELOAD_ICON,
   });
   reloadBtn.addEventListener('click', () => {
-    performKioskReload({
-      fullscreen: isDocumentFullscreen(),
-      reload,
-      softReload,
-    });
+    performKioskReload({ reload });
   });
   controls.appendChild(reloadBtn);
 

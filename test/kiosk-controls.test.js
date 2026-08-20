@@ -109,6 +109,40 @@ test('armKioskAutoFullscreen requests fullscreen then retries on pointerdown', a
   assert.equal(requested, 2);
 });
 
+test('armKioskAutoFullscreen ignores pointerdown on kiosk chrome', async () => {
+  let requested = 0;
+  const listeners = {};
+  const doc = {
+    fullscreenElement: null,
+    documentElement: {},
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  const target = {
+    addEventListener(type, fn) { listeners[type] = fn; },
+    removeEventListener(type) { delete listeners[type]; },
+  };
+  armKioskAutoFullscreen({
+    doc,
+    target,
+    enter: () => {
+      requested += 1;
+      return Promise.resolve(false);
+    },
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(requested, 1);
+  listeners.pointerdown({
+    target: { closest: (sel) => (sel === '.kiosk-controls' ? {} : null) },
+  });
+  assert.equal(requested, 1);
+  listeners.pointerdown({
+    target: { closest: () => null },
+  });
+  assert.equal(requested, 2);
+});
+
 test('isDocumentFullscreen follows fullscreenElement', () => {
   assert.equal(isDocumentFullscreen({ fullscreenElement: null }), false);
   assert.equal(isDocumentFullscreen({ fullscreenElement: {} }), true);
@@ -176,30 +210,25 @@ test('kioskLinkAction keeps kiosk history from growing', () => {
   assert.equal(kioskLinkAction('settings', {}), 'follow');
 });
 
-test('kioskReloadAction stays in-document while fullscreen', () => {
-  assert.equal(kioskReloadAction({ fullscreen: true }), 'soft');
+test('kioskReloadAction always hard-reloads', () => {
+  assert.equal(kioskReloadAction({ fullscreen: true }), 'hard');
   assert.equal(kioskReloadAction({ fullscreen: false }), 'hard');
   assert.equal(kioskReloadAction({}), 'hard');
 });
 
-test('performKioskReload does not hard-reload while fullscreen', () => {
-  let soft = 0;
+test('performKioskReload hard-reloads even while fullscreen', () => {
   let hard = 0;
   assert.equal(performKioskReload({
     fullscreen: true,
-    softReload: () => { soft += 1; },
     reload: () => { hard += 1; },
-  }), 'soft');
-  assert.equal(soft, 1);
-  assert.equal(hard, 0);
+  }), 'hard');
+  assert.equal(hard, 1);
 
   assert.equal(performKioskReload({
     fullscreen: false,
-    softReload: () => { soft += 1; },
     reload: () => { hard += 1; },
   }), 'hard');
-  assert.equal(soft, 1);
-  assert.equal(hard, 1);
+  assert.equal(hard, 2);
 });
 
 test('closeKioskWindow claims the window then closes', () => {
