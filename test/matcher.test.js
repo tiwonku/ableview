@@ -4,7 +4,12 @@ import { createBus, EVENTS } from '../src/core/bus.js';
 import { createLogger } from '../src/core/logger.js';
 import { makeNowPlaying, SOURCES } from '../src/core/now-playing.js';
 import { DEFAULTS } from '../src/config/index.js';
-import { normalizeClipName, parseAliases } from '../src/match/normalize.js';
+import {
+  hasTokenOverlap,
+  isGenericNormalizedQuery,
+  normalizeClipName,
+  parseAliases,
+} from '../src/match/normalize.js';
 import { matchClip, matchBestOfTracks, createMatcher } from '../src/match/index.js';
 
 const silentLog = createLogger();
@@ -97,6 +102,27 @@ test('normalizeClipName strips ALS bpm prefix without parsing musical keys', () 
 test('parseAliases splits on pipe and comma', () => {
   assert.deepEqual(parseAliases('a|b, c'), ['a', 'b', 'c']);
   assert.deepEqual(parseAliases(''), []);
+});
+
+test('isGenericNormalizedQuery flags arrangement-only leftovers', () => {
+  assert.equal(isGenericNormalizedQuery(''), true);
+  assert.equal(isGenericNormalizedQuery('intro'), true);
+  assert.equal(isGenericNormalizedQuery('layout'), true);
+  assert.equal(isGenericNormalizedQuery('140'), true);
+  assert.equal(isGenericNormalizedQuery('drop 1'), true);
+  assert.equal(isGenericNormalizedQuery('pl intro'), false);
+  assert.equal(isGenericNormalizedQuery('hotrox'), false);
+  assert.equal(isGenericNormalizedQuery('mickman'), false);
+});
+
+test('hasTokenOverlap requires a shared stem, not Fuse-adjacent letters', () => {
+  assert.equal(hasTokenOverlap('intro', 'hotrox'), false);
+  assert.equal(hasTokenOverlap('layout', 'solamente'), false);
+  assert.equal(hasTokenOverlap('pl intro', 'discipline'), false);
+  assert.equal(hasTokenOverlap('gazing at the glre', 'gazing at the glare'), true);
+  assert.equal(hasTokenOverlap('solament', 'solamente'), true);
+  assert.equal(hasTokenOverlap('hot rox', 'hotrox'), true);
+  assert.equal(hasTokenOverlap('hotrox', 'hot like rox'), false);
 });
 
 test('exact clip name matches the correct row', () => {
@@ -439,6 +465,136 @@ test('below-threshold clip returns matched false (NFR-7)', () => {
   assert.equal(payload.match.matched, false);
   assert.equal(payload.match.confidence, 0);
   assert.equal(payload.row, undefined);
+});
+
+test('generic arrangement clips do not Fuse-match a song (NFR-7)', () => {
+  const rows = [
+    {
+      rowId: '70',
+      data: {
+        'Clip Name': 'Hot Like Rox',
+        Aliases: 'HotRox',
+        'ALS Folder': 'Ebm_80bpm_HotRox_24',
+      },
+    },
+    {
+      rowId: '138',
+      data: {
+        'Clip Name': 'Solamente',
+        Aliases: '',
+        'ALS Folder': 'Am_98bpm_Solamente_24',
+      },
+    },
+    {
+      rowId: '187',
+      data: {
+        'Clip Name': 'DISCIPLINE',
+        Aliases: 'DISCIPLINE',
+      },
+    },
+    {
+      rowId: '7',
+      data: {
+        'Clip Name': 'After Midnight',
+        Aliases: '',
+        'ALS Folder': 'Dm_95bpm_AfterMidnight_24',
+      },
+    },
+  ];
+  const config = testConfig({
+    match: { ...DEFAULTS.match, threshold: 0.5 },
+    sheets: {
+      ...DEFAULTS.sheets,
+      matchColumn: 'Clip Name',
+      aliasColumn: 'Aliases',
+      alsFolderColumn: 'ALS Folder',
+    },
+  });
+  const snap = snapshot({ rows });
+
+  for (const clip of ['INTRO', 'LAYOUT', 'PL_INTRO', 'HT DROP', '140 DROP']) {
+    const payload = matchClip(clip, snap, config);
+    assert.equal(payload.match.matched, false, `${clip} should not match`);
+    assert.equal(payload.match.confidence, 0, `${clip} confidence`);
+  }
+
+  const real = matchClip('HotRox_ DRUMS', snap, config);
+  assert.equal(real.match.matched, true);
+  assert.equal(real.match.rowId, '70');
+  assert.equal(real.match.matchedValue, 'HotRox');
+});
+
+test('explicit INTRO alias still prefix-matches clip INTRO', () => {
+  const rows = [
+    {
+      rowId: '1',
+      data: { 'Clip Name': 'Cold Open', Aliases: 'INTRO' },
+    },
+  ];
+  const payload = matchClip('INTRO', snapshot({ rows }), testConfig());
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '1');
+  assert.equal(payload.match.viaAlias, true);
+  assert.equal(payload.match.matchedValue, 'INTRO');
+});
+
+test('bestMatch does not crown a generic deck as winner', () => {
+  const rows = [
+    {
+      rowId: '70',
+      data: {
+        'Clip Name': 'Hot Like Rox',
+        Aliases: 'HotRox',
+        'ALS Folder': 'Ebm_80bpm_HotRox_24',
+      },
+    },
+    {
+      rowId: '138',
+      data: {
+        'Clip Name': 'Solamente',
+        Aliases: '',
+        'ALS Folder': 'Am_98bpm_Solamente_24',
+      },
+    },
+  ];
+  const payload = matchBestOfTracks(
+    [
+      { trackIndex: 11, trackName: 'DECK A', clipName: 'LAYOUT', slotIndex: 1002 },
+      { trackIndex: 12, trackName: 'DECK B', clipName: 'INTRO', slotIndex: 998 },
+    ],
+    snapshot({ rows }),
+    testConfig({
+      match: { ...DEFAULTS.match, threshold: 0.5 },
+      sheets: {
+        ...DEFAULTS.sheets,
+        matchColumn: 'Clip Name',
+        aliasColumn: 'Aliases',
+        alsFolderColumn: 'ALS Folder',
+      },
+    })
+  );
+  assert.equal(payload.match.matched, false);
+  assert.equal(payload.clipName, null);
+  assert.equal(payload.trackMatches.every((t) => !t.matched && !t.winner), true);
+});
+
+test('Fuse still matches a real typo when tokens overlap', () => {
+  const rows = [
+    {
+      rowId: '62',
+      data: {
+        'Clip Name': 'Gazing At The Glare',
+        Aliases: '',
+      },
+    },
+  ];
+  const payload = matchClip(
+    'Gazing At The Glre',
+    snapshot({ rows }),
+    testConfig({ match: { ...DEFAULTS.match, threshold: 0.4 } })
+  );
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '62');
 });
 
 test('Fuse hit below confidence floor is unmatched (NFR-7)', () => {

@@ -554,6 +554,9 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
     'Confidence threshold (0–1)',
     numberInput('threshold', settings.match.threshold, { min: 0, max: 1, step: 0.05 })
   ));
+  const matchHint = el('p', 'settings-sim-hint');
+  matchHint.textContent = 'Generic clips (INTRO, LAYOUT, DROP) never match a song. Fuzzy matching only runs on longer names and needs a shared word with the sheet row — no match is safer than a wrong cue.';
+  matchGroup.appendChild(matchHint);
   bottomRow.appendChild(matchGroup);
 
   const clockRow = el('div', 'settings-row settings-row-single');

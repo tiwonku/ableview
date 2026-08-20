@@ -71,3 +71,63 @@ export function parseAliases(raw) {
     .map((part) => part.trim())
     .filter(Boolean);
 }
+
+/** Arrangement / role words that must not Fuse-match a song on their own. */
+const GENERIC_CLIP_TOKENS = new Set([
+  'intro',
+  'outro',
+  'layout',
+  'drop',
+  'verse',
+  'chorus',
+  'bridge',
+  'build',
+  'edit',
+  'arrangement',
+  'drums',
+  'drum',
+  'samples',
+  'sample',
+  'bass',
+  'vox',
+  'vocals',
+  'vocal',
+  'loop',
+  'loops',
+  'part',
+  'bar',
+  'bars',
+]);
+
+function compactTokens(s) {
+  return s.replace(/\s+/g, '');
+}
+
+/**
+ * True when the normalized clip is only arrangement/role vocabulary (INTRO, LAYOUT,
+ * 140 DROP → 140). Prefix/alias matching never sees these — no match is safer.
+ */
+export function isGenericNormalizedQuery(query) {
+  if (!query) return true;
+  const tokens = query.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  return tokens.every((t) => GENERIC_CLIP_TOKENS.has(t) || /^\d+$/.test(t));
+}
+
+/**
+ * Fuse confirmation: a 4+ char token in common, or compact containment
+ * (hot rox ↔ hotrox, solament ⊆ solamente).
+ */
+export function hasTokenOverlap(query, candidate) {
+  if (!query || !candidate) return false;
+  const qc = compactTokens(query);
+  const cc = compactTokens(candidate);
+  if (qc.length >= 4 && cc.length >= 4 && (qc.includes(cc) || cc.includes(qc))) {
+    return true;
+  }
+  const candidateTokens = new Set(candidate.split(/\s+/).filter((t) => t.length >= 4));
+  for (const token of query.split(/\s+/).filter((t) => t.length >= 4)) {
+    if (candidateTokens.has(token) || cc.includes(token)) return true;
+  }
+  return false;
+}

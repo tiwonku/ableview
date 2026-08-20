@@ -40,6 +40,10 @@ export const DEFAULTS = Object.freeze({
   match: {
     threshold: 0.4,
     minConfidenceGap: 0.08,
+    minFuseQueryLength: 6,
+    minMatchCharLength: 4,
+    fuseMinConfidence: 0.75,
+    requireTokenOverlap: true,
     normalize: { lowercase: true, stripPunctuation: true, stripVersionTags: true },
   },
   server: { wsHeartbeatSeconds: 5 },
@@ -117,6 +121,24 @@ export function validateConfig(config) {
   }
   if (!(config.match.threshold >= 0 && config.match.threshold <= 1)) {
     errors.push('match.threshold must be between 0 and 1');
+  }
+  if (config.match.fuseMinConfidence != null) {
+    const floor = config.match.fuseMinConfidence;
+    if (!(typeof floor === 'number' && floor >= 0 && floor <= 1)) {
+      errors.push('match.fuseMinConfidence must be between 0 and 1');
+    }
+  }
+  if (config.match.minFuseQueryLength != null) {
+    const n = config.match.minFuseQueryLength;
+    if (!(Number.isInteger(n) && n >= 1)) {
+      errors.push('match.minFuseQueryLength must be a positive integer');
+    }
+  }
+  if (config.match.minMatchCharLength != null) {
+    const n = config.match.minMatchCharLength;
+    if (!(Number.isInteger(n) && n >= 1)) {
+      errors.push('match.minMatchCharLength must be a positive integer');
+    }
   }
   if (!(config.sheets.refreshSeconds > 0)) errors.push('sheets.refreshSeconds must be > 0');
   if (!Number.isInteger(config.sheets.headerRow) || config.sheets.headerRow < 1) {

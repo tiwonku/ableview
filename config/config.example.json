@@ -42,6 +42,10 @@
   "match": {
     "threshold": 0.4,
     "minConfidenceGap": 0.08,
+    "minFuseQueryLength": 6,
+    "minMatchCharLength": 4,
+    "fuseMinConfidence": 0.75,
+    "requireTokenOverlap": true,
     "normalize": {
       "lowercase": true,
       "stripPunctuation": true,

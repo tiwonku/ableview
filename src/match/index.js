@@ -1,7 +1,12 @@
 import Fuse from 'fuse.js';
 import { EVENTS } from '../core/bus.js';
 import { makeCuePayload, makeMatchResult } from '../core/cue-payload.js';
-import { normalizeClipName, parseAliases } from './normalize.js';
+import {
+  hasTokenOverlap,
+  isGenericNormalizedQuery,
+  normalizeClipName,
+  parseAliases,
+} from './normalize.js';
 
 function buildSearchItems(rows, sheets, normalizeOptions) {
   const { matchColumn, aliasColumn, alsFolderColumn } = sheets;
@@ -42,12 +47,13 @@ function buildSearchItems(rows, sheets, normalizeOptions) {
   return items;
 }
 
-function createFuseIndex(items, threshold) {
+function createFuseIndex(items, threshold, minMatchCharLength) {
   return new Fuse(items, {
     keys: ['norm'],
     threshold,
     includeScore: true,
     ignoreLocation: true,
+    minMatchCharLength,
   });
 }
 
@@ -95,7 +101,12 @@ function emptyMatch() {
 
 /** Core single-clip match against an in-memory sheet snapshot. */
 export function resolveClipMatch(clipName, snapshot, config) {
-  const { threshold, normalize: normalizeOptions } = config.match;
+  const matchCfg = config.match ?? {};
+  const { threshold, normalize: normalizeOptions } = matchCfg;
+  const minFuseQueryLength = matchCfg.minFuseQueryLength ?? 6;
+  const minMatchCharLength = matchCfg.minMatchCharLength ?? 4;
+  const fuseMinConfidence = matchCfg.fuseMinConfidence ?? 0.75;
+  const requireTokenOverlap = matchCfg.requireTokenOverlap !== false;
   const { rows } = snapshot;
 
   if (!clipName?.trim()) {
@@ -108,6 +119,9 @@ export function resolveClipMatch(clipName, snapshot, config) {
   }
 
   const query = normalizeClipName(clipName, normalizeOptions);
+  if (!query) {
+    return { match: emptyMatch(), row: null };
+  }
 
   const prefixMatch = findPrefixMatch(query, items);
   if (prefixMatch) {
@@ -125,7 +139,13 @@ export function resolveClipMatch(clipName, snapshot, config) {
     };
   }
 
-  const fuse = createFuseIndex(items, threshold);
+  // Generic leftovers (INTRO, LAYOUT, 140 DROP → 140) must not Fuse a song.
+  // Exact/alias prefix above still wins if the sheet opted in (alias "INTRO").
+  if (isGenericNormalizedQuery(query) || query.length < minFuseQueryLength) {
+    return { match: emptyMatch(), row: null };
+  }
+
+  const fuse = createFuseIndex(items, threshold, minMatchCharLength);
   const results = fuse.search(query);
 
   if (results.length === 0) {
@@ -136,8 +156,13 @@ export function resolveClipMatch(clipName, snapshot, config) {
   const confidence = scoreToConfidence(best.score);
   // Fuse.js (ignoreLocation) can return scores worse than `threshold`.
   // Enforce the floor ourselves so NFR-7 cannot leak a wrong row.
-  const minConfidence = 1 - threshold;
+  // fuseMinConfidence is a safety floor: loosening threshold must not
+  // re-open 50–60% false positives (wrong song is worse than no match).
+  const minConfidence = Math.max(1 - threshold, fuseMinConfidence);
   if (confidence < minConfidence) {
+    return { match: emptyMatch(), row: null };
+  }
+  if (requireTokenOverlap && !hasTokenOverlap(query, best.item.norm)) {
     return { match: emptyMatch(), row: null };
   }
 
