@@ -88,7 +88,7 @@ export function canStartCreate(payload, clipNameOverride = null) {
 
 /**
  * Hero line for operator views.
- * @returns {{ text?: string, empty?: boolean, showHero: boolean, noMatch?: boolean }}
+ * @returns {{ text?: string, empty?: boolean, showHero: boolean, noMatch?: boolean, lastMatched?: boolean }}
  */
 export function resolveHeroDisplay(payload, matchColumn = null, { busy = false, noMatchHero = false } = {}) {
   if (busy) return { showHero: false };
@@ -99,6 +99,10 @@ export function resolveHeroDisplay(payload, matchColumn = null, { busy = false, 
   }
   if (hasPlayingClips(payload)) {
     if (noMatchHero) {
+      const lastTitle = payload?.lastMatched?.title?.trim();
+      if (lastTitle) {
+        return { text: lastTitle, empty: false, showHero: true, noMatch: true, lastMatched: true };
+      }
       return { text: 'No Match', empty: false, showHero: true, noMatch: true };
     }
     return { showHero: false };

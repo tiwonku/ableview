@@ -11,6 +11,7 @@ import {
   parseAliases,
 } from '../src/match/normalize.js';
 import { matchClip, matchBestOfTracks, createMatcher } from '../src/match/index.js';
+import { makeCuePayload, makeLastMatched, makeMatchResult } from '../src/core/cue-payload.js';
 
 const silentLog = createLogger();
 silentLog.level = 'silent';
@@ -975,4 +976,114 @@ test('createMatcher rematches when a watched-track clip changes under bestMatch'
   assert.equal(payloads[1].match.matched, true);
   assert.equal(payloads[1].match.rowId, '62');
   assert.equal(payloads[1].tracks[1].clipName, 'Cm_100bpm_Gazing_At_The_Glare 8 BAR INTRO');
+});
+
+test('makeLastMatched snapshots title without copying row', () => {
+  const payload = makeCuePayload({
+    clipName: 'E_87bpm_Yellow bird_SZ24',
+    match: makeMatchResult({
+      matched: true,
+      confidence: 0.9,
+      rowId: '87',
+      matchedValue: 'E_87bpm_Yellow bird_SZ24',
+      viaAlias: true,
+    }),
+    row: { 'Song Title': 'Yellow Bird', BPM: '87' },
+    trackMatches: [
+      {
+        trackIndex: 11,
+        trackName: 'DECK A',
+        clipName: 'E_87bpm_Yellow bird_SZ24',
+        matched: true,
+        rowId: '87',
+        winner: true,
+      },
+    ],
+  });
+
+  const last = makeLastMatched(payload, 'Song Title', '2026-08-21T19:00:00.000Z');
+  assert.deepEqual(last, {
+    title: 'Yellow Bird',
+    clipName: 'E_87bpm_Yellow bird_SZ24',
+    matchedValue: 'E_87bpm_Yellow bird_SZ24',
+    rowId: '87',
+    matchedAt: '2026-08-21T19:00:00.000Z',
+    trackName: 'DECK A',
+    trackIndex: 11,
+  });
+  assert.equal(last.row, undefined);
+  assert.equal(makeLastMatched(makeCuePayload({
+    clipName: 'INTRO',
+    match: makeMatchResult({ matched: false }),
+  }), 'Song Title'), null);
+});
+
+test('createMatcher stamps lastMatched on later unmatched payloads without row', () => {
+  const bus = createBus();
+  const payloads = [];
+  bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
+
+  createMatcher({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    getSnapshot: () => snapshot(),
+  });
+
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'INTRO',
+      tempo: 128,
+      tracks: [{ trackIndex: 0, trackName: 'Cue', clipName: 'INTRO', slotIndex: 0 }],
+    })
+  );
+  assert.equal(payloads[0].match.matched, false);
+  assert.equal(payloads[0].lastMatched, undefined);
+
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'Song A - Intro',
+      tempo: 128,
+      tracks: [{ trackIndex: 0, trackName: 'Cue', clipName: 'Song A - Intro', slotIndex: 1 }],
+    })
+  );
+  assert.equal(payloads[1].match.matched, true);
+  assert.equal(payloads[1].lastMatched.title, 'Song A - Intro');
+  assert.equal(payloads[1].lastMatched.rowId, '5');
+  assert.equal(payloads[1].lastMatched.trackName, 'Cue');
+  assert.equal(payloads[1].lastMatched.trackIndex, 0);
+
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'INTRO',
+      tempo: 128,
+      tracks: [{ trackIndex: 0, trackName: 'Cue', clipName: 'INTRO', slotIndex: 2 }],
+    })
+  );
+  assert.equal(payloads[2].match.matched, false);
+  assert.equal(payloads[2].row, undefined);
+  assert.equal(payloads[2].lastMatched.title, 'Song A - Intro');
+  assert.equal(payloads[2].lastMatched.rowId, '5');
+  assert.equal(payloads[2].lastMatched.trackName, 'Cue');
+  assert.equal(payloads[2].lastMatched, payloads[1].lastMatched);
+
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'Song B - Verse',
+      tempo: 100,
+      tracks: [{ trackIndex: 3, trackName: 'DECK B', clipName: 'Song B - Verse', slotIndex: 4 }],
+    })
+  );
+  assert.equal(payloads[3].match.matched, true);
+  assert.equal(payloads[3].lastMatched.title, 'Song B - Verse');
+  assert.equal(payloads[3].lastMatched.rowId, '7');
+  assert.equal(payloads[3].lastMatched.trackName, 'DECK B');
 });

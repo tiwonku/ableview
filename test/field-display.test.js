@@ -104,6 +104,13 @@ test('getFieldValue still reads sheet columns', () => {
   assert.equal(getFieldValue({ column: 'BPM' }, { row: { BPM: '128' }, tempo: 100 }), '128');
 });
 
+test('getFieldValue ignores lastMatched when current row is absent (NFR-7)', () => {
+  assert.equal(getFieldValue({ column: 'BPM' }, {
+    match: { matched: false },
+    lastMatched: { title: 'Yellow Bird', rowId: '87' },
+  }), null);
+});
+
 test('formatTempoFieldValue and fieldLabel helpers', () => {
   assert.equal(formatTempoFieldValue(128), '128');
   assert.equal(formatTempoFieldValue(128.25), '128.3');

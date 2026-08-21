@@ -49,7 +49,31 @@ test('resolveHeroDisplay shows No Match as operator hero when clips play unmatch
   assert.equal(hero.showHero, true);
   assert.equal(hero.text, 'No Match');
   assert.equal(hero.noMatch, true);
+  assert.equal(hero.lastMatched, undefined);
   assert.equal(hero.empty, false);
+});
+
+test('resolveHeroDisplay shows last matched title as operator hero when unmatched', () => {
+  const hero = resolveHeroDisplay({
+    match: { matched: false },
+    tracks: [{ trackIndex: 1, trackName: 'DECK A', clipName: 'INTRO' }],
+    lastMatched: { title: 'Yellow Bird', rowId: '87' },
+  }, 'Song Title', { noMatchHero: true });
+  assert.equal(hero.showHero, true);
+  assert.equal(hero.text, 'Yellow Bird');
+  assert.equal(hero.noMatch, true);
+  assert.equal(hero.lastMatched, true);
+  assert.equal(hero.empty, false);
+});
+
+test('resolveHeroDisplay prefers live match over lastMatched', () => {
+  const hero = resolveHeroDisplay({
+    ...yellowBirdPayload,
+    lastMatched: { title: 'Older Song' },
+  }, 'Song Title', { noMatchHero: true });
+  assert.equal(hero.text, 'Yellow Bird');
+  assert.equal(hero.noMatch, undefined);
+  assert.equal(hero.lastMatched, undefined);
 });
 
 test('resolveHeroDisplay hides admin hero when clips play unmatched', () => {

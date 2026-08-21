@@ -136,16 +136,30 @@ function isLaunching(payload) {
   return Boolean(payload?.pendingLaunch) && !payload?.simulated;
 }
 
-function renderHeroRow(parent, heroText, payload, { empty = false, noMatch = false, launching = isLaunching(payload) } = {}) {
+function renderHeroRow(parent, heroText, payload, {
+  empty = false,
+  noMatch = false,
+  lastMatched = false,
+  launching = isLaunching(payload),
+} = {}) {
   const row = document.createElement('div');
   row.className = 'clip-head' + (launching ? ' clip-head--launching' : '');
 
   const clipEl = document.createElement('p');
   clipEl.className = 'clip-name'
     + (empty ? ' empty-clip' : '')
-    + (noMatch ? ' clip-name--nomatch' : '');
+    + (noMatch ? ' clip-name--nomatch' : '')
+    + (lastMatched ? ' clip-name--last-matched' : '');
 
   if (heroText && !empty) {
+    if (lastMatched) {
+      const kicker = document.createElement('span');
+      kicker.className = 'clip-name-kicker';
+      kicker.textContent = 'Last matched';
+      clipEl.appendChild(kicker);
+      clipEl.setAttribute('aria-label', `Last matched: ${heroText}`);
+    }
+
     const text = document.createElement('span');
     text.className = 'clip-name-text';
     text.textContent = heroText;
@@ -352,7 +366,11 @@ function renderViewClipHead(parent, payload, matchColumn = null, { busy = false,
   }
   const hero = resolveHeroDisplay(payload, matchColumn, { busy, noMatchHero: true });
   if (!hero.showHero) return;
-  renderHeroRow(parent, hero.text, payload, { empty: hero.empty, noMatch: hero.noMatch });
+  renderHeroRow(parent, hero.text, payload, {
+    empty: hero.empty,
+    noMatch: hero.noMatch,
+    lastMatched: hero.lastMatched,
+  });
 }
 
 function renderViewEditActions({

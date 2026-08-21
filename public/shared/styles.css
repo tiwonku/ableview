@@ -377,6 +377,18 @@ body.layout-operator .clip-name--nomatch {
   font-size: clamp(1.6rem, 4dvh + 2.2vmin, 4rem);
 }
 
+.clip-name-kicker {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: max(0.72rem, 0.22em);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: inherit;
+  opacity: 0.8;
+}
+
 .clip-launching-badge {
   display: inline-block;
   flex-shrink: 0;
