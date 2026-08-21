@@ -65,6 +65,20 @@ function renderStatusBox(status) {
   return box;
 }
 
+/** Keep a typed draft; only follow the server name if the field was still showing the last committed value. */
+export function nextSessionNameInputValue({
+  serverName,
+  inputValue,
+  lastCommittedName,
+  always = false,
+} = {}) {
+  const committed = serverName || 'test';
+  if (always || lastCommittedName == null || inputValue === lastCommittedName) {
+    return committed;
+  }
+  return inputValue;
+}
+
 export function mountSessionLogPanel(selector) {
   const root = typeof selector === 'string'
     ? document.querySelector(selector)
@@ -74,6 +88,11 @@ export function mountSessionLogPanel(selector) {
   let status = null;
   let pollTimer = null;
   let unsubscribeLive = null;
+  let built = false;
+  let lastCommittedName = null;
+  let toggle = null;
+  let nameInput = null;
+  let applyBtn = null;
 
   const shell = el('div', 'session-log-panel');
   root.appendChild(shell);
@@ -95,9 +114,13 @@ export function mountSessionLogPanel(selector) {
     return data;
   }
 
-  function render() {
-    shell.replaceChildren();
+  function refreshStatusBox() {
+    const next = renderStatusBox(status);
+    const existing = shell.querySelector('[data-role="session-log-status"]');
+    if (existing) existing.replaceWith(next);
+  }
 
+  function buildShell() {
     shell.appendChild(el('h2', 'settings-page-title', 'Session log'));
     shell.appendChild(el(
       'p',
@@ -109,11 +132,10 @@ export function mountSessionLogPanel(selector) {
     fieldset.appendChild(el('legend', null, 'Session log'));
     fieldset.appendChild(renderStatusBox(status));
 
-    const toggle = el('input');
+    toggle = el('input');
     toggle.type = 'checkbox';
     toggle.id = 'sessionLogEnabled';
     toggle.className = 'settings-checkbox';
-    toggle.checked = status?.enabled === true;
 
     const toggleRow = el('div', 'settings-field settings-field-checkbox');
     toggleRow.appendChild(toggle);
@@ -128,13 +150,12 @@ export function mountSessionLogPanel(selector) {
     nameField.appendChild(nameLabel);
 
     const nameRow = el('div', 'session-log-name-row');
-    const nameInput = el('input');
+    nameInput = el('input');
     nameInput.type = 'text';
     nameInput.className = 'settings-input';
     nameInput.id = 'sessionLogName';
-    nameInput.value = status?.sessionName ?? 'test';
     nameInput.placeholder = 'Session name';
-    const applyBtn = el('button', 'settings-sync', 'Apply session name');
+    applyBtn = el('button', 'settings-sync', 'Apply session name');
     applyBtn.type = 'button';
     nameRow.append(nameInput, applyBtn);
     nameField.appendChild(nameRow);
@@ -150,8 +171,7 @@ export function mountSessionLogPanel(selector) {
 
     toggle.addEventListener('change', async () => {
       try {
-        status = await patchSessionLog({ enabled: toggle.checked });
-        render();
+        applyStatus(await patchSessionLog({ enabled: toggle.checked }));
         showBanner(shell, toggle.checked ? 'Session logging enabled' : 'Session logging disabled');
       } catch (err) {
         toggle.checked = !toggle.checked;
@@ -166,8 +186,7 @@ export function mountSessionLogPanel(selector) {
         return;
       }
       try {
-        status = await patchSessionLog({ sessionName });
-        render();
+        applyStatus(await patchSessionLog({ sessionName }), { alwaysSyncName: true });
         showBanner(shell, `Logging to ${status.sessionName}.jsonl`);
       } catch (err) {
         showBanner(shell, err.message, { error: true });
@@ -175,20 +194,41 @@ export function mountSessionLogPanel(selector) {
     });
   }
 
+  function applyStatus(nextStatus, { alwaysSyncName = false } = {}) {
+    status = nextStatus;
+    if (!built) {
+      buildShell();
+      built = true;
+    } else {
+      refreshStatusBox();
+    }
+
+    if (toggle) toggle.checked = status?.enabled === true;
+    if (nameInput) {
+      nameInput.value = nextSessionNameInputValue({
+        serverName: status?.sessionName,
+        inputValue: nameInput.value,
+        lastCommittedName,
+        always: alwaysSyncName,
+      });
+    }
+    lastCommittedName = status?.sessionName || 'test';
+  }
+
   async function refresh({ silent = false } = {}) {
     try {
-      status = await fetchStatus();
+      const next = await fetchStatus();
       try {
         const momentsRes = await fetch('/api/moments');
         if (momentsRes.ok) {
           const moments = await momentsRes.json();
-          status.lastMoment = moments.lastMoment ?? null;
-          status.momentCount = moments.momentCount ?? status.momentCount ?? 0;
+          next.lastMoment = moments.lastMoment ?? null;
+          next.momentCount = moments.momentCount ?? next.momentCount ?? 0;
         }
       } catch {
         // moments API optional during partial deploy
       }
-      render();
+      applyStatus(next);
       if (!silent) showBanner(shell, null);
     } catch (err) {
       if (!silent) showBanner(shell, err.message, { error: true });
@@ -197,18 +237,18 @@ export function mountSessionLogPanel(selector) {
 
   function applyLiveSessionLog(sessionLog) {
     if (!sessionLog) return;
-    status = {
+    applyStatus({
       ...(status ?? {}),
       enabled: sessionLog.enabled === true,
       sessionName: sessionLog.sessionName ?? status?.sessionName ?? 'test',
       lastLoggedAt: sessionLog.lastLoggedAt ?? status?.lastLoggedAt ?? null,
       momentCount: sessionLog.momentCount ?? status?.momentCount ?? 0,
-    };
-    render();
+    });
   }
 
   refresh();
   pollTimer = setInterval(() => refresh({ silent: true }), 5000);
+  pollTimer.unref?.();
   unsubscribeLive = subscribeSessionLog(applyLiveSessionLog);
 
   return () => {
