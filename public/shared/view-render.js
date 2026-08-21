@@ -24,6 +24,8 @@ import {
   hasArrangementPlayback,
   resolveHeroDisplay,
   renderPlayingClipsStrip,
+  resolveCuePane,
+  lastPanePayload,
 } from './playing-clips-strip.js';
 
 const TRANSPORT_PLAY_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5.5v13l11-6.5L8 5.5z"/></svg>`;
@@ -244,6 +246,8 @@ export function renderView(root, {
   onStartAlias,
   onCancelEdit,
   onSaveEdit,
+  cuePane = 'last',
+  onCuePaneChange,
 }) {
   closeColorPicker();
   root.innerHTML = '';
@@ -255,6 +259,7 @@ export function renderView(root, {
 
   const matched = payload?.match?.matched === true;
   const busy = Boolean(editSession || aliasSession);
+  const pane = resolveCuePane(payload, cuePane, { busy });
 
   const clipRow = document.createElement('div');
   clipRow.className = 'clip-head-row';
@@ -272,14 +277,17 @@ export function renderView(root, {
     onStartEdit,
     onCancelEdit,
     onSaveEdit,
+    cuePane: pane,
+    onCuePaneChange,
   });
   if (editActions) clipRow.appendChild(editActions);
   root.appendChild(clipRow);
 
   const showNoMatch = payload && !matched && !busy
     && (hasPlayingClips(payload) || payload.clipName?.trim());
+  const showLastFields = showNoMatch && pane === 'last';
 
-  if (showNoMatch) {
+  if (showNoMatch && !showLastFields) {
     renderNoMatchPanel(root, {
       payload,
       editable,
@@ -321,13 +329,14 @@ export function renderView(root, {
       saveError,
     });
   } else if (!busy && fields?.length) {
-    const visibleFields = matched ? fields : [];
-    if (visibleFields.length) {
-      root.appendChild(renderFieldsGrid(visibleFields, payload, {
+    if (matched) {
+      root.appendChild(renderFieldsGrid(fields, payload, {
         onPickColor: editable && onStartEdit
           ? (column) => onStartEdit(column)
           : undefined,
       }));
+    } else if (showLastFields) {
+      root.appendChild(renderLastMatchedFields(fields, payload));
     }
   }
 
@@ -373,6 +382,36 @@ function renderViewClipHead(parent, payload, matchColumn = null, { busy = false,
   });
 }
 
+function renderLastMatchedFields(fields, payload) {
+  const panel = document.createElement('div');
+  panel.className = 'no-match-panel no-match-panel--last-fields';
+  panel.setAttribute('aria-label', 'Last matched cue');
+  panel.appendChild(renderFieldsGrid(fields, lastPanePayload(payload)));
+  return panel;
+}
+
+function renderCuePaneToggle(cuePane, onCuePaneChange) {
+  const group = document.createElement('div');
+  group.className = 'cue-pane-toggle';
+  group.setAttribute('role', 'radiogroup');
+  group.setAttribute('aria-label', 'Cue pane');
+
+  for (const id of ['last', 'current']) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `cue-pane-btn cue-pane-btn--${id}`;
+    btn.setAttribute('role', 'radio');
+    btn.setAttribute('aria-checked', cuePane === id ? 'true' : 'false');
+    btn.textContent = id === 'last' ? 'Last' : 'Current';
+    btn.addEventListener('click', () => {
+      if (cuePane !== id) onCuePaneChange(id);
+    });
+    group.appendChild(btn);
+  }
+
+  return group;
+}
+
 function renderViewEditActions({
   editSession,
   matched,
@@ -381,10 +420,13 @@ function renderViewEditActions({
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
+  cuePane = null,
+  onCuePaneChange,
 }) {
   const showSave = Boolean(editSession && onCancelEdit && onSaveEdit);
   const showEdit = !editSession && matched && editable && onStartEdit;
-  if (!showSave && !showEdit) return null;
+  const showToggle = !editSession && Boolean(cuePane) && typeof onCuePaneChange === 'function';
+  if (!showSave && !showEdit && !showToggle) return null;
 
   const actions = document.createElement('div');
   actions.className = 'view-edit-actions';
@@ -409,6 +451,11 @@ function renderViewEditActions({
       if (section) onSaveEdit(section);
     });
     actions.appendChild(saveBtn);
+    return actions;
+  }
+
+  if (showToggle) {
+    actions.appendChild(renderCuePaneToggle(cuePane, onCuePaneChange));
     return actions;
   }
 

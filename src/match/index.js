@@ -1,6 +1,6 @@
 import Fuse from 'fuse.js';
 import { EVENTS } from '../core/bus.js';
-import { makeCuePayload, makeLastMatched, makeMatchResult } from '../core/cue-payload.js';
+import { makeCuePayload, makeLastMatched, makeMatchResult, refreshLastMatchedRow } from '../core/cue-payload.js';
 import {
   hasTokenOverlap,
   isGenericNormalizedQuery,
@@ -374,11 +374,12 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
   let ingestLive = true;
   let ableton = null;
 
-  function stampLastMatched(payload) {
+  function stampLastMatched(payload, snapshot) {
     if (payload.match?.matched === true) {
       lastMatched = makeLastMatched(payload, resolveConfig().sheets?.matchColumn);
     }
     if (lastMatched) {
+      lastMatched = refreshLastMatchedRow(lastMatched, snapshot) ?? lastMatched;
       payload.lastMatched = lastMatched;
     }
     return payload;
@@ -432,7 +433,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
       payload.pendingLaunch = event.pendingLaunch ?? false;
       payload.ingestLive = simulated ? true : ingestLive;
       payload.ableton = simulated ? null : ableton;
-      stampLastMatched(payload);
+      stampLastMatched(payload, snapshot);
     }
     lastMatchKey = mk;
     lastPayload = payload;

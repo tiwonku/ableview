@@ -88,6 +88,7 @@ export function connectView({
   let aliasSearchTimer = null;
   let aliasSearchSeq = 0;
   let aliasAutoFocusSearch = false;
+  let cuePane = 'last';
 
   function applySimState(simulated) {
     serverSimulated = simulated === true;
@@ -190,6 +191,9 @@ export function connectView({
       const prevPayload = lastPayload;
       lastPayload = msg.payload;
       if (cueContentChanged(prevPayload, msg.payload)) lastUpdate = new Date();
+      if (prevPayload?.match?.matched !== true && msg.payload.match?.matched === true) {
+        cuePane = 'last';
+      }
       applySimState(msg.payload.simulated === true);
       onPayload?.(lastPayload);
       if (editSession || aliasSession) {
@@ -198,6 +202,11 @@ export function connectView({
       }
       render();
     }
+  }
+
+  function setCuePane(next) {
+    cuePane = next === 'current' ? 'current' : 'last';
+    render();
   }
 
   function startEdit(openColorColumn) {
@@ -496,6 +505,8 @@ export function connectView({
         editorColumns,
         saveState,
         saveError,
+        cuePane,
+        onCuePaneChange: setCuePane,
         onStartEdit: viewConfig.editable ? startEdit : undefined,
         onStartCreate: viewConfig.editable ? startCreate : undefined,
         onStartAlias: viewConfig.editable ? startAlias : undefined,
@@ -628,6 +639,7 @@ export function connectView({
     aliasSession = null;
     saveState = 'idle';
     saveError = null;
+    cuePane = 'last';
     applyHistory(nextId, href, historyMode);
     reconnectNow();
   }

@@ -978,7 +978,7 @@ test('createMatcher rematches when a watched-track clip changes under bestMatch'
   assert.equal(payloads[1].tracks[1].clipName, 'Cm_100bpm_Gazing_At_The_Glare 8 BAR INTRO');
 });
 
-test('makeLastMatched snapshots title without copying row', () => {
+test('makeLastMatched snapshots title and row for the Last pane', () => {
   const payload = makeCuePayload({
     clipName: 'E_87bpm_Yellow bird_SZ24',
     match: makeMatchResult({
@@ -1010,15 +1010,16 @@ test('makeLastMatched snapshots title without copying row', () => {
     matchedAt: '2026-08-21T19:00:00.000Z',
     trackName: 'DECK A',
     trackIndex: 11,
+    row: { 'Song Title': 'Yellow Bird', BPM: '87' },
   });
-  assert.equal(last.row, undefined);
+  assert.notEqual(last.row, payload.row);
   assert.equal(makeLastMatched(makeCuePayload({
     clipName: 'INTRO',
     match: makeMatchResult({ matched: false }),
   }), 'Song Title'), null);
 });
 
-test('createMatcher stamps lastMatched on later unmatched payloads without row', () => {
+test('createMatcher stamps lastMatched.row on later unmatched payloads without CuePayload.row', () => {
   const bus = createBus();
   const payloads = [];
   bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
@@ -1056,6 +1057,7 @@ test('createMatcher stamps lastMatched on later unmatched payloads without row',
   assert.equal(payloads[1].lastMatched.rowId, '5');
   assert.equal(payloads[1].lastMatched.trackName, 'Cue');
   assert.equal(payloads[1].lastMatched.trackIndex, 0);
+  assert.deepEqual(payloads[1].lastMatched.row, SHEET_ROWS[0].data);
 
   bus.emit(
     EVENTS.NOW_PLAYING,
@@ -1071,7 +1073,7 @@ test('createMatcher stamps lastMatched on later unmatched payloads without row',
   assert.equal(payloads[2].lastMatched.title, 'Song A - Intro');
   assert.equal(payloads[2].lastMatched.rowId, '5');
   assert.equal(payloads[2].lastMatched.trackName, 'Cue');
-  assert.equal(payloads[2].lastMatched, payloads[1].lastMatched);
+  assert.deepEqual(payloads[2].lastMatched.row, SHEET_ROWS[0].data);
 
   bus.emit(
     EVENTS.NOW_PLAYING,
@@ -1086,4 +1088,51 @@ test('createMatcher stamps lastMatched on later unmatched payloads without row',
   assert.equal(payloads[3].lastMatched.title, 'Song B - Verse');
   assert.equal(payloads[3].lastMatched.rowId, '7');
   assert.equal(payloads[3].lastMatched.trackName, 'DECK B');
+  assert.deepEqual(payloads[3].lastMatched.row, SHEET_ROWS[2].data);
+});
+
+test('createMatcher refreshes lastMatched.row from the sheet snapshot on rematch', () => {
+  const bus = createBus();
+  const payloads = [];
+  bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
+
+  let snap = snapshot();
+  const matcher = createMatcher({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    getSnapshot: () => snap,
+  });
+
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'Song A - Intro',
+      tempo: 128,
+      tracks: [{ trackIndex: 0, trackName: 'Cue', clipName: 'Song A - Intro', slotIndex: 1 }],
+    })
+  );
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: 'INTRO',
+      tempo: 128,
+      tracks: [{ trackIndex: 0, trackName: 'Cue', clipName: 'INTRO', slotIndex: 2 }],
+    })
+  );
+  assert.equal(payloads.at(-1).match.matched, false);
+  assert.equal(payloads.at(-1).lastMatched.row['Band Notes'], 'Count in 4');
+
+  snap = snapshot({
+    rows: [
+      { ...SHEET_ROWS[0], data: { ...SHEET_ROWS[0].data, 'Band Notes': 'Updated count' } },
+      ...SHEET_ROWS.slice(1),
+    ],
+  });
+  matcher.rematch();
+  assert.equal(payloads.at(-1).match.matched, false);
+  assert.equal(payloads.at(-1).row, undefined);
+  assert.equal(payloads.at(-1).lastMatched.row['Band Notes'], 'Updated count');
 });

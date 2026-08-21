@@ -1,7 +1,8 @@
 // CuePayload contract (spec §9.2). Matcher → server → views.
 //
-// lastMatched is a sticky snapshot of the last confident match (title + ids,
-// never the sheet row). Views MUST NOT treat it as the current cue (NFR-7).
+// lastMatched is a sticky snapshot of the last confident match. It MAY include
+// `row` for the operator Last pane. Views MUST NOT treat lastMatched as the
+// current cue (NFR-7): `payload.row` is live-match only.
 
 export function makeCuePayload({
   clipName,
@@ -53,8 +54,14 @@ export function resolveMatchedTitle(payload, matchColumn = null) {
   return fromClip || null;
 }
 
+function cloneSheetRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return { ...row };
+}
+
 /**
- * Compact last-win snapshot. Omit `row` so unmatched views cannot paint old notes.
+ * Last-win snapshot. `row` is for the explicit Last pane only — never copy it
+ * onto CuePayload.row when unmatched (NFR-7).
  */
 export function makeLastMatched(payload, matchColumn = null, matchedAt = new Date().toISOString()) {
   if (payload?.match?.matched !== true) return null;
@@ -77,7 +84,20 @@ export function makeLastMatched(payload, matchColumn = null, matchedAt = new Dat
   };
   if (winner?.trackName) lastMatched.trackName = winner.trackName;
   if (winner?.trackIndex != null) lastMatched.trackIndex = winner.trackIndex;
+  const row = cloneSheetRow(payload.row);
+  if (row) lastMatched.row = row;
   return lastMatched;
+}
+
+/** Refresh lastMatched.row from the current sheet snapshot (same rowId). */
+export function refreshLastMatchedRow(lastMatched, snapshot) {
+  if (!lastMatched) return null;
+  const rowId = lastMatched.rowId != null ? String(lastMatched.rowId) : '';
+  if (!rowId) return lastMatched;
+  const found = snapshot?.rows?.find((r) => String(r.rowId) === rowId);
+  const data = found?.data;
+  if (!data || typeof data !== 'object') return lastMatched;
+  return { ...lastMatched, row: { ...data } };
 }
 
 export function makeMatchResult({

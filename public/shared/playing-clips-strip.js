@@ -86,6 +86,28 @@ export function canStartCreate(payload, clipNameOverride = null) {
   return payload?.match?.matched !== true;
 }
 
+export function hasLastMatchedRow(payload) {
+  const row = payload?.lastMatched?.row;
+  return Boolean(row) && typeof row === 'object';
+}
+
+/**
+ * Last/Current toggle during no-match. null = hide the control (NFR-7).
+ * @returns {'last' | 'current' | null}
+ */
+export function resolveCuePane(payload, requested = 'last', { busy = false } = {}) {
+  if (!payload || payload.match?.matched === true || busy) return null;
+  if (!hasPlayingClips(payload)) return null;
+  if (!hasLastMatchedRow(payload)) return null;
+  return requested === 'current' ? 'current' : 'last';
+}
+
+/** CuePayload slice for the Last pane: previous row, still unmatched. */
+export function lastPanePayload(payload) {
+  if (!hasLastMatchedRow(payload)) return payload;
+  return { ...payload, row: payload.lastMatched.row };
+}
+
 /**
  * Hero line for operator views.
  * @returns {{ text?: string, empty?: boolean, showHero: boolean, noMatch?: boolean, lastMatched?: boolean }}

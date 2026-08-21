@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -7,7 +9,11 @@ import {
   isArrangementTrack,
   canStartCreate,
   resolveCreateClipName,
+  resolveCuePane,
+  lastPanePayload,
+  hasLastMatchedRow,
 } from '../public/shared/playing-clips-strip.js';
+import { getFieldValue } from '../public/shared/field-display.js';
 
 const yellowBirdPayload = {
   clipName: 'E_87bpm_Yellow bird_SZ24',
@@ -143,4 +149,56 @@ test('canStartCreate allows generic create when nothing has matched', () => {
   };
   assert.equal(canStartCreate(unmatched), true);
   assert.equal(resolveCreateClipName(unmatched), 'Funnel Of Love');
+});
+
+const unmatchedWithLast = {
+  match: { matched: false },
+  tracks: [{ trackIndex: 1, trackName: 'DECK A', clipName: 'INTRO' }],
+  lastMatched: {
+    title: 'Yellow Bird',
+    rowId: '87',
+    row: { 'Song Title': 'Yellow Bird', BPM: '87', 'Lighting Notes': 'Warm wash' },
+  },
+};
+
+test('hasLastMatchedRow requires a row object', () => {
+  assert.equal(hasLastMatchedRow(unmatchedWithLast), true);
+  assert.equal(hasLastMatchedRow({ lastMatched: { title: 'Yellow Bird', rowId: '87' } }), false);
+  assert.equal(hasLastMatchedRow({ match: { matched: false } }), false);
+});
+
+test('resolveCuePane defaults to last during no-match when a previous row exists', () => {
+  assert.equal(resolveCuePane(unmatchedWithLast), 'last');
+  assert.equal(resolveCuePane(unmatchedWithLast, 'current'), 'current');
+  assert.equal(resolveCuePane(unmatchedWithLast, 'last', { busy: true }), null);
+  assert.equal(resolveCuePane(yellowBirdPayload), null);
+  assert.equal(resolveCuePane({
+    match: { matched: false },
+    tracks: [{ trackIndex: 1, trackName: 'DECK A', clipName: 'INTRO' }],
+  }), null);
+});
+
+test('lastPanePayload exposes lastMatched.row without treating it as a live match', () => {
+  const display = lastPanePayload(unmatchedWithLast);
+  assert.equal(display.match.matched, false);
+  assert.equal(getFieldValue({ column: 'BPM' }, unmatchedWithLast), null);
+  assert.equal(getFieldValue({ column: 'BPM' }, display), '87');
+  assert.equal(getFieldValue({ column: 'Lighting Notes' }, display), 'Warm wash');
+});
+
+test('operator Last/Current toggle is wired in view-render and ws-client', () => {
+  const viewSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)),
+    'utf8',
+  );
+  const clientSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/ws-client.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(viewSrc, /cue-pane-toggle/);
+  assert.match(viewSrc, /no-match-panel--last-fields/);
+  assert.match(viewSrc, /resolveCuePane/);
+  assert.match(viewSrc, /lastPanePayload/);
+  assert.match(clientSrc, /let cuePane = 'last'/);
+  assert.match(clientSrc, /onCuePaneChange: setCuePane/);
 });
