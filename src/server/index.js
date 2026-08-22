@@ -8,6 +8,7 @@ import { registerSheetsRoutes } from './sheets-api.js';
 import { registerSimRoutes } from './sim-api.js';
 import { registerSessionLogRoutes } from './session-log-api.js';
 import { registerMomentsRoutes, buildSessionLogBroadcast } from './moments-api.js';
+import { registerMatchRoutes } from './match-api.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
@@ -23,6 +24,7 @@ export async function createViewServer({
   sheetsActions,
   simActions,
   sessionLog,
+  matchActions,
 }) {
   let lastPayload = null;
   const clients = new Map();
@@ -144,6 +146,10 @@ export async function createViewServer({
 
   if (sheetsActions) {
     registerSheetsRoutes(app, { sheetsActions, log });
+  }
+
+  if (matchActions) {
+    registerMatchRoutes(app, { matchActions, log });
   }
 
   if (simActions) {

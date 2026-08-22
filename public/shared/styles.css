@@ -373,7 +373,12 @@ main {
   color: #ffd591;
 }
 
-body.layout-operator .clip-name--nomatch {
+.clip-name--pinned {
+  color: #ffd591;
+}
+
+body.layout-operator .clip-name--nomatch,
+body.layout-operator .clip-name--pinned {
   font-size: clamp(1.6rem, 4dvh + 2.2vmin, 4rem);
 }
 
@@ -1032,8 +1037,28 @@ body.layout-operator .clip-name--nomatch {
   color: #fff;
 }
 
-.view-edit-btn--primary:hover:not(:disabled) {
-  filter: brightness(1.08);
+.view-edit-btn--unpin {
+  border-color: var(--warn);
+  background: rgba(230, 162, 60, 0.18);
+  color: #ffd591;
+}
+
+.view-edit-btn--unpin:hover:not(:disabled) {
+  background: rgba(230, 162, 60, 0.28);
+}
+
+.last-fields-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.admin-pin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
 }
 
 .view-edit-btn-icon {
@@ -1936,7 +1961,9 @@ body.layout-operator .clip-head-row,
 body.layout-operator .no-match,
 body.layout-operator .no-match-panel:not(.no-match-panel--last-fields),
 body.layout-operator .view-edit-actions,
-body.layout-operator .operator-editor-context {
+body.layout-operator .operator-editor-context,
+body.layout-operator .pin-panel,
+body.layout-operator .last-fields-actions {
   flex-shrink: 0;
 }
 

@@ -110,14 +110,15 @@ export function lastPanePayload(payload) {
 
 /**
  * Hero line for operator views.
- * @returns {{ text?: string, empty?: boolean, showHero: boolean, noMatch?: boolean, lastMatched?: boolean }}
+ * @returns {{ text?: string, empty?: boolean, showHero: boolean, noMatch?: boolean, lastMatched?: boolean, pinned?: boolean }}
  */
 export function resolveHeroDisplay(payload, matchColumn = null, { busy = false, noMatchHero = false } = {}) {
   if (busy) return { showHero: false };
 
   const matchedTitle = resolveMatchedTitle(payload, matchColumn);
   if (matchedTitle) {
-    return { text: matchedTitle, empty: false, showHero: true };
+    const pinned = payload?.match?.viaOverride === true;
+    return { text: matchedTitle, empty: false, showHero: true, pinned };
   }
   if (hasPlayingClips(payload)) {
     if (noMatchHero) {

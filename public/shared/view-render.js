@@ -19,6 +19,7 @@ import {
   buildFieldLabels,
 } from './admin-row-editor.js';
 import { renderAliasPanel } from './alias-panel.js';
+import { renderPinPanel } from './pin-panel.js';
 import {
   hasPlayingClips,
   hasArrangementPlayback,
@@ -35,11 +36,29 @@ const EDIT_ICON = `<svg class="view-edit-btn-icon" viewBox="0 0 24 24" fill="non
 /** @type {HTMLElement | null} */
 let fieldExpandOverlay = null;
 
-function renderNoMatchActions(parent, { onStartCreate, onStartAlias, hideAlias = false }) {
-  if (!onStartCreate && (!onStartAlias || hideAlias)) return;
+function renderNoMatchActions(parent, { onStartCreate, onStartAlias, onStartPin, onPinLast, hideAlias = false }) {
+  if (!onStartCreate && (!onStartAlias || hideAlias) && !onStartPin && !onPinLast) return;
 
   const actions = document.createElement('div');
   actions.className = 'no-match-actions';
+
+  if (onPinLast) {
+    const lastBtn = document.createElement('button');
+    lastBtn.type = 'button';
+    lastBtn.className = 'admin-editor-btn admin-editor-btn--primary';
+    lastBtn.textContent = 'Pin last cue';
+    lastBtn.addEventListener('click', () => onPinLast());
+    actions.appendChild(lastBtn);
+  }
+
+  if (onStartPin) {
+    const pinBtn = document.createElement('button');
+    pinBtn.type = 'button';
+    pinBtn.className = 'admin-editor-btn';
+    pinBtn.textContent = 'Pin cue';
+    pinBtn.addEventListener('click', () => onStartPin());
+    actions.appendChild(pinBtn);
+  }
 
   if (onStartCreate) {
     const addBtn = document.createElement('button');
@@ -142,6 +161,7 @@ function renderHeroRow(parent, heroText, payload, {
   empty = false,
   noMatch = false,
   lastMatched = false,
+  pinned = false,
   launching = isLaunching(payload),
 } = {}) {
   const row = document.createElement('div');
@@ -151,15 +171,16 @@ function renderHeroRow(parent, heroText, payload, {
   clipEl.className = 'clip-name'
     + (empty ? ' empty-clip' : '')
     + (noMatch ? ' clip-name--nomatch' : '')
-    + (lastMatched ? ' clip-name--last-matched' : '');
+    + (lastMatched ? ' clip-name--last-matched' : '')
+    + (pinned ? ' clip-name--pinned' : '');
 
   if (heroText && !empty) {
-    if (lastMatched) {
+    if (lastMatched || pinned) {
       const kicker = document.createElement('span');
       kicker.className = 'clip-name-kicker';
-      kicker.textContent = 'Last matched';
+      kicker.textContent = pinned ? 'Pinned' : 'Last matched';
       clipEl.appendChild(kicker);
-      clipEl.setAttribute('aria-label', `Last matched: ${heroText}`);
+      clipEl.setAttribute('aria-label', pinned ? `Pinned: ${heroText}` : `Last matched: ${heroText}`);
     }
 
     const text = document.createElement('span');
@@ -190,6 +211,8 @@ function renderNoMatchPanel(root, {
   createSession,
   onStartCreate,
   onStartAlias,
+  onStartPin,
+  onPinLast,
 }) {
   const playing = hasPlayingClips(payload);
   const noMatch = document.createElement('div');
@@ -216,10 +239,19 @@ function renderNoMatchPanel(root, {
       createSession,
       showDeckNames: true,
     });
-  } else if (editable && (onStartCreate || onStartAlias)) {
+  }
+
+  const pinLast = onPinLast && payload?.lastMatched?.rowId ? onPinLast : undefined;
+  if (playing) {
+    if (onStartPin || pinLast) {
+      renderNoMatchActions(noMatch, { onStartPin, onPinLast: pinLast });
+    }
+  } else if (onStartPin || pinLast || (editable && (onStartCreate || onStartAlias))) {
     renderNoMatchActions(noMatch, {
-      onStartCreate,
-      onStartAlias,
+      onStartCreate: editable ? onStartCreate : undefined,
+      onStartAlias: editable ? onStartAlias : undefined,
+      onStartPin,
+      onPinLast: pinLast,
     });
   }
 
@@ -248,6 +280,11 @@ export function renderView(root, {
   onSaveEdit,
   cuePane = 'last',
   onCuePaneChange,
+  pinSession = null,
+  pinPanel = null,
+  onStartPin,
+  onPinLast,
+  onClearPin,
 }) {
   closeColorPicker();
   root.innerHTML = '';
@@ -258,7 +295,8 @@ export function renderView(root, {
   root.appendChild(titleEl);
 
   const matched = payload?.match?.matched === true;
-  const busy = Boolean(editSession || aliasSession);
+  const pinned = payload?.match?.viaOverride === true;
+  const busy = Boolean(editSession || aliasSession || pinSession);
   const pane = resolveCuePane(payload, cuePane, { busy });
 
   const clipRow = document.createElement('div');
@@ -279,6 +317,7 @@ export function renderView(root, {
     onSaveEdit,
     cuePane: pane,
     onCuePaneChange,
+    onClearPin: pinned ? onClearPin : undefined,
   });
   if (editActions) clipRow.appendChild(editActions);
   root.appendChild(clipRow);
@@ -295,6 +334,8 @@ export function renderView(root, {
       createSession: editSession?.mode === 'create' ? editSession : null,
       onStartCreate,
       onStartAlias,
+      onStartPin,
+      onPinLast,
     });
   }
 
@@ -311,7 +352,9 @@ export function renderView(root, {
     ...(aliasColumn ? { [aliasColumn]: aliasColumn } : {}),
   };
 
-  if (aliasSession && aliasPanel) {
+  if (pinSession && pinPanel) {
+    renderPinPanel(root, pinPanel);
+  } else if (aliasSession && aliasPanel) {
     renderAliasPanel(root, aliasPanel);
   } else if (editSession) {
     renderOperatorRowEditorPanel(root, {
@@ -336,7 +379,7 @@ export function renderView(root, {
           : undefined,
       }));
     } else if (showLastFields) {
-      root.appendChild(renderLastMatchedFields(fields, payload));
+      root.appendChild(renderLastMatchedFields(fields, payload, { onPinLast, onStartPin }));
     }
   }
 
@@ -379,13 +422,36 @@ function renderViewClipHead(parent, payload, matchColumn = null, { busy = false,
     empty: hero.empty,
     noMatch: hero.noMatch,
     lastMatched: hero.lastMatched,
+    pinned: hero.pinned,
   });
 }
 
-function renderLastMatchedFields(fields, payload) {
+function renderLastMatchedFields(fields, payload, { onPinLast, onStartPin } = {}) {
   const panel = document.createElement('div');
   panel.className = 'no-match-panel no-match-panel--last-fields';
   panel.setAttribute('aria-label', 'Last matched cue');
+  const canPinThis = onPinLast && payload?.lastMatched?.rowId;
+  if (canPinThis || onStartPin) {
+    const actions = document.createElement('div');
+    actions.className = 'last-fields-actions';
+    if (canPinThis) {
+      const pinBtn = document.createElement('button');
+      pinBtn.type = 'button';
+      pinBtn.className = 'admin-editor-btn admin-editor-btn--primary';
+      pinBtn.textContent = 'Pin this cue';
+      pinBtn.addEventListener('click', () => onPinLast());
+      actions.appendChild(pinBtn);
+    }
+    if (onStartPin) {
+      const otherBtn = document.createElement('button');
+      otherBtn.type = 'button';
+      otherBtn.className = canPinThis ? 'admin-editor-btn' : 'admin-editor-btn admin-editor-btn--primary';
+      otherBtn.textContent = 'Pin a different cue';
+      otherBtn.addEventListener('click', () => onStartPin());
+      actions.appendChild(otherBtn);
+    }
+    panel.appendChild(actions);
+  }
   panel.appendChild(renderFieldsGrid(fields, lastPanePayload(payload)));
   return panel;
 }
@@ -422,11 +488,13 @@ function renderViewEditActions({
   onSaveEdit,
   cuePane = null,
   onCuePaneChange,
+  onClearPin,
 }) {
   const showSave = Boolean(editSession && onCancelEdit && onSaveEdit);
   const showEdit = !editSession && matched && editable && onStartEdit;
   const showToggle = !editSession && Boolean(cuePane) && typeof onCuePaneChange === 'function';
-  if (!showSave && !showEdit && !showToggle) return null;
+  const showClear = !editSession && typeof onClearPin === 'function';
+  if (!showSave && !showEdit && !showToggle && !showClear) return null;
 
   const actions = document.createElement('div');
   actions.className = 'view-edit-actions';
@@ -459,12 +527,23 @@ function renderViewEditActions({
     return actions;
   }
 
-  const editBtn = document.createElement('button');
-  editBtn.type = 'button';
-  editBtn.className = 'view-edit-btn view-edit-btn--edit';
-  editBtn.innerHTML = `${EDIT_ICON}<span>Edit</span>`;
-  editBtn.addEventListener('click', onStartEdit);
-  actions.appendChild(editBtn);
+  if (showClear) {
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'view-edit-btn view-edit-btn--unpin';
+    clearBtn.textContent = 'Clear pin';
+    clearBtn.addEventListener('click', onClearPin);
+    actions.appendChild(clearBtn);
+  }
+
+  if (showEdit) {
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'view-edit-btn view-edit-btn--edit';
+    editBtn.innerHTML = `${EDIT_ICON}<span>Edit</span>`;
+    editBtn.addEventListener('click', onStartEdit);
+    actions.appendChild(editBtn);
+  }
   return actions;
 }
 
@@ -931,6 +1010,11 @@ export function renderAdmin(root, {
   onStartAlias,
   onCancelEdit,
   onSaveEdit,
+  pinSession = null,
+  pinPanel = null,
+  onStartPin,
+  onPinLast,
+  onClearPin,
 }) {
   root.innerHTML = '';
 
@@ -939,7 +1023,8 @@ export function renderAdmin(root, {
   titleEl.textContent = title ?? 'Admin';
   root.appendChild(titleEl);
 
-  const busy = Boolean(editSession || aliasSession);
+  const busy = Boolean(editSession || aliasSession || pinSession);
+  const pinned = payload?.match?.viaOverride === true;
 
   const clipHead = document.createElement('div');
   clipHead.id = 'admin-clip-head';
@@ -951,6 +1036,18 @@ export function renderAdmin(root, {
   stats.className = 'admin-stats';
   root.appendChild(stats);
   renderAdminStats(stats, payload, status);
+
+  if (pinned && onClearPin && !busy) {
+    const pinBar = document.createElement('div');
+    pinBar.className = 'admin-pin-actions';
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'admin-editor-btn';
+    clearBtn.textContent = 'Clear pin';
+    clearBtn.addEventListener('click', onClearPin);
+    pinBar.appendChild(clearBtn);
+    root.appendChild(pinBar);
+  }
 
   const matched = payload?.match?.matched === true;
   const showNoMatch = payload && !matched && !busy
@@ -964,10 +1061,14 @@ export function renderAdmin(root, {
       createSession: editSession?.mode === 'create' ? editSession : null,
       onStartCreate,
       onStartAlias,
+      onStartPin,
+      onPinLast,
     });
   }
 
-  if (aliasSession && aliasPanel) {
+  if (pinSession && pinPanel) {
+    renderPinPanel(root, pinPanel);
+  } else if (aliasSession && aliasPanel) {
     renderAliasPanel(root, aliasPanel);
   } else if (editSession) {
     renderRowEditorPanel(root, {
@@ -1007,7 +1108,7 @@ function renderAdminClipHead(parent, payload, matchColumn = null, { busy = false
   if (!hero.showHero) {
     return;
   }
-  renderHeroRow(parent, hero.text, payload, { empty: hero.empty });
+  renderHeroRow(parent, hero.text, payload, { empty: hero.empty, pinned: hero.pinned });
 
   const clipName = payload?.clipName?.trim();
   const matched = payload?.match?.matched === true;
@@ -1023,13 +1124,20 @@ function renderAdminStats(parent, payload, status) {
   parent.innerHTML = '';
 
   const matched = payload?.match?.matched === true;
+  const pinned = payload?.match?.viaOverride === true;
   const clipName = payload?.clipName?.trim() || null;
   const playing = hasPlayingClips(payload);
-  addStat(parent, 'Match', matched ? 'Yes' : 'No', { warn: payload && !matched && (playing || clipName) });
+  addStat(
+    parent,
+    'Match',
+    pinned ? 'Manual' : matched ? 'Yes' : 'No',
+    { warn: Boolean(pinned || (payload && !matched && (playing || clipName))) },
+  );
   addStat(parent, 'Confidence', formatConfidence(payload?.match?.confidence));
   addStat(parent, 'Row ID', payload?.match?.rowId ?? '—');
   addStat(parent, 'Matched value', payload?.match?.matchedValue ?? '—');
   addStat(parent, 'Via alias', payload?.match?.viaAlias ? 'Yes' : 'No');
+  addStat(parent, 'Via override', pinned ? 'Yes' : 'No', { warn: pinned });
   addStat(parent, 'Tempo', formatTempo(payload?.tempo));
   addStat(parent, 'Beat', formatBeat(payload?.beat));
   if (Array.isArray(payload?.tracks) && payload.tracks.length) {

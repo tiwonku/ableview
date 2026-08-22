@@ -48,5 +48,6 @@ export function matchKey(payload) {
     rowId: m.rowId ?? null,
     matchedValue: m.matchedValue ?? null,
     viaAlias: !!m.viaAlias,
+    viaOverride: !!m.viaOverride,
   });
 }

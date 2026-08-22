@@ -82,6 +82,16 @@ test('resolveHeroDisplay prefers live match over lastMatched', () => {
   assert.equal(hero.lastMatched, undefined);
 });
 
+test('resolveHeroDisplay marks a pinned match', () => {
+  const hero = resolveHeroDisplay({
+    ...yellowBirdPayload,
+    match: { ...yellowBirdPayload.match, viaOverride: true },
+  }, 'Song Title', { noMatchHero: true });
+  assert.equal(hero.text, 'Yellow Bird');
+  assert.equal(hero.pinned, true);
+  assert.equal(hero.noMatch, undefined);
+});
+
 test('resolveHeroDisplay hides admin hero when clips play unmatched', () => {
   const hero = resolveHeroDisplay({
     match: { matched: false },
@@ -201,4 +211,21 @@ test('operator Last/Current toggle is wired in view-render and ws-client', () =>
   assert.match(viewSrc, /lastPanePayload/);
   assert.match(clientSrc, /let cuePane = 'last'/);
   assert.match(clientSrc, /onCuePaneChange: setCuePane/);
+});
+
+test('operator pin cue is wired in view-render and ws-client', () => {
+  const viewSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)),
+    'utf8',
+  );
+  const clientSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/ws-client.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(viewSrc, /Pin this cue/);
+  assert.match(viewSrc, /Pin a different cue/);
+  assert.match(viewSrc, /Clear pin/);
+  assert.match(viewSrc, /renderPinPanel/);
+  assert.match(clientSrc, /\/api\/match\/override/);
+  assert.match(clientSrc, /function startPin/);
 });

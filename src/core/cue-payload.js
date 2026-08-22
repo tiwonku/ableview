@@ -106,9 +106,33 @@ export function makeMatchResult({
   rowId = null,
   matchedValue = null,
   viaAlias = false,
+  viaOverride = false,
 }) {
   const result = { matched, confidence, viaAlias };
   if (rowId != null) result.rowId = rowId;
   if (matchedValue != null) result.matchedValue = matchedValue;
+  if (viaOverride) result.viaOverride = true;
   return result;
+}
+
+/** Apply a temporary pin onto an unmatched payload. Returns null if the row is gone. */
+export function applyPinnedRow(payload, snapshot, matchColumn, rowId) {
+  const id = rowId != null ? String(rowId) : '';
+  if (!id) return null;
+  const found = snapshot?.rows?.find((r) => String(r.rowId) === id);
+  if (!found?.data || typeof found.data !== 'object') return null;
+  const matchedValue = String(found.data[matchColumn] ?? '').trim()
+    || payload?.clipName
+    || '';
+  return {
+    ...payload,
+    match: makeMatchResult({
+      matched: true,
+      confidence: 1,
+      rowId: String(found.rowId),
+      matchedValue,
+      viaOverride: true,
+    }),
+    row: { ...found.data },
+  };
 }

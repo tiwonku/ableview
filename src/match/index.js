@@ -1,6 +1,6 @@
 import Fuse from 'fuse.js';
 import { EVENTS } from '../core/bus.js';
-import { makeCuePayload, makeLastMatched, makeMatchResult, refreshLastMatchedRow } from '../core/cue-payload.js';
+import { makeCuePayload, makeLastMatched, makeMatchResult, refreshLastMatchedRow, applyPinnedRow } from '../core/cue-payload.js';
 import {
   hasTokenOverlap,
   isGenericNormalizedQuery,
@@ -373,6 +373,17 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
   let lastMatched = null;
   let ingestLive = true;
   let ableton = null;
+  let overrideRowId = null;
+  let overrideSetAtMatchKey = null;
+
+  function overrideStatus() {
+    const applied = lastPayload?.match?.viaOverride === true;
+    return {
+      rowId: overrideRowId,
+      applied,
+      queued: Boolean(overrideRowId) && !applied,
+    };
+  }
 
   function stampLastMatched(payload, snapshot) {
     if (payload.match?.matched === true) {
@@ -433,6 +444,27 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
       payload.pendingLaunch = event.pendingLaunch ?? false;
       payload.ingestLive = simulated ? true : ingestLive;
       payload.ableton = simulated ? null : ableton;
+
+      if (payload.match?.matched === true) {
+        if (overrideRowId && mk !== overrideSetAtMatchKey) {
+          overrideRowId = null;
+          overrideSetAtMatchKey = null;
+        }
+      } else if (overrideRowId) {
+        const pinned = applyPinnedRow(
+          payload,
+          snapshot,
+          resolveConfig().sheets?.matchColumn,
+          overrideRowId,
+        );
+        if (pinned) {
+          payload = pinned;
+        } else {
+          overrideRowId = null;
+          overrideSetAtMatchKey = null;
+        }
+      }
+
       stampLastMatched(payload, snapshot);
     }
     lastMatchKey = mk;
@@ -445,6 +477,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
         confidence: payload.match.confidence,
         rowId: payload.match.rowId ?? null,
         viaAlias: payload.match.viaAlias ?? false,
+        viaOverride: payload.match.viaOverride === true,
         stale: payload.stale,
         trackMatches: (payload.trackMatches ?? []).length,
       },
@@ -472,5 +505,23 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
     rematch: () => {
       if (lastEvent) handleNowPlaying(lastEvent, { force: true });
     },
+    setOverride(rowId) {
+      const id = rowId != null ? String(rowId).trim() : '';
+      if (!id) throw new Error('rowId is required');
+      const snapshot = getSnapshot();
+      const found = snapshot?.rows?.find((r) => String(r.rowId) === id);
+      if (!found) throw new Error(`row not found: ${id}`);
+      overrideRowId = id;
+      overrideSetAtMatchKey = lastMatchKey;
+      if (lastEvent) handleNowPlaying(lastEvent, { force: true });
+      return overrideStatus();
+    },
+    clearOverride() {
+      overrideRowId = null;
+      overrideSetAtMatchKey = null;
+      if (lastEvent) handleNowPlaying(lastEvent, { force: true });
+      return overrideStatus();
+    },
+    getOverride: () => overrideStatus(),
   };
 }

@@ -1136,3 +1136,109 @@ test('createMatcher refreshes lastMatched.row from the sheet snapshot on rematch
   assert.equal(payloads.at(-1).row, undefined);
   assert.equal(payloads.at(-1).lastMatched.row['Band Notes'], 'Updated count');
 });
+
+function emitClip(bus, clipName, trackIndex = 0, trackName = 'Cue', slotIndex = 0) {
+  bus.emit(
+    EVENTS.NOW_PLAYING,
+    makeNowPlaying({
+      source: SOURCES.ABLETONOSC,
+      authoritativeClip: clipName,
+      tempo: 128,
+      tracks: [{ trackIndex, trackName, clipName, slotIndex }],
+    })
+  );
+}
+
+test('setOverride pins a row while unmatched until the next auto match', () => {
+  const bus = createBus();
+  const payloads = [];
+  bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
+
+  const matcher = createMatcher({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    getSnapshot: () => snapshot(),
+  });
+
+  emitClip(bus, 'INTRO');
+  assert.equal(payloads.at(-1).match.matched, false);
+
+  const status = matcher.setOverride('5');
+  assert.equal(status.applied, true);
+  assert.equal(status.queued, false);
+  assert.equal(payloads.at(-1).match.matched, true);
+  assert.equal(payloads.at(-1).match.viaOverride, true);
+  assert.equal(payloads.at(-1).match.rowId, '5');
+  assert.equal(payloads.at(-1).row['Clip Name'], 'Song A - Intro');
+  assert.equal(payloads.at(-1).trackMatches[0].matched, false);
+
+  emitClip(bus, 'DROP', 0, 'Cue', 3);
+  assert.equal(payloads.at(-1).match.viaOverride, true);
+  assert.equal(payloads.at(-1).match.rowId, '5');
+  assert.equal(payloads.at(-1).tracks[0].clipName, 'DROP');
+
+  emitClip(bus, 'Song B - Verse', 3, 'DECK B', 4);
+  assert.equal(payloads.at(-1).match.matched, true);
+  assert.equal(payloads.at(-1).match.viaOverride, undefined);
+  assert.equal(payloads.at(-1).match.rowId, '7');
+  assert.equal(matcher.getOverride().rowId, null);
+});
+
+test('setOverride queues while auto-matched and applies on the next miss', () => {
+  const bus = createBus();
+  const payloads = [];
+  bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
+
+  const matcher = createMatcher({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    getSnapshot: () => snapshot(),
+  });
+
+  emitClip(bus, 'Song A - Intro');
+  assert.equal(payloads.at(-1).match.rowId, '5');
+  assert.equal(payloads.at(-1).match.viaOverride, undefined);
+
+  const status = matcher.setOverride('7');
+  assert.equal(status.queued, true);
+  assert.equal(status.applied, false);
+  assert.equal(payloads.at(-1).match.rowId, '5');
+  assert.equal(payloads.at(-1).match.viaOverride, undefined);
+
+  emitClip(bus, 'INTRO');
+  assert.equal(payloads.at(-1).match.viaOverride, true);
+  assert.equal(payloads.at(-1).match.rowId, '7');
+  assert.equal(payloads.at(-1).row['Clip Name'], 'Song B - Verse');
+});
+
+test('clearOverride returns to unmatched without writing aliases', () => {
+  const bus = createBus();
+  const payloads = [];
+  bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
+
+  const matcher = createMatcher({
+    config: testConfig(),
+    bus,
+    log: silentLog,
+    getSnapshot: () => snapshot(),
+  });
+
+  emitClip(bus, 'INTRO');
+  matcher.setOverride('5');
+  matcher.clearOverride();
+  assert.equal(payloads.at(-1).match.matched, false);
+  assert.equal(payloads.at(-1).row, undefined);
+  assert.equal(matcher.getOverride().rowId, null);
+});
+
+test('setOverride rejects an unknown rowId', () => {
+  const matcher = createMatcher({
+    config: testConfig(),
+    bus: createBus(),
+    log: silentLog,
+    getSnapshot: () => snapshot(),
+  });
+  assert.throws(() => matcher.setOverride('999'), /row not found/);
+});

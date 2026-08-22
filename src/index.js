@@ -78,6 +78,10 @@ async function main() {
       getSnapshot: sheets.getSnapshot,
       onSynced: () => matcher.rematch(),
     },
+    matchActions: {
+      setOverride: (rowId) => matcher.setOverride(rowId),
+      clearOverride: () => matcher.clearOverride(),
+    },
     simActions: {
       isAvailable: () => ingest.isSimControlAvailable(),
       canControl: () => ingest.canSimControl(),

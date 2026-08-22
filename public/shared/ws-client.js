@@ -17,6 +17,7 @@ import {
   openOperatorColorField,
 } from './admin-row-editor.js';
 import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
+import { createPinSession } from './pin-panel.js';
 import { closeColorPicker } from './color-picker.js';
 import {
   operatorCreateColumns,
@@ -89,6 +90,7 @@ export function connectView({
   let aliasSearchSeq = 0;
   let aliasAutoFocusSearch = false;
   let cuePane = 'last';
+  let pinSession = null;
 
   function applySimState(simulated) {
     serverSimulated = simulated === true;
@@ -113,7 +115,7 @@ export function connectView({
   }
 
   function updateLiveChromeDuringEdit() {
-    if ((!editSession && !aliasSession) || !root) return;
+    if ((!editSession && !aliasSession && !pinSession) || !root) return;
     const chrome = {
       payload: lastPayload,
       connected,
@@ -169,7 +171,7 @@ export function connectView({
 
     if (msg.type === 'sessionLog' && msg.sessionLog) {
       applySessionLogState(msg.sessionLog);
-      if (editSession || aliasSession) {
+      if (editSession || aliasSession || pinSession) {
         updateLiveChromeDuringEdit();
         return;
       }
@@ -179,7 +181,7 @@ export function connectView({
 
     if (msg.type === 'status' && msg.status) {
       lastStatus = msg.status;
-      if (editSession || aliasSession) {
+      if (editSession || aliasSession || pinSession) {
         updateLiveChromeDuringEdit();
         return;
       }
@@ -196,7 +198,7 @@ export function connectView({
       }
       applySimState(msg.payload.simulated === true);
       onPayload?.(lastPayload);
-      if (editSession || aliasSession) {
+      if (editSession || aliasSession || pinSession) {
         updateLiveChromeDuringEdit();
         return;
       }
@@ -211,6 +213,8 @@ export function connectView({
 
   function startEdit(openColorColumn) {
     if (!lastPayload?.match?.matched || !lastPayload.row) return;
+    if (pinSession) cancelPin();
+    if (aliasSession) cancelAlias();
     const column = typeof openColorColumn === 'string' ? openColorColumn : null;
     const scope = viewConfig.editable
       ? { columns: viewFieldColumns(viewConfig.fields) }
@@ -227,6 +231,7 @@ export function connectView({
     if (!canStartCreate(lastPayload, clipNameOverride)) return;
     if (!matchColumn) return;
     if (aliasSession) cancelAlias();
+    if (pinSession) cancelPin();
 
     const isSystem = viewConfig.system;
     const columns = isSystem
@@ -255,6 +260,7 @@ export function connectView({
     if (!clipName) return;
     if (typeof clipNameOverride !== 'string' && lastPayload?.match?.matched === true) return;
     if (editSession) cancelEdit();
+    if (pinSession) cancelPin();
 
     aliasSession = createAliasSession(clipName, {
       trackName: track?.trackName ?? null,
@@ -283,6 +289,129 @@ export function connectView({
     saveState = 'idle';
     saveError = null;
     render();
+  }
+
+  function cancelPin() {
+    if (aliasSearchTimer) {
+      clearTimeout(aliasSearchTimer);
+      aliasSearchTimer = null;
+    }
+    pinSession = null;
+    saveState = 'idle';
+    saveError = null;
+    render();
+  }
+
+  function startPin() {
+    if (editSession) cancelEdit();
+    if (aliasSession) cancelAlias();
+    pinSession = createPinSession();
+    aliasAutoFocusSearch = true;
+    saveState = 'idle';
+    saveError = null;
+    render();
+    runPinSearch(pinSession.query);
+  }
+
+  function pinLastCue() {
+    const rowId = lastPayload?.lastMatched?.rowId;
+    if (!rowId) return;
+    postPin(rowId);
+  }
+
+  function selectPinRow(row) {
+    if (!pinSession) return;
+    pinSession = { ...pinSession, selectedRow: row };
+    saveError = null;
+    render();
+  }
+
+  function schedulePinSearch(query) {
+    if (!pinSession) return;
+    pinSession = { ...pinSession, query, searching: true };
+    render();
+    if (aliasSearchTimer) clearTimeout(aliasSearchTimer);
+    aliasSearchTimer = setTimeout(() => {
+      aliasSearchTimer = null;
+      runPinSearch(query);
+    }, ALIAS_SEARCH_DEBOUNCE_MS);
+  }
+
+  async function runPinSearch(query) {
+    if (!pinSession) return;
+    const seq = ++aliasSearchSeq;
+    pinSession = { ...pinSession, query, searching: true };
+    render();
+
+    try {
+      const url = `/api/sheets/rows/search?q=${encodeURIComponent(query ?? '')}&limit=15`;
+      const res = await fetch(url);
+      const body = await res.json().catch(() => ({}));
+      if (seq !== aliasSearchSeq || !pinSession) return;
+      if (!res.ok) throw new Error(body.error ?? `Search failed (${res.status})`);
+
+      pinSession = {
+        ...pinSession,
+        results: body.results ?? [],
+        searching: false,
+      };
+      saveError = null;
+      render();
+    } catch (err) {
+      if (seq !== aliasSearchSeq || !pinSession) return;
+      pinSession = { ...pinSession, results: [], searching: false };
+      saveError = err.message ?? 'Search failed';
+      render();
+    }
+  }
+
+  async function savePin() {
+    const rowId = pinSession?.selectedRow?.rowId;
+    if (!rowId) return;
+    await postPin(rowId);
+  }
+
+  async function postPin(rowId) {
+    if (saveState === 'saving') return;
+    saveState = 'saving';
+    saveError = null;
+    render();
+    try {
+      const res = await fetch('/api/match/override', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rowId: String(rowId) }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `Pin failed (${res.status})`);
+      pinSession = null;
+      saveState = 'idle';
+      saveError = null;
+      render();
+    } catch (err) {
+      saveState = 'idle';
+      saveError = err.message ?? 'Pin failed';
+      render();
+    }
+  }
+
+  async function clearPin() {
+    if (saveState === 'saving') return;
+    saveState = 'saving';
+    saveError = null;
+    render();
+    try {
+      const res = await fetch('/api/match/override', { method: 'DELETE' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `Clear pin failed (${res.status})`);
+      saveState = 'idle';
+      saveError = null;
+      render();
+    } catch (err) {
+      saveState = 'idle';
+      saveError = err.message ?? 'Clear pin failed';
+      render();
+    }
   }
 
   function scheduleAliasSearch(query) {
@@ -439,6 +568,22 @@ export function connectView({
     };
   }
 
+  function buildPinPanelProps() {
+    if (!pinSession) return null;
+    return {
+      query: pinSession.query,
+      results: pinSession.results,
+      selectedRow: pinSession.selectedRow,
+      searching: pinSession.searching,
+      saveState,
+      saveError,
+      onQueryChange: schedulePinSearch,
+      onSelectRow: selectPinRow,
+      onCancel: cancelPin,
+      onSave: savePin,
+    };
+  }
+
   function render() {
     closeColorPicker();
     if (!viewConfig) return;
@@ -455,7 +600,7 @@ export function connectView({
       setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
       return;
     }
-    const aliasFocus = aliasSession ? captureAliasPanelFocus() : null;
+    const aliasFocus = (aliasSession || pinSession) ? captureAliasPanelFocus() : null;
     const autoFocusSearch = aliasAutoFocusSearch;
     aliasAutoFocusSearch = false;
 
@@ -463,6 +608,11 @@ export function connectView({
     if (aliasPanel) {
       aliasPanel.focusRestore = aliasFocus;
       aliasPanel.autoFocusSearch = autoFocusSearch;
+    }
+    const pinPanel = buildPinPanelProps();
+    if (pinPanel) {
+      pinPanel.focusRestore = aliasFocus;
+      pinPanel.autoFocusSearch = autoFocusSearch;
     }
     if (currentViewId === 'session') {
       renderSession(root, {
@@ -494,6 +644,11 @@ export function connectView({
         onStartAlias: startAlias,
         onCancelEdit: cancelEdit,
         onSaveEdit: saveEdit,
+        pinSession,
+        pinPanel,
+        onStartPin: startPin,
+        onPinLast: pinLastCue,
+        onClearPin: clearPin,
       });
     } else {
       renderView(root, {
@@ -507,6 +662,11 @@ export function connectView({
         saveError,
         cuePane,
         onCuePaneChange: setCuePane,
+        pinSession,
+        pinPanel,
+        onStartPin: startPin,
+        onPinLast: pinLastCue,
+        onClearPin: clearPin,
         onStartEdit: viewConfig.editable ? startEdit : undefined,
         onStartCreate: viewConfig.editable ? startCreate : undefined,
         onStartAlias: viewConfig.editable ? startAlias : undefined,
@@ -605,6 +765,7 @@ export function connectView({
     closeColorPicker();
     editSession = null;
     aliasSession = null;
+    pinSession = null;
     saveState = 'idle';
     saveError = null;
     applyHistory('settings', href, historyMode);
@@ -637,6 +798,7 @@ export function connectView({
     currentViewId = nextId;
     editSession = null;
     aliasSession = null;
+    pinSession = null;
     saveState = 'idle';
     saveError = null;
     cuePane = 'last';
