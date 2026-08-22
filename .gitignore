@@ -6,10 +6,16 @@ secrets/*
 config/config.json
 !secrets/.gitkeep
 
-# Runtime data (offline sheet cache, logs)
+# Runtime cache (offline sheet snapshot, future waveform cache)
 data/*
 !data/.gitkeep
 *.log
+
+# Shared session logs — pull on any machine
+!data/sessions/
+!data/sessions/.gitkeep
+data/sessions/.active.json
+data/sessions/test.jsonl
 
 # Node
 node_modules/
