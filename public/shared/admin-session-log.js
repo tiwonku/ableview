@@ -125,7 +125,7 @@ export function mountSessionLogPanel(selector) {
     shell.appendChild(el(
       'p',
       'settings-lead',
-      'Append-only JSONL of watched-track clip changes, scene/clip launch events, and sheet match events. Files live under data/sessions/ (not in git).',
+      'Append-only JSONL of watched-track clip changes, scene/clip launch events, and sheet match events. Files live under data/sessions/ and are committed so other machines can pull them. The active-session sidecar stays local.',
     ));
 
     const fieldset = el('fieldset', 'settings-group session-log-group');

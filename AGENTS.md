@@ -271,7 +271,7 @@ config/
   config.example.json  # committed template
   config.json          # local copy (gitignored)
   scenarios/           # sim scenario files
-data/               # runtime cache (gitignored except .gitkeep)
+data/               # sheet cache gitignored; session JSONL in data/sessions/ is committed
 secrets/            # service account key (gitignored)
 deploy/             # systemd unit
 test/               # node:test suite
@@ -281,7 +281,8 @@ test/               # node:test suite
 
 ## Git / secrets
 
-- **Never commit:** `.env`, `config/config.json`, `secrets/*`, `data/sheet-cache.json`
+- **Never commit:** `.env`, `config/config.json`, `secrets/*`, `data/sheet-cache.json`, `data/sessions/.active.json`
+- **Do commit:** `data/sessions/*.jsonl` (show/rehearsal logs; skip the sim default `test.jsonl`)
 - **Never commit** unless the user explicitly asks
 - `.env.example` documents required env vars without values
 

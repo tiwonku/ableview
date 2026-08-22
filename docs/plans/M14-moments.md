@@ -646,7 +646,7 @@ session name; custom Companion module (§12) for Stream Deck LED feedback.
    - `data/sessions/` contains the new `.jsonl` with a `moment` line
 6. If you need logging to **not** auto-start (strict rehearsal), set `moments.autoStartOnMoment`
    to `false` in settings — buttons then return 409 until logging is enabled manually.
-7. After show: copy the session `.jsonl` from `data/sessions/` for the VOD tool.
+7. After show: commit and push the session `.jsonl` from `data/sessions/` for the VOD tool.
 
 **Example jq — moments only**
 

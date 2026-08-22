@@ -112,7 +112,7 @@ handle from bootstrap (same pattern as `sheetsActions` / `simActions`).
 | ID | Topic | Default for M10 |
 |---|---|---|
 | OD-L1 | File format | **JSONL** (one JSON object per line, UTF-8) |
-| OD-L2 | Directory | `./data/sessions` (gitignored via existing `data/*`) |
+| OD-L2 | Directory | `./data/sessions` (JSONL committed for other machines; `.active.json` and sim `test.jsonl` stay gitignored) |
 | OD-L3 | Default session basename on rotate | ISO date + time local-safe slug, e.g. `session-2026-07-27T22-15-00Z` |
 | OD-L4 | Auto-start on boot | **`sessionLog.autoStart: false`** in committed example; **`true` only when `sim.enabled`** if `sessionLog.autoStartWhenSim: true` (both configurable) |
 | OD-L5 | Default basename when sim auto-starts | **`test`** → file `test.jsonl` (operator can rename/rotate before rehearsal) |
@@ -241,7 +241,7 @@ Persist runtime across process restart without polluting `config.json`.
 
 - Updated after each append (prefer **after each append** for simplicity in M10).
 - On startup: if file missing, use config defaults only.
-- **Gitignored** (under `data/`).
+- **Gitignored** (sidecar only; session `.jsonl` files are committed).
 
 ### 4.3 REST: `GET /api/session-log`
 
@@ -661,7 +661,7 @@ export function resolveLogTimestamp(getTimecodeStatus) {
 3. Set session name (e.g. `rehearsal-july-27`); enable logging.
 4. Run show or sim; confirm **line count** increases on clip changes (not every beat).
 5. To start a new segment: change session name → **Apply** (previous `.jsonl` remains on disk).
-6. After show: copy files from `data/sessions/` off the NUC for analysis.
+6. After show: commit and push the new `.jsonl` under `data/sessions/` so other machines can pull it.
 
 **Example jq:**
 
