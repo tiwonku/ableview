@@ -37,6 +37,10 @@ test('parseCellForEditor and formatCellForSheet round-trip color', () => {
   assert.equal(formatCellForSheet('', cfg), '');
 });
 
+test('formatCellForSheet keeps a leading zero in cyan RGB', () => {
+  assert.equal(formatCellForSheet('#00FFFF', { type: 'color' }), '0,255,255');
+});
+
 test('validateAndFormatChanges clears color to empty string', () => {
   const formatted = validateAndFormatChanges({ RGB_1: '' }, EDITOR_COLUMNS, HEADERS);
   assert.equal(formatted.RGB_1, '');

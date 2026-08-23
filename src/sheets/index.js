@@ -15,6 +15,10 @@ import { searchSheetRows } from './search-rows.js';
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
+// RAW stores "0,255,255" as text. USER_ENTERED treats it as the integer 255255
+// (US thousands grouping), so cyan and other R=0 colors vanish on the next sync.
+const VALUE_INPUT_OPTION = 'RAW';
+
 function readCacheFile(cachePath) {
   const raw = readFileSync(cachePath, 'utf8');
   const parsed = JSON.parse(raw);
@@ -144,7 +148,7 @@ export function createSheetsStore({ config, getConfig, log }) {
     await client.spreadsheets.values.batchUpdate({
       spreadsheetId: sheetId,
       requestBody: {
-        valueInputOption: 'USER_ENTERED',
+        valueInputOption: VALUE_INPUT_OPTION,
         data,
       },
     });
@@ -176,7 +180,7 @@ export function createSheetsStore({ config, getConfig, log }) {
     await client.spreadsheets.values.update({
       spreadsheetId: sheetId,
       range,
-      valueInputOption: 'USER_ENTERED',
+      valueInputOption: VALUE_INPUT_OPTION,
       requestBody: { values: [rowValues] },
     });
 

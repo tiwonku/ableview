@@ -18,6 +18,12 @@ test('parseRgbCell accepts spaced commas', () => {
   assert.equal(parseRgbCell('255, 229, 153').hex, '#FFE599');
 });
 
+test('parseRgbCell keeps a leading zero in cyan RGB', () => {
+  const color = parseRgbCell('0,255,255');
+  assert.equal(color?.hex, '#00FFFF');
+  assert.equal(color?.r, 0);
+});
+
 test('parseRgbCell rejects invalid input', () => {
   assert.equal(parseRgbCell(''), null);
   assert.equal(parseRgbCell('109,158'), null);
