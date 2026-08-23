@@ -115,7 +115,7 @@ export function makeMatchResult({
   return result;
 }
 
-/** Apply a temporary pin onto an unmatched payload. Returns null if the row is gone. */
+/** Apply a temporary pin, replacing any auto-match. Returns null if the row is gone. */
 export function applyPinnedRow(payload, snapshot, matchColumn, rowId) {
   const id = rowId != null ? String(rowId) : '';
   if (!id) return null;

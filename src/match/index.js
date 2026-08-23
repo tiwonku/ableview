@@ -445,23 +445,24 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
       payload.ingestLive = simulated ? true : ingestLive;
       payload.ableton = simulated ? null : ableton;
 
-      if (payload.match?.matched === true) {
-        if (overrideRowId && mk !== overrideSetAtMatchKey) {
+      if (overrideRowId) {
+        const newAutoMatch = payload.match?.matched === true && mk !== overrideSetAtMatchKey;
+        if (newAutoMatch) {
           overrideRowId = null;
           overrideSetAtMatchKey = null;
-        }
-      } else if (overrideRowId) {
-        const pinned = applyPinnedRow(
-          payload,
-          snapshot,
-          resolveConfig().sheets?.matchColumn,
-          overrideRowId,
-        );
-        if (pinned) {
-          payload = pinned;
         } else {
-          overrideRowId = null;
-          overrideSetAtMatchKey = null;
+          const pinned = applyPinnedRow(
+            payload,
+            snapshot,
+            resolveConfig().sheets?.matchColumn,
+            overrideRowId,
+          );
+          if (pinned) {
+            payload = pinned;
+          } else {
+            overrideRowId = null;
+            overrideSetAtMatchKey = null;
+          }
         }
       }
 

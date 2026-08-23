@@ -85,7 +85,7 @@ export function renderPinPanel(parent, opts) {
     el(
       'p',
       'alias-panel-context',
-      'Show this sheet row as the live cue until the next automatic match. Does not add an alias or change future matching.',
+      'Show this sheet row as the live cue until the next automatic match. Replaces the current match if one is showing. Does not add an alias or change future matching.',
     ),
   );
 

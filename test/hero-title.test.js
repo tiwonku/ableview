@@ -224,6 +224,7 @@ test('operator pin cue is wired in view-render and ws-client', () => {
   );
   assert.match(viewSrc, /Pin this cue/);
   assert.match(viewSrc, /Pin a different cue/);
+  assert.match(viewSrc, /Change cue/);
   assert.match(viewSrc, /Clear pin/);
   assert.match(viewSrc, /renderPinPanel/);
   assert.match(clientSrc, /\/api\/match\/override/);

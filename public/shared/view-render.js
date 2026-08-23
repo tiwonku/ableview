@@ -317,7 +317,8 @@ export function renderView(root, {
     onSaveEdit,
     cuePane: pane,
     onCuePaneChange,
-    onClearPin: pinned ? onClearPin : undefined,
+    onClearPin: pinned && !busy ? onClearPin : undefined,
+    onStartPin: matched && !busy ? onStartPin : undefined,
   });
   if (editActions) clipRow.appendChild(editActions);
   root.appendChild(clipRow);
@@ -489,12 +490,14 @@ function renderViewEditActions({
   cuePane = null,
   onCuePaneChange,
   onClearPin,
+  onStartPin,
 }) {
   const showSave = Boolean(editSession && onCancelEdit && onSaveEdit);
   const showEdit = !editSession && matched && editable && onStartEdit;
   const showToggle = !editSession && Boolean(cuePane) && typeof onCuePaneChange === 'function';
   const showClear = !editSession && typeof onClearPin === 'function';
-  if (!showSave && !showEdit && !showToggle && !showClear) return null;
+  const showChange = !editSession && typeof onStartPin === 'function';
+  if (!showSave && !showEdit && !showToggle && !showClear && !showChange) return null;
 
   const actions = document.createElement('div');
   actions.className = 'view-edit-actions';
@@ -525,6 +528,15 @@ function renderViewEditActions({
   if (showToggle) {
     actions.appendChild(renderCuePaneToggle(cuePane, onCuePaneChange));
     return actions;
+  }
+
+  if (showChange) {
+    const changeBtn = document.createElement('button');
+    changeBtn.type = 'button';
+    changeBtn.className = 'view-edit-btn';
+    changeBtn.textContent = 'Change cue';
+    changeBtn.addEventListener('click', onStartPin);
+    actions.appendChild(changeBtn);
   }
 
   if (showClear) {
@@ -1037,19 +1049,28 @@ export function renderAdmin(root, {
   root.appendChild(stats);
   renderAdminStats(stats, payload, status);
 
-  if (pinned && onClearPin && !busy) {
+  const matched = payload?.match?.matched === true;
+  if (!busy && matched && (onStartPin || (pinned && onClearPin))) {
     const pinBar = document.createElement('div');
     pinBar.className = 'admin-pin-actions';
-    const clearBtn = document.createElement('button');
-    clearBtn.type = 'button';
-    clearBtn.className = 'admin-editor-btn';
-    clearBtn.textContent = 'Clear pin';
-    clearBtn.addEventListener('click', onClearPin);
-    pinBar.appendChild(clearBtn);
+    if (onStartPin) {
+      const changeBtn = document.createElement('button');
+      changeBtn.type = 'button';
+      changeBtn.className = 'admin-editor-btn';
+      changeBtn.textContent = 'Change cue';
+      changeBtn.addEventListener('click', onStartPin);
+      pinBar.appendChild(changeBtn);
+    }
+    if (pinned && onClearPin) {
+      const clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'admin-editor-btn';
+      clearBtn.textContent = 'Clear pin';
+      clearBtn.addEventListener('click', onClearPin);
+      pinBar.appendChild(clearBtn);
+    }
     root.appendChild(pinBar);
   }
-
-  const matched = payload?.match?.matched === true;
   const showNoMatch = payload && !matched && !busy
     && (hasPlayingClips(payload) || payload.clipName?.trim());
 

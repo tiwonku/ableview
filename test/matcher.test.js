@@ -1185,7 +1185,7 @@ test('setOverride pins a row while unmatched until the next auto match', () => {
   assert.equal(matcher.getOverride().rowId, null);
 });
 
-test('setOverride queues while auto-matched and applies on the next miss', () => {
+test('setOverride replaces a live auto-match until the next auto match', () => {
   const bus = createBus();
   const payloads = [];
   bus.on(EVENTS.CUE_PAYLOAD, (p) => payloads.push(p));
@@ -1202,15 +1202,21 @@ test('setOverride queues while auto-matched and applies on the next miss', () =>
   assert.equal(payloads.at(-1).match.viaOverride, undefined);
 
   const status = matcher.setOverride('7');
-  assert.equal(status.queued, true);
-  assert.equal(status.applied, false);
-  assert.equal(payloads.at(-1).match.rowId, '5');
-  assert.equal(payloads.at(-1).match.viaOverride, undefined);
+  assert.equal(status.applied, true);
+  assert.equal(status.queued, false);
+  assert.equal(payloads.at(-1).match.rowId, '7');
+  assert.equal(payloads.at(-1).match.viaOverride, true);
+  assert.equal(payloads.at(-1).row['Clip Name'], 'Song B - Verse');
 
   emitClip(bus, 'INTRO');
   assert.equal(payloads.at(-1).match.viaOverride, true);
   assert.equal(payloads.at(-1).match.rowId, '7');
-  assert.equal(payloads.at(-1).row['Clip Name'], 'Song B - Verse');
+
+  emitClip(bus, 'Song B - Verse', 3, 'DECK B', 4);
+  assert.equal(payloads.at(-1).match.matched, true);
+  assert.equal(payloads.at(-1).match.viaOverride, undefined);
+  assert.equal(payloads.at(-1).match.rowId, '7');
+  assert.equal(matcher.getOverride().rowId, null);
 });
 
 test('clearOverride returns to unmatched without writing aliases', () => {
