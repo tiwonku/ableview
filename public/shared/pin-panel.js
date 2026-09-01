@@ -1,4 +1,4 @@
-// Temporary pin picker: search the cue sheet and hold that row until the next auto match.
+// Temporary pin picker: tonight's setlist first, then search the rest of the cue sheet.
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -14,12 +14,90 @@ function secondaryLabel(result) {
   return '';
 }
 
+function haystackMatches(value, needle) {
+  return String(value ?? '').toLowerCase().includes(needle);
+}
+
+function pinResultMatches(result, needle) {
+  if (!needle) return true;
+  if (haystackMatches(result.title, needle)) return true;
+  if (haystackMatches(result.aliases, needle)) return true;
+  return (result.secondary ?? []).some((s) => haystackMatches(s.value, needle));
+}
+
+/** Sheet-shaped cards from the active setlist (skip rows missing from the sheet). */
+export function pinResultsFromSetlist(setlist) {
+  const items = Array.isArray(setlist?.items) ? setlist.items : [];
+  const results = [];
+  for (const item of items) {
+    if (item?.missing) continue;
+    const rowId = item?.rowId != null ? String(item.rowId).trim() : '';
+    if (!rowId) continue;
+    results.push({
+      rowId,
+      title: String(item.liveTitle || item.title || '').trim() || `Row ${rowId}`,
+      aliases: '',
+      secondary: [],
+      fromSetlist: true,
+      status: item.status ?? null,
+    });
+  }
+  return results;
+}
+
+function enrichSetlistResult(item, sheet) {
+  if (!sheet) return { ...item, fromSetlist: true };
+  return {
+    ...sheet,
+    rowId: item.rowId,
+    title: String(sheet.title || item.title || '').trim() || item.title,
+    fromSetlist: true,
+    status: item.status ?? null,
+  };
+}
+
+/**
+ * Empty query → setlist cards in show order.
+ * Typed query → matching setlist rows first, then other cue-sheet hits.
+ */
+export function mergePinResults({ query = '', setlist = null, sheetResults = [] } = {}) {
+  const q = String(query ?? '').trim();
+  const setlistItems = pinResultsFromSetlist(setlist);
+  const sheetList = Array.isArray(sheetResults) ? sheetResults : [];
+  const sheetById = new Map(sheetList.map((row) => [String(row.rowId), row]));
+
+  if (!q) {
+    return { results: setlistItems, source: 'setlist' };
+  }
+
+  const needle = q.toLowerCase();
+  const ordered = [];
+  const seen = new Set();
+
+  for (const item of setlistItems) {
+    const sheet = sheetById.get(item.rowId);
+    if (!pinResultMatches(item, needle) && !sheet) continue;
+    ordered.push(enrichSetlistResult(item, sheet));
+    seen.add(item.rowId);
+  }
+
+  for (const sheet of sheetList) {
+    const id = String(sheet.rowId);
+    if (seen.has(id)) continue;
+    ordered.push({ ...sheet, fromSetlist: false });
+    seen.add(id);
+  }
+
+  return { results: ordered, source: 'sheet' };
+}
+
 export function createPinSession() {
   return {
     query: '',
     results: [],
     selectedRow: null,
     searching: false,
+    source: 'setlist',
   };
 }
 
@@ -30,6 +108,8 @@ export function createPinSession() {
  *   results: Array,
  *   selectedRow: object|null,
  *   searching?: boolean,
+ *   source?: 'setlist'|'sheet',
+ *   setlistName?: string,
  *   saveState?: string,
  *   saveError?: string|null,
  *   onQueryChange: (q: string) => void,
@@ -46,6 +126,8 @@ export function renderPinPanel(parent, opts) {
     results = [],
     selectedRow = null,
     searching = false,
+    source = 'setlist',
+    setlistName = '',
     saveState = 'idle',
     saveError = null,
     onQueryChange,
@@ -85,7 +167,7 @@ export function renderPinPanel(parent, opts) {
     el(
       'p',
       'alias-panel-context',
-      'Show this sheet row as the live cue until the next automatic match. Replaces the current match if one is showing. Does not add an alias or change future matching.',
+      'Show this sheet row as the live cue until the next automatic match. Starts with tonight’s setlist; search to pick any other sheet row. Replaces the current match if one is showing. Does not add an alias or change future matching.',
     ),
   );
 
@@ -94,24 +176,35 @@ export function renderPinPanel(parent, opts) {
   }
 
   const stepRow = el('div', 'alias-step');
-  stepRow.appendChild(el('p', 'alias-step-label', 'Find the sheet row'));
+  const label = source === 'setlist'
+    ? (setlistName ? `Tonight’s setlist · ${setlistName}` : 'Tonight’s setlist')
+    : 'Setlist + cue sheet';
+  stepRow.appendChild(el('p', 'alias-step-label', label));
 
   const searchInput = el('input', 'alias-search-input');
   searchInput.type = 'search';
-  searchInput.placeholder = 'Search song title, aliases, ALS folder…';
+  searchInput.placeholder = 'Search setlist or cue sheet…';
   searchInput.value = query ?? '';
   searchInput.autocomplete = 'off';
   searchInput.addEventListener('input', () => onQueryChange(searchInput.value));
   stepRow.appendChild(searchInput);
 
   const resultsList = el('div', 'alias-search-results');
-  if (searching) {
+  const q = String(query ?? '').trim();
+  if (searching && !results.length) {
     resultsList.appendChild(el('p', 'alias-search-empty', 'Searching…'));
   } else if (!results.length) {
     resultsList.appendChild(
-      el('p', 'alias-search-empty', String(query ?? '').trim() ? 'No rows matched.' : 'Type to search the cue sheet.'),
+      el(
+        'p',
+        'alias-search-empty',
+        q
+          ? 'No rows matched.'
+          : 'No songs on tonight’s setlist. Search the cue sheet to pin another row.',
+      ),
     );
   } else {
+    const showSetlistBadge = source === 'sheet';
     for (const result of results) {
       const btn = el('button', 'alias-search-result');
       btn.type = 'button';
@@ -119,11 +212,16 @@ export function renderPinPanel(parent, opts) {
       btn.addEventListener('click', () => onSelectRow(result));
 
       btn.appendChild(el('span', 'alias-search-result-title', result.title));
-      const meta = el('span', 'alias-search-result-meta', `Row ${result.rowId}`);
+      const parts = [];
+      if (showSetlistBadge && result.fromSetlist) parts.push('On setlist');
+      parts.push(`Row ${result.rowId}`);
       const sub = secondaryLabel(result);
-      if (sub) meta.textContent += ` · ${sub}`;
-      btn.appendChild(meta);
+      if (sub) parts.push(sub);
+      btn.appendChild(el('span', 'alias-search-result-meta', parts.join(' · ')));
       resultsList.appendChild(btn);
+    }
+    if (searching) {
+      resultsList.appendChild(el('p', 'alias-search-empty', 'Searching cue sheet…'));
     }
   }
   stepRow.appendChild(resultsList);

@@ -23,4 +23,5 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
   assert.match(clientSrc, /renderSetlist/);
   assert.match(clientSrc, /\/api\/setlist/);
   assert.match(clientSrc, /function setlistCueChanged/);
+  assert.match(clientSrc, /mergePinResults/);
 });

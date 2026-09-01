@@ -21,7 +21,7 @@ import {
   openOperatorColorField,
 } from './admin-row-editor.js';
 import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
-import { createPinSession } from './pin-panel.js';
+import { createPinSession, mergePinResults } from './pin-panel.js';
 import { closeColorPicker } from './color-picker.js';
 import {
   operatorCreateColumns,
@@ -203,6 +203,11 @@ export function connectView({
 
     if (msg.type === 'setlist' && msg.setlist) {
       lastSetlist = msg.setlist;
+      if (pinSession && !String(pinSession.query ?? '').trim()) {
+        applyPinResults(pinSession.query ?? '');
+        render();
+        return;
+      }
       if (currentViewId === 'setlist' && !showingSettings && !statusOnly) render();
       return;
     }
@@ -334,6 +339,22 @@ export function connectView({
     render();
   }
 
+  function applyPinResults(query, sheetResults = []) {
+    if (!pinSession) return;
+    const merged = mergePinResults({
+      query,
+      setlist: lastSetlist,
+      sheetResults,
+    });
+    pinSession = {
+      ...pinSession,
+      query,
+      results: merged.results,
+      source: merged.source,
+      searching: false,
+    };
+  }
+
   function startPin() {
     if (editSession) cancelEdit();
     if (aliasSession) cancelAlias();
@@ -341,8 +362,8 @@ export function connectView({
     aliasAutoFocusSearch = true;
     saveState = 'idle';
     saveError = null;
+    applyPinResults('');
     render();
-    runPinSearch(pinSession.query);
   }
 
   function pinLastCue() {
@@ -360,9 +381,29 @@ export function connectView({
 
   function schedulePinSearch(query) {
     if (!pinSession) return;
-    pinSession = { ...pinSession, query, searching: true };
+    if (aliasSearchTimer) {
+      clearTimeout(aliasSearchTimer);
+      aliasSearchTimer = null;
+    }
+    if (!String(query ?? '').trim()) {
+      applyPinResults('');
+      saveError = null;
+      render();
+      return;
+    }
+    const preview = mergePinResults({
+      query,
+      setlist: lastSetlist,
+      sheetResults: [],
+    });
+    pinSession = {
+      ...pinSession,
+      query,
+      results: preview.results,
+      source: preview.source,
+      searching: true,
+    };
     render();
-    if (aliasSearchTimer) clearTimeout(aliasSearchTimer);
     aliasSearchTimer = setTimeout(() => {
       aliasSearchTimer = null;
       runPinSearch(query);
@@ -371,6 +412,12 @@ export function connectView({
 
   async function runPinSearch(query) {
     if (!pinSession) return;
+    if (!String(query ?? '').trim()) {
+      applyPinResults('');
+      saveError = null;
+      render();
+      return;
+    }
     const seq = ++aliasSearchSeq;
     pinSession = { ...pinSession, query, searching: true };
     render();
@@ -382,16 +429,23 @@ export function connectView({
       if (seq !== aliasSearchSeq || !pinSession) return;
       if (!res.ok) throw new Error(body.error ?? `Search failed (${res.status})`);
 
-      pinSession = {
-        ...pinSession,
-        results: body.results ?? [],
-        searching: false,
-      };
+      applyPinResults(query, body.results ?? []);
       saveError = null;
       render();
     } catch (err) {
       if (seq !== aliasSearchSeq || !pinSession) return;
-      pinSession = { ...pinSession, results: [], searching: false };
+      const preview = mergePinResults({
+        query,
+        setlist: lastSetlist,
+        sheetResults: [],
+      });
+      pinSession = {
+        ...pinSession,
+        query,
+        results: preview.results,
+        source: preview.source,
+        searching: false,
+      };
       saveError = err.message ?? 'Search failed';
       render();
     }
@@ -698,6 +752,8 @@ export function connectView({
       results: pinSession.results,
       selectedRow: pinSession.selectedRow,
       searching: pinSession.searching,
+      source: pinSession.source ?? 'setlist',
+      setlistName: lastSetlist?.name ?? '',
       saveState,
       saveError,
       onQueryChange: schedulePinSearch,
