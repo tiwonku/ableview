@@ -104,6 +104,7 @@ AbletonOSC / Simulator  →  event bus  →  [matcher]  →  [view server]  → 
 | OSC clock out | `src/outputs/osc.js` | Rebroadcasts Live tempo / beat / bar / transport to configured UDP destinations. |
 | Logger | `src/core/logger.js` | pino, structured JSON. |
 | Session log | `src/session-log/` | Append-only JSONL of `track_clip` + `match` events (M10). |
+| Setlist | `src/setlist/` | Named JSON setlists (`data/setlists/`) + `.active.json` sidecar; glance + pin, not a match source. |
 
 ### Planned modules (not yet implemented)
 
@@ -264,6 +265,8 @@ src/
   sim/              # on-the-wire OSC mock (sim.mode "osc")
   sheets/           # (M2)
   match/            # (M3)
+  session-log/      # (M10) JSONL cue log
+  setlist/          # named JSON setlists + sidecar
   server/           # (M4)
   index.js          # bootstrap / wiring
 public/             # (M4) static views + shared ws-client
@@ -271,7 +274,7 @@ config/
   config.example.json  # committed template
   config.json          # local copy (gitignored)
   scenarios/           # sim scenario files
-data/               # sheet cache gitignored; session JSONL in data/sessions/ is committed
+data/               # sheet cache gitignored; session JSONL and named setlists may be committed
 secrets/            # service account key (gitignored)
 deploy/             # systemd unit
 test/               # node:test suite
@@ -281,8 +284,8 @@ test/               # node:test suite
 
 ## Git / secrets
 
-- **Never commit:** `.env`, `config/config.json`, `secrets/*`, `data/sheet-cache.json`, `data/sessions/.active.json`
-- **Do commit:** `data/sessions/*.jsonl` (show/rehearsal logs; skip the sim default `test.jsonl`)
+- **Never commit:** `.env`, `config/config.json`, `secrets/*`, `data/sheet-cache.json`, `data/sessions/.active.json`, `data/setlists/.active.json`
+- **Do commit:** `data/sessions/*.jsonl` (show/rehearsal logs; skip the sim default `test.jsonl`); optional `data/setlists/*.json` named setlists
 - **Never commit** unless the user explicitly asks
 - `.env.example` documents required env vars without values
 

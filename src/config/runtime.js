@@ -31,6 +31,7 @@ export function serializeFileConfig(config) {
     server: { wsHeartbeatSeconds: config.server.wsHeartbeatSeconds },
     timecode: { ...config.timecode },
     sessionLog: { ...config.sessionLog },
+    setlist: { ...config.setlist },
     moments: { ...config.moments },
     oscOut: {
       enabled: config.oscOut?.enabled === true,

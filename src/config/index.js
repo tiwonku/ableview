@@ -59,6 +59,10 @@ export const DEFAULTS = Object.freeze({
     autoStartWhenSim: true,
     defaultSessionName: 'test',
   },
+  setlist: {
+    directory: './data/setlists',
+    defaultName: 'default',
+  },
   moments: {
     autoStartOnMoment: true,
     kinds: ['dope'],
@@ -176,6 +180,14 @@ export function validateConfig(config) {
     errors.push('sessionLog.autoStartWhenSim must be a boolean');
   }
 
+  const setlist = config.setlist ?? {};
+  if (setlist.directory != null && (typeof setlist.directory !== 'string' || !setlist.directory.trim())) {
+    errors.push('setlist.directory must be a non-empty string');
+  }
+  if (setlist.defaultName != null && typeof setlist.defaultName !== 'string') {
+    errors.push('setlist.defaultName must be a string');
+  }
+
   const moments = config.moments ?? {};
   if (moments.autoStartOnMoment != null && typeof moments.autoStartOnMoment !== 'boolean') {
     errors.push('moments.autoStartOnMoment must be a boolean');
@@ -282,6 +294,10 @@ export function loadConfig({ configPath = './config/config.json', envPath = '.en
   }
 
   const config = deepMerge(DEFAULTS, fileConfig);
+
+  if (!config.views.setlist) {
+    config.views.setlist = { title: 'Setlist', system: true };
+  }
 
   // Secrets and machine-specific settings come from the environment (§8).
   config.secrets = {

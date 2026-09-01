@@ -20,6 +20,7 @@ Build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claud
 | M12 | Multi-operator edit coordination (presence, revision, conflict warnings) | 📋 planned — [`docs/plans/M12-multi-operator-edit-coordination.md`](./docs/plans/M12-multi-operator-edit-coordination.md) |
 | M13 | External deck monitor — Djay Pro multi-Mac program sources, on-air UI + session log | 📋 planned — [`docs/plans/M13-external-deck-monitor.md`](./docs/plans/M13-external-deck-monitor.md) |
 | M14 | Moments — crew Stream Deck markers via Companion HTTP → session log JSONL; auto-start with timestamp session name; live title on operator views | ✅ done — [`docs/plans/M14-moments.md`](./docs/plans/M14-moments.md), [`docs/companion-moments.md`](./docs/companion-moments.md) |
+| M15 | Setlist editor / viewer — named JSON lists of sheet rows, dedicated view, pin from list | ✅ done — [`docs/plans/M15-setlist.md`](./docs/plans/M15-setlist.md) |
 
 v2026 core scope (spec §10, §13) is complete. Items below are deferred, partial, or
 post-v2026.
@@ -38,6 +39,7 @@ post-v2026.
 | **Session cue log** | Append-only JSONL (`track_clip` + `match` events in one file); watched-track clip changes + sheet match changes; Art-Net timestamp when live; admin toggle, session name → rotate file; sim auto-start optional. | ✅ done |
 | **OSC clock rebroadcast** | UDP fan-out of Live transport: tempo, 1-based beat-in-bar, bar, `is_playing`, signature. Multiple destinations from admin settings. Clip/cue triggers still not sent. | ✅ done |
 | **bestMatch over watched tracks** | Match all playing watched clips; bpm-stem normalize (no key regex); optional ALS Folder soft key; Session per-deck match/confidence/winner. Cue track optional. | ✅ done |
+| **Setlist editor / viewer** | Named JSON setlists of cue-sheet rows; dedicated `/views/setlist` glance + editor; pin uses existing override. Auto-saves; switch/save-as for other nights. | ✅ done |
 
 ---
 

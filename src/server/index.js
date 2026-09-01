@@ -9,6 +9,7 @@ import { registerSimRoutes } from './sim-api.js';
 import { registerSessionLogRoutes } from './session-log-api.js';
 import { registerMomentsRoutes, buildSessionLogBroadcast } from './moments-api.js';
 import { registerMatchRoutes } from './match-api.js';
+import { registerSetlistRoutes } from './setlist-api.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
@@ -25,6 +26,7 @@ export async function createViewServer({
   simActions,
   sessionLog,
   matchActions,
+  setlistStore,
 }) {
   let lastPayload = null;
   const clients = new Map();
@@ -98,6 +100,14 @@ export async function createViewServer({
     });
   }
 
+  function broadcastSetlist() {
+    if (!setlistStore) return;
+    broadcast({
+      type: 'setlist',
+      setlist: setlistStore.getState(),
+    });
+  }
+
   bus.on(EVENTS.CUE_PAYLOAD, (payload) => {
     lastPayload = clientPayload(payload);
     broadcast({ type: 'cue', payload: lastPayload });
@@ -162,6 +172,9 @@ export async function createViewServer({
     sessionLog.setOnSessionLogChange?.(broadcastSessionLog);
   }
 
+  registerSetlistRoutes(app, { setlistStore, log });
+  setlistStore?.setOnChange?.(broadcastSetlist);
+
   app.get('/views/:name', async (req, reply) => {
     try {
       const { content, mime } = await readPublicFile(`views/${req.params.name}.html`);
@@ -224,6 +237,9 @@ export async function createViewServer({
     if (sessionLog) {
       init.sessionLog = buildSessionLogBroadcast(sessionLog);
     }
+    if (setlistStore) {
+      init.setlist = setlistStore.getState();
+    }
     if (viewConfig.system) {
       init.system = true;
       init.status = buildStatus();
@@ -282,6 +298,7 @@ export async function createViewServer({
     getConnectedViewCount,
     rebroadcastSimState,
     broadcastSessionLog,
+    broadcastSetlist,
     async stop() {
       if (timecodeBroadcastTimer) clearTimeout(timecodeBroadcastTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);

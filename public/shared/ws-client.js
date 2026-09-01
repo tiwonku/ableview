@@ -10,6 +10,10 @@ import {
 } from './view-render.js';
 import { renderSession } from './session-render.js';
 import {
+  renderSetlist,
+  captureSetlistFocus,
+} from './setlist-render.js';
+import {
   collectEditorChanges,
   collectEditorValues,
   captureCreateSession,
@@ -49,6 +53,14 @@ function cueContentChanged(prev, next) {
     || prev.pendingLaunch !== next.pendingLaunch
     || tracksKey(prev.tracks) !== tracksKey(next.tracks)
     || sceneKey(prev.scene) !== sceneKey(next.scene);
+}
+
+function setlistCueChanged(prev, next) {
+  if (!prev) return true;
+  return prev.clipName !== next.clipName
+    || prev.match?.rowId !== next.match?.rowId
+    || prev.match?.matched !== next.match?.matched
+    || prev.match?.viaOverride !== next.match?.viaOverride;
 }
 
 export function connectView({
@@ -91,6 +103,12 @@ export function connectView({
   let aliasAutoFocusSearch = false;
   let cuePane = 'last';
   let pinSession = null;
+  let lastSetlist = null;
+  let setlistAddQuery = '';
+  let setlistAddResults = [];
+  let setlistAddSearching = false;
+  let setlistNameDraft = '';
+  let setlistAutoFocusSearch = false;
 
   function applySimState(simulated) {
     serverSimulated = simulated === true;
@@ -153,6 +171,10 @@ export function connectView({
       syncChrome();
       if (msg.status) lastStatus = msg.status;
       if (msg.sessionLog) applySessionLogState(msg.sessionLog);
+      if (msg.setlist) {
+        lastSetlist = msg.setlist;
+        if (!setlistNameDraft) setlistNameDraft = msg.setlist.name ?? '';
+      }
       applySimState(msg.simulated === true);
       if (msg.payload) {
         lastPayload = msg.payload;
@@ -179,6 +201,12 @@ export function connectView({
       return;
     }
 
+    if (msg.type === 'setlist' && msg.setlist) {
+      lastSetlist = msg.setlist;
+      if (currentViewId === 'setlist' && !showingSettings && !statusOnly) render();
+      return;
+    }
+
     if (msg.type === 'status' && msg.status) {
       lastStatus = msg.status;
       if (editSession || aliasSession || pinSession) {
@@ -200,6 +228,10 @@ export function connectView({
       onPayload?.(lastPayload);
       if (editSession || aliasSession || pinSession) {
         updateLiveChromeDuringEdit();
+        return;
+      }
+      if (currentViewId === 'setlist' && !setlistCueChanged(prevPayload, lastPayload)) {
+        setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
         return;
       }
       render();
@@ -393,6 +425,97 @@ export function connectView({
       saveError = err.message ?? 'Pin failed';
       render();
     }
+  }
+
+  function applySetlistState(body) {
+    if (!body || body.ok === false) return;
+    const { ok: _ok, error: _error, ...state } = body;
+    if (state.name && state.name !== lastSetlist?.name) {
+      setlistNameDraft = state.name;
+    }
+    if (state.items || state.name) lastSetlist = state;
+  }
+
+  async function mutateSetlist(url, { method = 'POST', body } = {}) {
+    if (saveState === 'saving') return;
+    saveState = 'saving';
+    saveError = null;
+    render();
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error ?? `Setlist failed (${res.status})`);
+      applySetlistState(payload);
+      saveState = 'idle';
+      saveError = null;
+      render();
+      return payload;
+    } catch (err) {
+      saveState = 'idle';
+      saveError = err.message ?? 'Setlist failed';
+      render();
+    }
+  }
+
+  function scheduleSetlistSearch(query) {
+    setlistAddQuery = query;
+    setlistAddSearching = true;
+    render();
+    if (aliasSearchTimer) clearTimeout(aliasSearchTimer);
+    aliasSearchTimer = setTimeout(() => {
+      aliasSearchTimer = null;
+      runSetlistSearch(query);
+    }, ALIAS_SEARCH_DEBOUNCE_MS);
+  }
+
+  async function runSetlistSearch(query) {
+    const seq = ++aliasSearchSeq;
+    setlistAddQuery = query;
+    setlistAddSearching = true;
+    render();
+    try {
+      const url = `/api/sheets/rows/search?q=${encodeURIComponent(query ?? '')}&limit=15`;
+      const res = await fetch(url);
+      const body = await res.json().catch(() => ({}));
+      if (seq !== aliasSearchSeq) return;
+      if (!res.ok) throw new Error(body.error ?? `Search failed (${res.status})`);
+      setlistAddResults = body.results ?? [];
+      setlistAddSearching = false;
+      saveError = null;
+      render();
+    } catch (err) {
+      if (seq !== aliasSearchSeq) return;
+      setlistAddResults = [];
+      setlistAddSearching = false;
+      saveError = err.message ?? 'Search failed';
+      render();
+    }
+  }
+
+  async function addSetlistRow(row) {
+    const result = await mutateSetlist('/api/setlist/items', {
+      body: { rowId: row.rowId },
+    });
+    if (result?.ok) {
+      setlistAddQuery = '';
+      setlistAddResults = [];
+      render();
+    }
+  }
+
+  function moveSetlistItem(rowId, direction) {
+    const items = lastSetlist?.items ?? [];
+    const ids = items.map((item) => String(item.rowId));
+    const from = ids.indexOf(String(rowId));
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    ids.splice(from, 1);
+    ids.splice(to, 0, String(rowId));
+    mutateSetlist('/api/setlist', { method: 'PATCH', body: { order: ids } });
   }
 
   async function clearPin() {
@@ -601,8 +724,11 @@ export function connectView({
       return;
     }
     const aliasFocus = (aliasSession || pinSession) ? captureAliasPanelFocus() : null;
+    const setlistFocus = currentViewId === 'setlist' ? captureSetlistFocus() : null;
     const autoFocusSearch = aliasAutoFocusSearch;
     aliasAutoFocusSearch = false;
+    const autoFocusSetlistSearch = setlistAutoFocusSearch;
+    setlistAutoFocusSearch = false;
 
     const aliasPanel = buildAliasPanelProps();
     if (aliasPanel) {
@@ -627,6 +753,39 @@ export function connectView({
         onStartCreate: startCreate,
         onCancelEdit: cancelEdit,
         onSaveEdit: saveEdit,
+      });
+      return;
+    }
+    if (currentViewId === 'setlist') {
+      renderSetlist(root, {
+        ...ctx,
+        setlist: lastSetlist,
+        addQuery: setlistAddQuery,
+        addResults: setlistAddResults,
+        addSearching: setlistAddSearching,
+        nameDraft: setlistNameDraft,
+        saveState,
+        saveError,
+        focusRestore: setlistFocus,
+        autoFocusSearch: autoFocusSetlistSearch,
+        onAddQueryChange: scheduleSetlistSearch,
+        onAddRow: addSetlistRow,
+        onRemove: (rowId) => mutateSetlist(`/api/setlist/items/${encodeURIComponent(rowId)}`, { method: 'DELETE' }),
+        onStatus: (rowId, status) => mutateSetlist(
+          `/api/setlist/items/${encodeURIComponent(rowId)}`,
+          { method: 'PATCH', body: { status } },
+        ),
+        onMove: moveSetlistItem,
+        onReorder: (rowIds) => mutateSetlist('/api/setlist', { method: 'PATCH', body: { order: rowIds } }),
+        onSwitch: (name) => mutateSetlist('/api/setlist', { method: 'PATCH', body: { name } }),
+        onCreate: (name) => mutateSetlist('/api/setlist', { method: 'PATCH', body: { name, create: true } }),
+        onDuplicate: (name) => mutateSetlist('/api/setlist', { method: 'PATCH', body: { name, duplicate: true } }),
+        onNameDraftChange: (name) => {
+          setlistNameDraft = name;
+          render();
+        },
+        onPin: postPin,
+        onClearPin: clearPin,
       });
       return;
     }
@@ -718,14 +877,17 @@ export function connectView({
 
   function syncChrome() {
     const isSession = !showingSettings && currentViewId === 'session';
+    const isSetlist = !showingSettings && currentViewId === 'setlist';
     const isAdmin = !showingSettings && viewConfig?.system === true && currentViewId === 'admin';
     const isOperator = Boolean(viewConfig)
       && !viewConfig.system
       && !statusOnly
       && !isSession
+      && !isSetlist
       && !showingSettings;
     document.body.classList.toggle('layout-operator', isOperator);
     document.body.classList.toggle('layout-session', isSession);
+    document.body.classList.toggle('layout-setlist', isSetlist);
     document.body.classList.toggle('layout-settings', showingSettings);
     document.title = showingSettings
       ? 'AbleView — Settings'
@@ -802,6 +964,9 @@ export function connectView({
     saveState = 'idle';
     saveError = null;
     cuePane = 'last';
+    setlistAddQuery = '';
+    setlistAddResults = [];
+    setlistAddSearching = false;
     applyHistory(nextId, href, historyMode);
     reconnectNow();
   }

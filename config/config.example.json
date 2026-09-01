@@ -67,6 +67,10 @@
     "autoStartWhenSim": true,
     "defaultSessionName": "test"
   },
+  "setlist": {
+    "directory": "./data/setlists",
+    "defaultName": "default"
+  },
   "moments": {
     "autoStartOnMoment": true,
     "kinds": ["dope", "not_dope"],
@@ -172,6 +176,10 @@
     },
     "session": {
       "title": "Session",
+      "system": true
+    },
+    "setlist": {
+      "title": "Setlist",
       "system": true
     },
     "admin": {

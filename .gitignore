@@ -17,6 +17,11 @@ data/*
 data/sessions/.active.json
 data/sessions/test.jsonl
 
+# Named setlists (sidecar is runtime-only; JSON files may be committed)
+!data/setlists/
+!data/setlists/.gitkeep
+data/setlists/.active.json
+
 # Node
 node_modules/
 npm-debug.log*

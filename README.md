@@ -34,7 +34,7 @@ cp config/config.example.json config/config.json  # local settings (gitignored)
 
 # Run in simulation mode (no Ableton needed) — walks config/scenarios/demo-set.json
 npm run sim
-# Then open http://localhost:8080/views/band (or /views/visuals, /views/lighting, /views/admin)
+# Then open http://localhost:8080/views/band (or /views/visuals, /views/lighting, /views/setlist, /views/admin)
 
 # Run against a real Ableton session with AbletonOSC installed
 npm start

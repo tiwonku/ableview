@@ -9,6 +9,7 @@ import { createViewServer } from './server/index.js';
 import { createTimecodeListener } from './timecode/index.js';
 import { createOscOutput } from './outputs/osc.js';
 import { createSessionLogger } from './session-log/index.js';
+import { createSetlistStore } from './setlist/index.js';
 
 const log = createLogger({ app: 'ableview' });
 
@@ -64,6 +65,14 @@ async function main() {
     log: log.child({ module: 'session-log' }),
   });
 
+  const setlist = createSetlistStore({
+    getConfig,
+    getSnapshot: sheets.getSnapshot,
+    bus,
+    log: log.child({ module: 'setlist' }),
+  });
+  setlist.start();
+
   const viewServer = await createViewServer({
     config,
     bus,
@@ -76,8 +85,12 @@ async function main() {
       appendAlias: (rowId, alias) => sheets.appendAlias(rowId, alias),
       searchRows: (query, opts) => sheets.searchRows(query, opts),
       getSnapshot: sheets.getSnapshot,
-      onSynced: () => matcher.rematch(),
+      onSynced: () => {
+        matcher.rematch();
+        setlist.refresh();
+      },
     },
+    setlistStore: setlist,
     matchActions: {
       setOverride: (rowId) => matcher.setOverride(rowId),
       clearOverride: () => matcher.clearOverride(),
@@ -160,6 +173,7 @@ async function main() {
   const shutdown = async (signal) => {
     log.info({ signal }, 'shutting down');
     sessionLog.stop();
+    setlist.stop();
     oscOut.stop();
     timecode.stop();
     ingest.stop();

@@ -7,6 +7,7 @@ export const EVENTS = Object.freeze({
   CUE_PAYLOAD: 'cuePayload',
   INGEST_STATUS: 'ingestStatus',
   TIMECODE: 'timecode',
+  SETLIST: 'setlist',
 });
 
 export function createBus() {
