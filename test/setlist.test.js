@@ -156,6 +156,39 @@ test('switch, create, and duplicate named setlists', () => {
   assert.throws(() => store.switchTo('missing-show'), /not found/);
 });
 
+test('removeSetlist deletes the file and switches to a remaining list', () => {
+  const { store, dir } = tempStore();
+  store.start();
+  store.addItem('5');
+  store.duplicate('festival-saturday');
+  store.createNew('club-warmup');
+
+  const afterDelete = store.removeSetlist();
+  assert.equal(afterDelete.name, 'default');
+  assert.equal(existsSync(join(dir, 'club-warmup.json')), false);
+  assert.equal(existsSync(join(dir, 'default.json')), true);
+  assert.equal(existsSync(join(dir, 'festival-saturday.json')), true);
+
+  const sidecar = JSON.parse(readFileSync(join(dir, SIDECAR_NAME), 'utf8'));
+  assert.equal(sidecar.setlistName, 'default');
+  assert.deepEqual(store.getState().library.map((e) => e.name).sort(), [
+    'default',
+    'festival-saturday',
+  ]);
+});
+
+test('removeSetlist recreates default when it was the last remaining set', () => {
+  const { store, dir } = tempStore();
+  store.start();
+  store.addItem('5');
+  const state = store.removeSetlist();
+  assert.equal(state.name, 'default');
+  assert.equal(state.items.length, 0);
+  assert.equal(existsSync(join(dir, 'default.json')), true);
+  const saved = JSON.parse(readFileSync(join(dir, 'default.json'), 'utf8'));
+  assert.deepEqual(saved.items, []);
+});
+
 test('restart restores the active setlist from the sidecar', () => {
   const dir = mkdtempSync(join(tmpdir(), 'ableview-setlist-restore-'));
   const config = {

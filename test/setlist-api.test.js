@@ -219,6 +219,44 @@ test('create, duplicate, and switch named setlists', async () => {
   }
 });
 
+test('DELETE /api/setlist and PATCH delete remove the current named set', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ableview-setlist-api-'));
+  const { server } = await createTestServer(dir);
+  const base = `http://127.0.0.1:${server.port}`;
+  try {
+    await fetch(`${base}/api/setlist`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'festival-saturday', create: true }),
+    });
+
+    const gone = await fetch(`${base}/api/setlist`, { method: 'DELETE' });
+    assert.equal(gone.status, 200);
+    const deleted = await gone.json();
+    assert.equal(deleted.ok, true);
+    assert.equal(deleted.name, 'default');
+    assert.equal(deleted.library.some((entry) => entry.name === 'festival-saturday'), false);
+
+    await fetch(`${base}/api/setlist`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'club-warmup', create: true }),
+    });
+    const patched = await fetch(`${base}/api/setlist`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delete: true }),
+    });
+    assert.equal(patched.status, 200);
+    const body = await patched.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.name, 'default');
+    assert.equal(body.library.some((entry) => entry.name === 'club-warmup'), false);
+  } finally {
+    await server.stop();
+  }
+});
+
 test('WS init includes setlist and mutations broadcast', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'ableview-setlist-api-'));
   const { server } = await createTestServer(dir);

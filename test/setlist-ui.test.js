@@ -27,10 +27,13 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
   assert.match(renderSrc, /title \|\| 'Set'/);
   assert.match(renderSrc, /Pin only when you want this row on the live board/);
   assert.match(renderSrc, /Clear pin/);
+  assert.match(renderSrc, /Delete set/);
+  assert.match(renderSrc, /onDelete/);
   assert.match(clientSrc, /currentViewId === 'setlist'/);
   assert.match(clientSrc, /renderSetlist/);
   assert.match(clientSrc, /syncSessionLogPanel/);
   assert.match(clientSrc, /\/api\/setlist/);
+  assert.match(clientSrc, /body: \{ delete: true \}/);
   assert.match(clientSrc, /function setlistCueChanged/);
   assert.match(clientSrc, /mergePinResults/);
 });

@@ -504,7 +504,12 @@ export function connectView({
         body: body !== undefined ? JSON.stringify(body) : undefined,
       });
       const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.error ?? `Setlist failed (${res.status})`);
+      if (!res.ok) {
+        const detail = payload.error && payload.error !== 'Not Found'
+          ? payload.error
+          : payload.message ?? payload.error ?? `Setlist failed (${res.status})`;
+        throw new Error(detail);
+      }
       applySetlistState(payload);
       saveState = 'idle';
       saveError = null;
@@ -840,6 +845,7 @@ export function connectView({
         onSwitch: (name) => mutateSetlist('/api/setlist', { method: 'PATCH', body: { name } }),
         onCreate: (name) => mutateSetlist('/api/setlist', { method: 'PATCH', body: { name, create: true } }),
         onDuplicate: (name) => mutateSetlist('/api/setlist', { method: 'PATCH', body: { name, duplicate: true } }),
+        onDelete: () => mutateSetlist('/api/setlist', { method: 'PATCH', body: { delete: true } }),
         onNameDraftChange: (name) => {
           setlistNameDraft = name;
           render();

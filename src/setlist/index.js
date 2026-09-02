@@ -3,6 +3,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -349,6 +350,31 @@ export function createSetlistStore({
     return getState();
   }
 
+  function loadNextAfterDelete() {
+    const remaining = listLibrary().map((entry) => entry.name);
+    const fallback = defaultName();
+    const next = remaining.includes(fallback) ? fallback : remaining[0];
+    if (next) {
+      loadFile(next);
+      persistSidecar();
+      return;
+    }
+    createAndLoad(fallback);
+  }
+
+  function removeSetlist() {
+    const deletedName = document.name;
+    const { file } = setlistFilePath(directory(), deletedName, cwd);
+    if (!existsSync(file)) {
+      throw new Error(`setlist not found: ${deletedName}`);
+    }
+    unlinkSync(file);
+    loadNextAfterDelete();
+    log?.info({ name: deletedName, now: document.name }, 'setlist deleted');
+    notify();
+    return getState();
+  }
+
   function start() {
     const { dir } = setlistFilePath(directory(), 'x', cwd);
     mkdirSync(dir, { recursive: true });
@@ -403,6 +429,7 @@ export function createSetlistStore({
     switchTo,
     createNew,
     duplicate,
+    removeSetlist,
     refresh: notify,
     setOnChange(handler) {
       changeHandler = handler ?? null;

@@ -125,6 +125,7 @@ function secondaryLabel(result) {
  *   onSwitch?: (name: string) => void,
  *   onCreate?: (name: string) => void,
  *   onDuplicate?: (name: string) => void,
+ *   onDelete?: () => void,
  *   onNameDraftChange?: (name: string) => void,
  *   onPin?: (rowId: string) => void,
  *   onClearPin?: () => void,
@@ -157,6 +158,7 @@ export function renderSetlist(root, ctx) {
     onSwitch,
     onCreate,
     onDuplicate,
+    onDelete,
     onNameDraftChange,
     onPin,
     onClearPin,
@@ -234,6 +236,21 @@ export function renderSetlist(root, ctx) {
   saveAsBtn.disabled = busy || !draft || draft === currentName;
   saveAsBtn.addEventListener('click', () => onDuplicate?.(draft));
   toolbar.appendChild(saveAsBtn);
+
+  const deleteBtn = el('button', 'admin-editor-btn admin-editor-btn--danger', 'Delete');
+  deleteBtn.type = 'button';
+  deleteBtn.title = library.length < 2
+    ? 'Create another set before deleting this one'
+    : `Delete “${currentName}”`;
+  deleteBtn.disabled = busy || !currentName || library.length < 2;
+  deleteBtn.addEventListener('click', () => {
+    if (!currentName || library.length < 2) return;
+    const confirmed = typeof window !== 'undefined' && typeof window.confirm === 'function'
+      ? window.confirm(`Delete set “${currentName}”? This cannot be undone.`)
+      : true;
+    if (confirmed) onDelete?.();
+  });
+  toolbar.appendChild(deleteBtn);
 
   root.appendChild(toolbar);
 

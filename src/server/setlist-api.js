@@ -30,18 +30,38 @@ export function registerSetlistRoutes(app, { setlistStore, log }) {
         if (body.name == null) throw new Error('body.name is required to create');
         state = setlistStore.createNew(body.name);
         log.info({ name: state.name }, 'setlist created');
+      } else if (body.delete === true) {
+        const previous = setlistStore.getState().name;
+        state = setlistStore.removeSetlist();
+        log.info({ name: previous, now: state.name }, 'setlist deleted');
       } else if (body.name != null) {
         state = setlistStore.switchTo(body.name);
         log.info({ name: state.name }, 'setlist switched');
       } else if (Array.isArray(body.order)) {
         state = setlistStore.reorder(body.order);
       } else {
-        throw new Error('body.name, body.create, body.duplicate, or body.order is required');
+        throw new Error('body.name, body.create, body.duplicate, body.delete, or body.order is required');
       }
       return reply.send({ ok: true, ...state });
     } catch (err) {
       const message = err.message ?? 'setlist update failed';
       log.warn({ err: message }, 'setlist patch failed');
+      return reply.code(httpCode(err)).send({ ok: false, error: message });
+    }
+  });
+
+  app.delete('/api/setlist', async (_req, reply) => {
+    if (!setlistStore) {
+      return reply.code(501).send({ ok: false, error: 'setlist is not available' });
+    }
+    try {
+      const previous = setlistStore.getState().name;
+      const state = setlistStore.removeSetlist();
+      log.info({ name: previous, now: state.name }, 'setlist deleted');
+      return reply.send({ ok: true, ...state });
+    } catch (err) {
+      const message = err.message ?? 'setlist delete failed';
+      log.warn({ err: message }, 'setlist delete failed');
       return reply.code(httpCode(err)).send({ ok: false, error: message });
     }
   });

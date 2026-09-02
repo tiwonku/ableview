@@ -1255,6 +1255,15 @@ body.layout-operator .clip-name--pinned {
   color: #fff;
 }
 
+.admin-editor-btn--danger {
+  color: var(--danger);
+  border-color: rgba(224, 82, 82, 0.45);
+}
+
+.admin-editor-btn--danger:hover:not(:disabled) {
+  border-color: var(--danger);
+}
+
 .admin-editor-context {
   margin: 0 0 0.85rem;
   font-size: 0.82rem;
