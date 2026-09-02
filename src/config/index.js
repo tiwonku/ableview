@@ -297,7 +297,7 @@ export function loadConfig({ configPath = './config/config.json', envPath = '.en
   const config = deepMerge(DEFAULTS, fileConfig);
 
   if (!config.views.setlist) {
-    config.views.setlist = { title: 'Setlist', system: true };
+    config.views.setlist = { title: 'Set', system: true };
   }
 
   // Secrets and machine-specific settings come from the environment (§8).

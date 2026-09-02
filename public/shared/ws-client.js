@@ -109,6 +109,8 @@ export function connectView({
   let setlistAddSearching = false;
   let setlistNameDraft = '';
   let setlistAutoFocusSearch = false;
+  let sessionLogGen = 0;
+  let unmountSessionLog = null;
 
   function applySimState(simulated) {
     serverSimulated = simulated === true;
@@ -774,6 +776,8 @@ export function connectView({
       lastUpdate,
       matchColumn,
       aliasColumn,
+      sessionLog: lastSessionLog,
+      simulated: serverSimulated,
     };
     if (statusOnly || showingSettings) {
       setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
@@ -957,6 +961,35 @@ export function connectView({
     if (viewsList) {
       mountViewNav(currentViewId, viewsList, { settingsActive: showingSettings, onNavigate });
     }
+    syncSessionLogPanel();
+  }
+
+  async function syncSessionLogPanel() {
+    const onSet = !statusOnly && !showingSettings && currentViewId === 'setlist';
+    if (!onSet) {
+      sessionLogGen += 1;
+      unmountSessionLog?.();
+      unmountSessionLog = null;
+      const host = document.getElementById('session-log');
+      if (host) {
+        host.replaceChildren();
+        host.hidden = true;
+      }
+      return;
+    }
+    if (unmountSessionLog) {
+      const host = document.getElementById('session-log');
+      if (host) host.hidden = false;
+      return;
+    }
+    const gen = ++sessionLogGen;
+    const { ensureSessionLogHost, mountSessionLogPanel } = await import('./admin-session-log.js');
+    if (gen !== sessionLogGen || showingSettings || currentViewId !== 'setlist') return;
+    const { host } = ensureSessionLogHost(root);
+    if (!host) return;
+    host.hidden = false;
+    unmountSessionLog?.();
+    unmountSessionLog = mountSessionLogPanel(host);
   }
 
   function applyHistory(nextId, href, historyMode) {
@@ -1069,6 +1102,9 @@ export function connectView({
     stop() {
       stopped = true;
       socketGen += 1;
+      sessionLogGen += 1;
+      unmountSessionLog?.();
+      unmountSessionLog = null;
       leaveSettings();
       window.removeEventListener('popstate', onPopState);
       if (reconnectTimer) clearTimeout(reconnectTimer);

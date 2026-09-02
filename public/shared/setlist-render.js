@@ -106,6 +106,8 @@ function secondaryLabel(result) {
  *   matchColumn?: string|null,
  *   connected?: boolean,
  *   lastUpdate?: Date|null,
+ *   simulated?: boolean|null,
+ *   sessionLog?: object|null,
  *   addQuery?: string,
  *   addResults?: Array,
  *   addSearching?: boolean,
@@ -136,6 +138,8 @@ export function renderSetlist(root, ctx) {
     matchColumn = null,
     connected,
     lastUpdate,
+    simulated = null,
+    sessionLog = null,
     addQuery = '',
     addResults = [],
     addSearching = false,
@@ -158,12 +162,12 @@ export function renderSetlist(root, ctx) {
     onClearPin,
   } = ctx;
 
-  setConnectionState(connected, lastUpdate, payload);
+  setConnectionState(connected, lastUpdate, payload, simulated, sessionLog);
 
   root.replaceChildren();
   root.className = 'setlist-main';
 
-  const heading = el('h1', 'view-title', title || 'Setlist');
+  const heading = el('h1', 'view-title', title || 'Set');
   root.appendChild(heading);
 
   const banner = liveBanner(payload, matchColumn);
@@ -185,12 +189,12 @@ export function renderSetlist(root, ctx) {
 
   const select = el('select', 'setlist-select');
   select.dataset.setlistField = 'library';
-  select.setAttribute('aria-label', 'Saved setlists');
+  select.setAttribute('aria-label', 'Saved sets');
   select.disabled = busy || library.length === 0;
   if (library.length === 0) {
     const opt = document.createElement('option');
     opt.value = '';
-    opt.textContent = currentName || 'No setlists';
+    opt.textContent = currentName || 'No sets';
     select.appendChild(opt);
   } else {
     for (const entry of library) {
@@ -210,7 +214,7 @@ export function renderSetlist(root, ctx) {
 
   const nameInput = el('input', 'setlist-name-input');
   nameInput.type = 'text';
-  nameInput.placeholder = 'New setlist name';
+  nameInput.placeholder = 'New set name';
   nameInput.value = nameDraft;
   nameInput.autocomplete = 'off';
   nameInput.dataset.setlistField = 'name';
@@ -271,7 +275,7 @@ export function renderSetlist(root, ctx) {
       const meta = el(
         'span',
         'alias-search-result-meta',
-        already ? `Already on setlist · Row ${result.rowId}` : `Row ${result.rowId}`,
+        already ? `Already on set · Row ${result.rowId}` : `Row ${result.rowId}`,
       );
       const sub = secondaryLabel(result);
       if (sub && !already) meta.textContent += ` · ${sub}`;

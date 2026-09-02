@@ -1,4 +1,4 @@
-// Session log panel (M10). GET/PATCH /api/session-log — separate from config.json settings.
+// Compact session-log bar on the Set view. GET/PATCH /api/session-log — runtime, not config.json.
 
 import { subscribeSessionLog } from './session-log-live.js';
 
@@ -9,60 +9,33 @@ function el(tag, className, text) {
   return node;
 }
 
-function formatTime(iso) {
+function formatShortTime(iso) {
   if (!iso) return '—';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString();
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  return sameDay
+    ? date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-function showBanner(container, message, { error = false } = {}) {
-  const existing = container.querySelector('[data-role="session-log-banner"]');
-  if (existing) existing.remove();
-  if (!message) return;
-  const banner = el('div', `settings-status ${error ? 'err' : 'ok'}`);
-  banner.dataset.role = 'session-log-banner';
-  banner.textContent = message;
-  container.prepend(banner);
+function plural(count, noun) {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
-function renderStatusBox(status) {
-  const box = el('div', 'session-log-status');
-  box.dataset.role = 'session-log-status';
-
+/** One-line status for the Set view log bar. */
+export function formatSessionLogStatusLine(status) {
   const enabled = status?.enabled === true;
-  box.appendChild(el('p', 'ableton-session-line', enabled ? 'Logging enabled' : 'Logging disabled'));
-
-  if (enabled && status.filePath) {
-    box.appendChild(el('p', 'ableton-session-line', `File: ${status.filePath}`));
-    box.appendChild(el('p', 'ableton-session-line', `Lines: ${status.lineCount ?? 0}`));
-    box.appendChild(el('p', 'ableton-session-line', `Moments this session: ${status.momentCount ?? 0}`));
-    box.appendChild(el('p', 'ableton-session-line', `Last entry: ${formatTime(status.lastLoggedAt)}`));
-    if (status.lastMoment) {
-      const who = status.lastMoment.who ? ` (${status.lastMoment.who})` : '';
-      box.appendChild(el(
-        'p',
-        'ableton-session-line',
-        `Last moment: ${status.lastMoment.kind}${who} at ${formatTime(status.lastMoment.loggedAt)}`,
-      ));
-    }
-    const summary = status.launchSummary;
-    if (summary && (summary.totalLaunches ?? 0) > 0) {
-      const sceneCount = summary.sceneLaunches ?? 0;
-      const clipCount = summary.clipLaunches ?? 0;
-      const total = summary.totalLaunches ?? sceneCount + clipCount;
-      const scenePct = total > 0 ? Math.round((sceneCount / total) * 100) : 0;
-      box.appendChild(el(
-        'p',
-        'ableton-session-line',
-        `Launches: ${total} (${sceneCount} scene, ${clipCount} clip · ${scenePct}% scenes)`,
-      ));
-    }
-  } else if (status?.sessionName) {
-    box.appendChild(el('p', 'ableton-session-line', `Session name: ${status.sessionName}`));
+  const name = status?.sessionName ? `${status.sessionName}.jsonl` : null;
+  if (!enabled) {
+    return name ? `Logging off · ${name}` : 'Logging off';
   }
-
-  return box;
+  const parts = [name || 'Logging on'];
+  if (status.lineCount != null) parts.push(plural(status.lineCount, 'line'));
+  if (status.momentCount != null) parts.push(plural(status.momentCount, 'moment'));
+  if (status.lastLoggedAt) parts.push(`last ${formatShortTime(status.lastLoggedAt)}`);
+  return parts.join(' · ');
 }
 
 /** Keep a typed draft; only follow the server name if the field was still showing the last committed value. */
@@ -79,6 +52,44 @@ export function nextSessionNameInputValue({
   return inputValue;
 }
 
+/** Insert (or reuse) a host above #app so setlist re-renders do not wipe the log bar. */
+export function ensureSessionLogHost(app) {
+  const doc = app?.ownerDocument ?? (typeof document !== 'undefined' ? document : null);
+  let host = doc?.getElementById?.('session-log');
+  if (host) return { host, created: false };
+  if (!doc?.createElement) return { host: null, created: false };
+
+  host = doc.createElement('section');
+  host.id = 'session-log';
+  host.className = 'set-log';
+  host.setAttribute('aria-label', 'Session log');
+
+  const target = (app && typeof app.insertAdjacentElement === 'function')
+    ? app
+    : doc.getElementById?.('app');
+  if (target && typeof target.insertAdjacentElement === 'function') {
+    target.insertAdjacentElement('beforebegin', host);
+  } else {
+    const bar = doc.getElementById?.('status-bar');
+    if (bar && typeof bar.insertAdjacentElement === 'function') {
+      bar.insertAdjacentElement('afterend', host);
+    } else {
+      doc.body?.appendChild?.(host);
+    }
+  }
+  return { host, created: true };
+}
+
+function showBanner(container, message) {
+  const existing = container.querySelector('[data-role="session-log-banner"]');
+  if (existing) existing.remove();
+  if (!message) return;
+  const banner = el('p', 'set-log-banner');
+  banner.dataset.role = 'session-log-banner';
+  banner.textContent = message;
+  container.prepend(banner);
+}
+
 export function mountSessionLogPanel(selector) {
   const root = typeof selector === 'string'
     ? document.querySelector(selector)
@@ -93,8 +104,9 @@ export function mountSessionLogPanel(selector) {
   let toggle = null;
   let nameInput = null;
   let applyBtn = null;
+  let statusLine = null;
 
-  const shell = el('div', 'session-log-panel');
+  const shell = el('div', 'set-log-bar');
   root.appendChild(shell);
 
   async function fetchStatus() {
@@ -114,82 +126,59 @@ export function mountSessionLogPanel(selector) {
     return data;
   }
 
-  function refreshStatusBox() {
-    const next = renderStatusBox(status);
-    const existing = shell.querySelector('[data-role="session-log-status"]');
-    if (existing) existing.replaceWith(next);
+  function refreshStatusLine() {
+    if (statusLine) statusLine.textContent = formatSessionLogStatusLine(status);
   }
 
   function buildShell() {
-    shell.appendChild(el('h2', 'settings-page-title', 'Session log'));
-    shell.appendChild(el(
-      'p',
-      'settings-lead',
-      'Append-only JSONL of watched-track clip changes, scene/clip launch events, and sheet match events. Files live under data/sessions/ and are committed so other machines can pull them. The active-session sidecar stays local.',
-    ));
-
-    const fieldset = el('fieldset', 'settings-group session-log-group');
-    fieldset.appendChild(el('legend', null, 'Session log'));
-    fieldset.appendChild(renderStatusBox(status));
-
+    const toggleLabel = el('label', 'set-log-toggle');
     toggle = el('input');
     toggle.type = 'checkbox';
     toggle.id = 'sessionLogEnabled';
     toggle.className = 'settings-checkbox';
+    toggleLabel.appendChild(toggle);
+    toggleLabel.appendChild(document.createTextNode('Log'));
+    shell.appendChild(toggleLabel);
 
-    const toggleRow = el('div', 'settings-field settings-field-checkbox');
-    toggleRow.appendChild(toggle);
-    const toggleLabel = el('label', 'settings-checkbox-label', 'Enable logging');
-    toggleLabel.htmlFor = 'sessionLogEnabled';
-    toggleRow.appendChild(toggleLabel);
-    fieldset.appendChild(toggleRow);
-
-    const nameField = el('div', 'settings-field settings-field-stacked session-log-name-field');
-    const nameLabel = el('label', 'settings-label', 'Session name');
-    nameLabel.htmlFor = 'sessionLogName';
-    nameField.appendChild(nameLabel);
-
-    const nameRow = el('div', 'session-log-name-row');
-    nameInput = el('input');
+    nameInput = el('input', 'settings-input set-log-name');
     nameInput.type = 'text';
-    nameInput.className = 'settings-input';
     nameInput.id = 'sessionLogName';
     nameInput.placeholder = 'Session name';
-    applyBtn = el('button', 'settings-sync', 'Apply session name');
+    nameInput.setAttribute('aria-label', 'Session name');
+    nameInput.title = 'Changing the name starts a new .jsonl file';
+    shell.appendChild(nameInput);
+
+    applyBtn = el('button', 'admin-editor-btn admin-editor-btn--primary');
     applyBtn.type = 'button';
-    nameRow.append(nameInput, applyBtn);
-    nameField.appendChild(nameRow);
-    fieldset.appendChild(nameField);
+    applyBtn.textContent = 'Apply';
+    applyBtn.title = 'Apply session name (also enables logging)';
+    shell.appendChild(applyBtn);
 
-    fieldset.appendChild(el(
-      'p',
-      'settings-hint session-log-hint',
-      'Changing the session name starts a new .jsonl file. Applying a name also enables logging. Timestamps use Art-Net SMPTE when live, otherwise local clock.',
-    ));
-
-    shell.appendChild(fieldset);
+    statusLine = el('p', 'set-log-status', formatSessionLogStatusLine(status));
+    statusLine.dataset.role = 'session-log-status';
+    shell.appendChild(statusLine);
 
     toggle.addEventListener('change', async () => {
       try {
         applyStatus(await patchSessionLog({ enabled: toggle.checked }));
-        showBanner(shell, toggle.checked ? 'Session logging enabled' : 'Session logging disabled');
+        showBanner(shell, null);
       } catch (err) {
         toggle.checked = !toggle.checked;
-        showBanner(shell, err.message, { error: true });
+        showBanner(shell, err.message);
       }
     });
 
     applyBtn.addEventListener('click', async () => {
       const sessionName = nameInput.value.trim();
       if (!sessionName) {
-        showBanner(shell, 'Session name is required', { error: true });
+        showBanner(shell, 'Session name is required');
         return;
       }
       try {
         applyStatus(await patchSessionLog({ sessionName }), { alwaysSyncName: true });
-        showBanner(shell, `Logging to ${status.sessionName}.jsonl`);
+        showBanner(shell, null);
       } catch (err) {
-        showBanner(shell, err.message, { error: true });
+        showBanner(shell, err.message);
       }
     });
   }
@@ -200,7 +189,7 @@ export function mountSessionLogPanel(selector) {
       buildShell();
       built = true;
     } else {
-      refreshStatusBox();
+      refreshStatusLine();
     }
 
     if (toggle) toggle.checked = status?.enabled === true;
@@ -231,7 +220,7 @@ export function mountSessionLogPanel(selector) {
       applyStatus(next);
       if (!silent) showBanner(shell, null);
     } catch (err) {
-      if (!silent) showBanner(shell, err.message, { error: true });
+      if (!silent) showBanner(shell, err.message);
     }
   }
 

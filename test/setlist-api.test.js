@@ -28,7 +28,7 @@ function testConfig(setlistDir) {
     },
     views: {
       band: { title: 'Band', fields: [{ column: 'Key' }] },
-      setlist: { title: 'Setlist', system: true },
+      setlist: { title: 'Set', system: true },
       admin: { title: 'Admin', system: true },
     },
   };
@@ -91,7 +91,7 @@ test('GET /views/setlist serves the setlist page', async () => {
     const res = await fetch(`http://127.0.0.1:${server.port}/views/setlist`);
     assert.equal(res.status, 200);
     const html = await res.text();
-    assert.match(html, /AbleView — Setlist/);
+    assert.match(html, /AbleView — Set/);
     assert.match(html, /connectView/);
   } finally {
     await server.stop();

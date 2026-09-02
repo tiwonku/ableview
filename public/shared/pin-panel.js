@@ -167,7 +167,7 @@ export function renderPinPanel(parent, opts) {
     el(
       'p',
       'alias-panel-context',
-      'Show this sheet row as the live cue until the next automatic match. Starts with tonight’s setlist; search to pick any other sheet row. Replaces the current match if one is showing. Does not add an alias or change future matching.',
+      'Show this sheet row as the live cue until the next automatic match. Starts with tonight’s set; search to pick any other sheet row. Replaces the current match if one is showing. Does not add an alias or change future matching.',
     ),
   );
 
@@ -177,13 +177,13 @@ export function renderPinPanel(parent, opts) {
 
   const stepRow = el('div', 'alias-step');
   const label = source === 'setlist'
-    ? (setlistName ? `Tonight’s setlist · ${setlistName}` : 'Tonight’s setlist')
-    : 'Setlist + cue sheet';
+    ? (setlistName ? `Tonight’s set · ${setlistName}` : 'Tonight’s set')
+    : 'Set + cue sheet';
   stepRow.appendChild(el('p', 'alias-step-label', label));
 
   const searchInput = el('input', 'alias-search-input');
   searchInput.type = 'search';
-  searchInput.placeholder = 'Search setlist or cue sheet…';
+  searchInput.placeholder = 'Search set or cue sheet…';
   searchInput.value = query ?? '';
   searchInput.autocomplete = 'off';
   searchInput.addEventListener('input', () => onQueryChange(searchInput.value));
@@ -200,7 +200,7 @@ export function renderPinPanel(parent, opts) {
         'alias-search-empty',
         q
           ? 'No rows matched.'
-          : 'No songs on tonight’s setlist. Search the cue sheet to pin another row.',
+          : 'No songs on tonight’s set. Search the cue sheet to pin another row.',
       ),
     );
   } else {
@@ -213,7 +213,7 @@ export function renderPinPanel(parent, opts) {
 
       btn.appendChild(el('span', 'alias-search-result-title', result.title));
       const parts = [];
-      if (showSetlistBadge && result.fromSetlist) parts.push('On setlist');
+      if (showSetlistBadge && result.fromSetlist) parts.push('On set');
       parts.push(`Row ${result.rowId}`);
       const sub = secondaryLabel(result);
       if (sub) parts.push(sub);

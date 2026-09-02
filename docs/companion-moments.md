@@ -217,7 +217,7 @@ No AbleView code change required.
 To **require** session logging to be enabled before moments work:
 
 1. Settings → **Moments** → uncheck **Auto-start session log on first moment tap**.
-2. Enable logging manually on the **Session log** panel first.
+2. Enable logging manually on the **Set** view log bar first.
 3. Buttons return **409** with `feedbackState: "error"` if logging is still off.
 
 ---
@@ -230,13 +230,13 @@ To **require** session logging to be enabled before moments work:
 | Symptom | Check |
 |---|---|
 | HTTP connection failed | Show box IP, firewall, `HTTP_PORT`, AbleView running |
-| 409 `session_log_disabled` | Enable session log in Settings, or turn auto-start back on |
+| 409 `session_log_disabled` | Enable session log on the Set view, or turn auto-start back on |
 | 400 `unknown_kind` | Add the kind to **Allowed kinds** in Settings |
 | Button stays yellow | Step 3 not setting `success`; see §3 common mistakes |
 | Colors never change | Feedbacks must check `moment_feedback`, not `moment_response` |
 | Logging works, colors don't | POST **JSON Response Data Variable** must be `moment_response`; step 3 needs √x expression mode |
 | Operator views don't show log name | Page must be open on the show box URL; check WebSocket connection dot |
-| Admin counter not moving | Settings → Session log panel; counter updates live over WebSocket |
+| Admin counter not moving | Set view log bar; counter updates live over WebSocket |
 
 
 ---

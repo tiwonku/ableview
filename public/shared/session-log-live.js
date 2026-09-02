@@ -1,4 +1,4 @@
-// Lightweight WebSocket listener for session log state (settings page, M14).
+// Lightweight WebSocket listener for session log state (Set view, M14).
 
 export function subscribeSessionLog(onUpdate) {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';

@@ -33,5 +33,5 @@ version-specific and must be validated on your Companion build before sharing.
 
 ## Admin confirmation
 
-The AbleView **Settings → Session log** panel shows **Moments this session: N** and updates live
+The AbleView **Set** view log bar shows the moment count and updates live
 when crew tap buttons (no page refresh needed).

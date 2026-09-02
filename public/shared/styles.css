@@ -3462,46 +3462,60 @@ body.layout-session .session-main {
   }
 }
 
-.session-log-main {
-  margin-top: 1.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border);
+.set-log {
+  flex: 0 0 auto;
+  width: 100%;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.45rem clamp(0.65rem, 2vw, 1.15rem);
+  padding-left: max(clamp(0.65rem, 2vw, 1.15rem), env(safe-area-inset-left, 0px));
+  padding-right: max(clamp(0.65rem, 2vw, 1.15rem), env(safe-area-inset-right, 0px));
 }
 
-.session-log-group .settings-field-checkbox {
-  margin-top: 0.25rem;
+.set-log[hidden] {
+  display: none !important;
 }
 
-.session-log-name-field {
-  margin-bottom: 0.5rem;
-}
-
-.session-log-name-row {
+.set-log-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: stretch;
-  width: 100%;
+  align-items: center;
+  gap: 0.4rem 0.65rem;
 }
 
-.session-log-name-row .settings-input {
-  flex: 1 1 12rem;
-  min-width: 0;
-}
-
-.session-log-name-row .settings-sync {
-  flex: 0 0 auto;
-  align-self: stretch;
+.set-log-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
   white-space: nowrap;
 }
 
-.session-log-status {
-  margin-bottom: 0.75rem;
+.set-log-name {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  max-width: 18rem;
 }
 
-.session-log-hint {
-  margin-top: 0.75rem;
-  margin-bottom: 0;
+.set-log-status {
+  flex: 1 1 12rem;
+  margin: 0;
+  min-width: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.set-log-banner {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--danger);
 }
 
 /* Setlist view — night-specific ordered sheet rows */
