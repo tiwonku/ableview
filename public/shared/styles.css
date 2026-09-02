@@ -789,6 +789,21 @@ body.layout-operator .clip-name--pinned {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
 
+.color-swatch--rainbow,
+.color-picker-preview.color-swatch--rainbow {
+  background-color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    #ff2a2a 0%,
+    #ff7a00 16%,
+    #ffd400 33%,
+    #3adf4b 50%,
+    #25c4ff 66%,
+    #3a5bff 83%,
+    #c43aff 100%
+  );
+}
+
 .color-values {
   display: flex;
   flex-direction: column;
@@ -983,6 +998,85 @@ body.layout-operator .clip-name--pinned {
   font-size: 0.95rem;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.row-table dd:has(.row-table-swatch),
+.row-table dd:has(.row-table-image) {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  white-space: normal;
+}
+
+.row-table-swatch {
+  width: 1.35rem;
+  height: 1.35rem;
+  aspect-ratio: 1;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.row-table-image,
+.field-image {
+  display: block;
+  max-width: 12rem;
+  max-height: 12rem;
+  width: auto;
+  height: auto;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.field--image .field-image-body {
+  margin-top: 0.35rem;
+}
+
+.row-editor-image {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.row-editor-image-preview:empty {
+  display: none;
+}
+
+.row-editor-color-rainbow {
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.row-editor-color-rainbow:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.row-editor-color-rainbow.is-active,
+.color-picker-btn--rainbow.is-active {
+  border-color: transparent;
+  color: #111;
+  background-image: linear-gradient(
+    90deg,
+    #ff2a2a 0%,
+    #ff7a00 16%,
+    #ffd400 33%,
+    #3adf4b 50%,
+    #25c4ff 66%,
+    #3a5bff 83%,
+    #c43aff 100%
+  );
+}
+
+.row-editor-color.is-rainbow .row-editor-color-input {
+  opacity: 0.35;
 }
 
 .view-edit-bar {

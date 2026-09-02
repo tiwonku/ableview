@@ -1,6 +1,7 @@
 // Shared view rendering (spec §9.4). Maps CuePayload + field config → DOM.
 
-import { parseRgbCell } from './color-parse.js';
+import { applyColorSwatchStyle, parseRgbCell } from './color-parse.js';
+import { parseImageCell } from './image-parse.js';
 import { closeColorPicker } from './color-picker.js';
 import {
   getFieldValue,
@@ -572,6 +573,8 @@ function renderFieldsGrid(fields, payload, { onPickColor } = {}) {
     for (const field of fields) {
       if (field.type === 'color') {
         grid.appendChild(renderColorField(field, payload, { onPickColor }));
+      } else if (field.type === 'image') {
+        grid.appendChild(renderImageField(field, payload));
       } else {
         grid.appendChild(renderTextField(field, payload, null, layoutMode));
       }
@@ -580,6 +583,8 @@ function renderFieldsGrid(fields, payload, { onPickColor } = {}) {
     for (const row of groupFieldsForLayout(fields, payload)) {
       if (row.type === 'colors') {
         grid.appendChild(renderColorGroup(row.fields, payload, { onPickColor }));
+      } else if (row.type === 'image') {
+        grid.appendChild(renderImageField(row.field, payload));
       } else if (row.type === 'note') {
         grid.appendChild(renderTextField(row.field, payload, 'note'));
       } else {
@@ -662,8 +667,8 @@ function makeColorPickButton(label, color, onPick) {
   openBtn.title = `Pick ${label} color`;
 
   const swatch = document.createElement('div');
-  swatch.className = 'color-swatch' + (color ? '' : ' color-swatch--empty');
-  if (color) swatch.style.backgroundColor = color.css;
+  swatch.className = 'color-swatch';
+  applyColorSwatchStyle(swatch, color);
   swatch.setAttribute('aria-hidden', 'true');
   openBtn.appendChild(swatch);
 
@@ -675,6 +680,46 @@ function makeColorPickButton(label, color, onPick) {
 
   openBtn.addEventListener('click', onPick);
   return openBtn;
+}
+
+function renderImageField(field, payload) {
+  const label = fieldLabel(field);
+  const raw = payload?.row?.[field.column];
+  const parsed = parseImageCell(raw);
+
+  const card = document.createElement('div');
+  card.className = 'field field--image';
+
+  const labelEl = document.createElement('p');
+  labelEl.className = 'field-label';
+  labelEl.textContent = label;
+  card.appendChild(labelEl);
+
+  if (!parsed) {
+    const empty = document.createElement('p');
+    empty.className = 'field-value empty';
+    empty.textContent = '—';
+    card.appendChild(empty);
+    return card;
+  }
+
+  const body = document.createElement('div');
+  body.className = 'field-image-body';
+
+  const img = document.createElement('img');
+  img.className = 'field-image';
+  img.src = parsed.url;
+  img.alt = label;
+  img.referrerPolicy = 'no-referrer';
+  img.addEventListener('error', () => {
+    img.replaceWith(Object.assign(document.createElement('p'), {
+      className: 'field-value empty',
+      textContent: 'Image failed to load',
+    }));
+  });
+  body.appendChild(img);
+  card.appendChild(body);
+  return card;
 }
 
 function renderColorField(field, payload, { onPickColor } = {}) {
@@ -704,10 +749,10 @@ function renderColorField(field, payload, { onPickColor } = {}) {
 
   if (onPickColor) {
     body.appendChild(makeColorPickButton(label, color, () => onPickColor(column)));
-  } else {
+  } else if (color) {
     const swatch = document.createElement('div');
     swatch.className = 'color-swatch';
-    swatch.style.backgroundColor = color.css;
+    applyColorSwatchStyle(swatch, color);
     swatch.setAttribute('aria-label', `${label}: ${color.rgbText}`);
     body.appendChild(swatch);
   }
@@ -716,7 +761,9 @@ function renderColorField(field, payload, { onPickColor } = {}) {
     const values = document.createElement('div');
     values.className = 'color-values';
     values.appendChild(makeCopyButton('RGB', color.rgbText));
-    values.appendChild(makeCopyButton('Hex', color.hex));
+    if (color.kind !== 'rainbow' && color.hex) {
+      values.appendChild(makeCopyButton('Hex', color.hex));
+    }
     body.appendChild(values);
   }
 
@@ -1102,9 +1149,17 @@ export function renderAdmin(root, {
       saveError,
     });
   } else if (payload?.match?.matched === true && payload.row && onStartEdit) {
-    renderReadOnlyRowPanel(root, { payload, onStartEdit });
+    renderReadOnlyRowPanel(root, {
+      payload,
+      onStartEdit,
+      editorColumns,
+    });
   } else if (payload?.match?.matched === true && payload.row) {
-    renderReadOnlyRowPanel(root, { payload, onStartEdit: () => {} });
+    renderReadOnlyRowPanel(root, {
+      payload,
+      onStartEdit: () => {},
+      editorColumns,
+    });
   }
 
   updateStatusBar({ connected, lastUpdate, payload });

@@ -1,9 +1,28 @@
 // Parse sheet RGB cells (e.g. "109,158,235") → display values.
 
+export const RAINBOW_TOKEN = 'RAINBOW';
+
+export function isRainbowToken(raw) {
+  return String(raw ?? '').trim().toUpperCase() === RAINBOW_TOKEN;
+}
+
 export function parseRgbCell(raw) {
   if (raw == null) return null;
   const trimmed = String(raw).trim();
   if (!trimmed) return null;
+
+  if (isRainbowToken(trimmed)) {
+    return {
+      kind: 'rainbow',
+      token: RAINBOW_TOKEN,
+      r: null,
+      g: null,
+      b: null,
+      css: null,
+      hex: null,
+      rgbText: RAINBOW_TOKEN,
+    };
+  }
 
   const parts = trimmed.split(',').map((p) => p.trim());
   if (parts.length !== 3) return null;
@@ -116,4 +135,12 @@ export function hsvToRgb(h, s, v) {
     g: Math.round((g + m) * 255),
     b: Math.round((b + m) * 255),
   };
+}
+
+export function applyColorSwatchStyle(el, color) {
+  if (!el) return;
+  const rainbow = color?.kind === 'rainbow';
+  el.classList.toggle('color-swatch--empty', !color);
+  el.classList.toggle('color-swatch--rainbow', rainbow);
+  el.style.backgroundColor = color && !rainbow ? color.css : '';
 }

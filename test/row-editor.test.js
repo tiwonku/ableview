@@ -239,4 +239,16 @@ test('operator color fields open the custom picker instead of a native overlay',
   assert.doesNotMatch(editorSrc, /row-editor-color-picker-overlay/);
   assert.match(pickerSrc, /color-picker-sv/);
   assert.match(pickerSrc, /hsvToRgb/);
+  assert.match(pickerSrc, /RAINBOW_TOKEN/);
+  assert.match(pickerSrc, /color-picker-btn--rainbow/);
+});
+
+test('editor preserves RAINBOW instead of treating it as empty', () => {
+  const src = readFileSync(
+    fileURLToPath(new URL('../public/shared/admin-row-editor.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(src, /setColorRainbow/);
+  assert.match(src, /dataset\.rainbow/);
+  assert.match(src, /RAINBOW_TOKEN/);
 });

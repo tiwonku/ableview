@@ -90,6 +90,20 @@ test('groupFieldsForLayout groups colors and caps row width', () => {
   assert.equal(rows[3].type, 'note');
 });
 
+test('groupFieldsForLayout keeps image fields on their own row', () => {
+  const rows = groupFieldsForLayout(
+    [
+      { column: 'ENERGY' },
+      { column: 'ART', type: 'image' },
+      { column: 'VIBE TAGS' },
+    ],
+    { row: { ENERGY: '2. Groove', ART: '=IMAGE("https://example.com/a.png", 1)' } },
+  );
+  assert.equal(rows[0].type, 'row');
+  assert.equal(rows[1].type, 'image');
+  assert.equal(rows[1].field.column, 'ART');
+});
+
 test('getFieldValue reads live tempo from CuePayload', () => {
   const field = { source: 'tempo', label: 'Tempo' };
   assert.equal(getFieldValue(field, { tempo: 128 }), '128');

@@ -98,6 +98,12 @@ export function groupFieldsForLayout(fields, payload) {
       continue;
     }
 
+    if (field.type === 'image') {
+      rows.push({ type: 'image', field });
+      i++;
+      continue;
+    }
+
     const display = resolveFieldDisplay(field, getFieldValue(field, payload));
     if (display === 'note') {
       rows.push({ type: 'note', field });
@@ -106,7 +112,7 @@ export function groupFieldsForLayout(fields, payload) {
     }
 
     const items = [];
-    while (i < fields.length && fields[i].type !== 'color') {
+    while (i < fields.length && fields[i].type !== 'color' && fields[i].type !== 'image') {
       const nextField = fields[i];
       const nextDisplay = resolveFieldDisplay(nextField, getFieldValue(nextField, payload));
       if (nextDisplay === 'note') break;

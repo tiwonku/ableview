@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseRgbCell, hexToRgb, rgbToHex, rgbToHsv, hsvToRgb } from '../public/shared/color-parse.js';
+import { parseRgbCell, hexToRgb, rgbToHex, rgbToHsv, hsvToRgb, isRainbowToken } from '../public/shared/color-parse.js';
 
 test('parseRgbCell parses comma-separated 0-255 values', () => {
   const color = parseRgbCell('109,158,235');
@@ -30,6 +30,17 @@ test('parseRgbCell rejects invalid input', () => {
   assert.equal(parseRgbCell('109,158,300'), null);
   assert.equal(parseRgbCell('not-a-color'), null);
   assert.equal(parseRgbCell(null), null);
+});
+
+test('parseRgbCell recognizes RAINBOW', () => {
+  const color = parseRgbCell('rainbow');
+  assert.equal(color?.kind, 'rainbow');
+  assert.equal(color?.token, 'RAINBOW');
+  assert.equal(color?.rgbText, 'RAINBOW');
+  assert.equal(color?.hex, null);
+  assert.equal(isRainbowToken('RAINBOW'), true);
+  assert.equal(isRainbowToken('  rainbow  '), true);
+  assert.equal(isRainbowToken('red'), false);
 });
 
 test('hexToRgb accepts hash, 6-digit, and 3-digit values', () => {

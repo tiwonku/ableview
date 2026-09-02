@@ -36,7 +36,11 @@
       "Pillar": { "type": "icon", "true": "✅", "false": "✖" },
       "RGB_1": { "type": "color" },
       "RGB_2": { "type": "color" },
-      "RGB_3": { "type": "color" }
+      "RGB_3": { "type": "color" },
+      "ART": { "type": "image" },
+      "PREVIZ-A": { "type": "image" },
+      "PREVIZ-B": { "type": "image" },
+      "PREVIZ-C": { "type": "image" }
     }
   },
   "match": {

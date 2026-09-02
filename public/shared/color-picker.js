@@ -1,6 +1,13 @@
 // Touch-first HSV color picker overlay for operator views.
 
-import { hexToRgb, hsvToRgb, rgbToHex, rgbToHsv } from './color-parse.js';
+import {
+  hexToRgb,
+  hsvToRgb,
+  isRainbowToken,
+  rgbToHex,
+  rgbToHsv,
+  RAINBOW_TOKEN,
+} from './color-parse.js';
 
 const EMPTY_START = { h: 20, s: 1, v: 1 };
 
@@ -15,6 +22,7 @@ let overlay = null;
 let session = null;
 let hsv = { ...EMPTY_START };
 let emptyStart = false;
+let rainbowMode = false;
 
 export function closeColorPicker() {
   dismiss({ restore: false });
@@ -23,6 +31,7 @@ export function closeColorPicker() {
 export function openColorPicker({
   title = 'Color',
   hex = null,
+  value = null,
   onInput,
   onCancel,
   onClear,
@@ -30,8 +39,10 @@ export function openColorPicker({
   dismiss({ restore: true });
 
   const el = ensureOverlay();
-  const parsed = hexToRgb(hex);
-  emptyStart = !parsed;
+  const start = value ?? hex;
+  rainbowMode = isRainbowToken(start);
+  const parsed = rainbowMode ? null : hexToRgb(start);
+  emptyStart = !rainbowMode && !parsed;
   hsv = parsed ? rgbToHsv(parsed.r, parsed.g, parsed.b) : { ...EMPTY_START };
 
   session = {
@@ -60,8 +71,12 @@ function dismiss({ restore }) {
   current.focusRestore?.focus?.();
 }
 
-function emitHex() {
+function emitValue() {
   if (!session || emptyStart) return;
+  if (rainbowMode) {
+    session.onInput?.(RAINBOW_TOKEN);
+    return;
+  }
   const rgb = hsvToRgb(hsv.h, hsv.s, hsv.v);
   session.onInput?.(rgbToHex(rgb.r, rgb.g, rgb.b));
 }
@@ -69,8 +84,16 @@ function emitHex() {
 function applyUserHsv(next) {
   hsv = next;
   emptyStart = false;
+  rainbowMode = false;
   syncPickerUi();
-  emitHex();
+  emitValue();
+}
+
+function applyRainbow() {
+  emptyStart = false;
+  rainbowMode = true;
+  syncPickerUi();
+  emitValue();
 }
 
 function ensureOverlay() {
@@ -175,6 +198,10 @@ function ensureOverlay() {
   hexInput.setAttribute('aria-label', 'Hex color');
   hexInput.addEventListener('input', () => {
     const raw = hexInput.value.trim();
+    if (isRainbowToken(raw)) {
+      applyRainbow();
+      return;
+    }
     const withHash = raw.startsWith('#') ? raw : `#${raw}`;
     if (!/^#[0-9a-fA-F]{6}$/.test(withHash)) return;
     const parsed = hexToRgb(withHash);
@@ -208,6 +235,14 @@ function ensureOverlay() {
   });
   actions.appendChild(clearBtn);
 
+  const rainbowBtn = document.createElement('button');
+  rainbowBtn.type = 'button';
+  rainbowBtn.className = 'color-picker-btn color-picker-btn--rainbow';
+  rainbowBtn.dataset.role = 'color-picker-rainbow';
+  rainbowBtn.textContent = 'Rainbow';
+  rainbowBtn.addEventListener('click', () => applyRainbow());
+  actions.appendChild(rainbowBtn);
+
   const doneBtn = document.createElement('button');
   doneBtn.type = 'button';
   doneBtn.className = 'color-picker-btn color-picker-btn--primary';
@@ -218,7 +253,7 @@ function ensureOverlay() {
       dismiss({ restore: false });
       return;
     }
-    emitHex();
+    emitValue();
     dismiss({ restore: false });
   });
   actions.appendChild(doneBtn);
@@ -250,17 +285,26 @@ function syncPickerUi() {
   const preview = overlay.querySelector('[data-role="color-picker-preview"]');
   const rgbEl = overlay.querySelector('[data-role="color-picker-rgb"]');
   const hexInput = overlay.querySelector('[data-role="color-picker-hex"]');
+  const rainbowBtn = overlay.querySelector('[data-role="color-picker-rainbow"]');
+
+  overlay.classList.toggle('is-rainbow', rainbowMode);
+  rainbowBtn?.classList.toggle('is-active', rainbowMode);
 
   if (sv) sv.style.setProperty('--picker-hue', hueColor);
   if (svThumb) {
     svThumb.style.left = `${hsv.s * 100}%`;
     svThumb.style.top = `${(1 - hsv.v) * 100}%`;
-    svThumb.style.background = hex;
+    svThumb.style.background = rainbowMode ? '' : hex;
   }
   if (hueThumb) hueThumb.style.setProperty('--hue-t', `${(hsv.h / 360) * 100}%`);
-  if (preview) preview.style.background = hex;
-  if (rgbEl) rgbEl.textContent = `RGB ${rgb.r}, ${rgb.g}, ${rgb.b}`;
-  if (hexInput && document.activeElement !== hexInput) hexInput.value = hex;
+  if (preview) {
+    preview.classList.toggle('color-swatch--rainbow', rainbowMode);
+    preview.style.background = rainbowMode ? '' : hex;
+  }
+  if (rgbEl) rgbEl.textContent = rainbowMode ? RAINBOW_TOKEN : `RGB ${rgb.r}, ${rgb.g}, ${rgb.b}`;
+  if (hexInput && document.activeElement !== hexInput) {
+    hexInput.value = rainbowMode ? RAINBOW_TOKEN : hex;
+  }
 
   sv?.setAttribute('aria-valuetext', `Saturation ${Math.round(hsv.s * 100)}%, brightness ${Math.round(hsv.v * 100)}%`);
   overlay.querySelector('[data-role="color-picker-hue"]')

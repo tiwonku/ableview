@@ -1,10 +1,11 @@
 // Sheet cell format helpers for the row editor (read ↔ widget ↔ save).
 
-import { parseRgbCell } from './color-parse.js';
+import { parseRgbCell, isRainbowToken, RAINBOW_TOKEN } from './color-parse.js';
+import { formatImageCellForSheet } from './image-parse.js';
 
 export const DEFAULT_ICON = Object.freeze({ true: '✅', false: '✖' });
 
-const VALID_TYPES = new Set(['text', 'number', 'color', 'icon']);
+const VALID_TYPES = new Set(['text', 'number', 'color', 'icon', 'image']);
 
 export function normalizeColumnConfig(config) {
   if (!config || typeof config !== 'object') return { type: 'text' };
@@ -32,8 +33,12 @@ export function parseCellForEditor(raw, columnConfig) {
       return text.trim();
     case 'color': {
       const parsed = parseRgbCell(text);
-      return parsed?.hex ?? null;
+      if (!parsed) return null;
+      if (parsed.kind === 'rainbow') return RAINBOW_TOKEN;
+      return parsed.hex ?? null;
     }
+    case 'image':
+      return text;
     case 'icon':
       return text.trim() === cfg.true;
     default:
@@ -58,10 +63,13 @@ export function formatCellForSheet(state, columnConfig) {
     case 'color': {
       const hex = String(state ?? '').trim();
       if (!hex) return '';
+      if (isRainbowToken(hex)) return RAINBOW_TOKEN;
       const rgb = hexToRgb(hex);
       if (!rgb) throw new Error('must be a valid color');
-      return `${rgb.r},${rgb.g},${rgb.b}`;
+      return `${rgb.r}, ${rgb.g}, ${rgb.b}`;
     }
+    case 'image':
+      return formatImageCellForSheet(state);
     case 'icon':
       return state ? cfg.true : cfg.false;
     default:

@@ -33,12 +33,19 @@ test('parseCellForEditor and formatCellForSheet round-trip color', () => {
   const cfg = EDITOR_COLUMNS.RGB_1;
   assert.equal(parseCellForEditor('17,85,204', cfg), '#1155CC');
   assert.equal(parseCellForEditor('', cfg), null);
-  assert.equal(formatCellForSheet('#1155CC', cfg), '17,85,204');
+  assert.equal(formatCellForSheet('#1155CC', cfg), '17, 85, 204');
   assert.equal(formatCellForSheet('', cfg), '');
 });
 
-test('formatCellForSheet keeps a leading zero in cyan RGB', () => {
-  assert.equal(formatCellForSheet('#00FFFF', { type: 'color' }), '0,255,255');
+test('formatCellForSheet writes spaced RGB and keeps a leading zero', () => {
+  assert.equal(formatCellForSheet('#00FFFF', { type: 'color' }), '0, 255, 255');
+});
+
+test('parseCellForEditor and formatCellForSheet round-trip RAINBOW', () => {
+  const cfg = EDITOR_COLUMNS.RGB_1;
+  assert.equal(parseCellForEditor('RAINBOW', cfg), 'RAINBOW');
+  assert.equal(parseCellForEditor('rainbow', cfg), 'RAINBOW');
+  assert.equal(formatCellForSheet('RAINBOW', cfg), 'RAINBOW');
 });
 
 test('validateAndFormatChanges clears color to empty string', () => {
@@ -55,7 +62,7 @@ test('validateAndFormatChanges formats only provided columns', () => {
   assert.deepEqual(formatted, {
     BPM: '128',
     Cue: '✅',
-    RGB_1: '255,0,0',
+    RGB_1: '255, 0, 0',
   });
 });
 

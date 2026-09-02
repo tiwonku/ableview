@@ -12,12 +12,18 @@ import {
 import { buildRowUpdateRanges, formatChangesForSheet, patchSnapshotRow } from './update-row.js';
 import { assertAliasColumnPresent, mergeAliasValue } from './aliases.js';
 import { searchSheetRows } from './search-rows.js';
+import {
+  collectImageColumns,
+  overlayImageFormulas,
+  partitionChangesByInputOption,
+} from './image-columns.js';
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
 // RAW stores "0,255,255" as text. USER_ENTERED treats it as the integer 255255
 // (US thousands grouping), so cyan and other R=0 colors vanish on the next sync.
 const VALUE_INPUT_OPTION = 'RAW';
+const FORMULA_INPUT_OPTION = 'USER_ENTERED';
 
 function readCacheFile(cachePath) {
   const raw = readFileSync(cachePath, 'utf8');
@@ -116,6 +122,24 @@ export function createSheetsStore({ config, getConfig, log }) {
 
     const res = await client.spreadsheets.values.get({ spreadsheetId: sheetId, range });
     const parsed = parseSheetGrid(res.data.values ?? [], { headerRow });
+    const imageColumns = collectImageColumns(resolveConfig());
+    if (imageColumns.length) {
+      try {
+        const filled = await overlayImageFormulas({
+          client,
+          sheetId,
+          worksheet,
+          headers: parsed.headers,
+          rows: parsed.rows,
+          columns: imageColumns,
+        });
+        if (filled) {
+          log.info({ filled, imageColumns }, 'overlaid IMAGE formulas onto blank cells');
+        }
+      } catch (err) {
+        log.warn({ err: err.message, imageColumns }, 'image formula overlay failed');
+      }
+    }
     const syncedAt = new Date().toISOString();
 
     applyParsed(parsed, { syncedAt, stale: false });
@@ -124,6 +148,15 @@ export function createSheetsStore({ config, getConfig, log }) {
       { rows: snapshot.rows.length, headerRow, worksheet, syncedAt },
       'sheet synced from Google'
     );
+  }
+
+  async function writeRowRanges(client, sheetId, worksheet, headers, rowId, changes, valueInputOption) {
+    if (!changes || Object.keys(changes).length === 0) return;
+    const data = buildRowUpdateRanges({ worksheet, headers, rowId, changes });
+    await client.spreadsheets.values.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: { valueInputOption, data },
+    });
   }
 
   async function updateRow(rowId, changes) {
@@ -138,20 +171,9 @@ export function createSheetsStore({ config, getConfig, log }) {
 
     const { client, sheetId } = sheetsClient();
     const { worksheet } = sheetSettings();
-    const data = buildRowUpdateRanges({
-      worksheet,
-      headers: snapshot.headers,
-      rowId,
-      changes: formatted,
-    });
-
-    await client.spreadsheets.values.batchUpdate({
-      spreadsheetId: sheetId,
-      requestBody: {
-        valueInputOption: VALUE_INPUT_OPTION,
-        data,
-      },
-    });
+    const { raw, userEntered } = partitionChangesByInputOption(formatted, editorColumns);
+    await writeRowRanges(client, sheetId, worksheet, snapshot.headers, rowId, raw, VALUE_INPUT_OPTION);
+    await writeRowRanges(client, sheetId, worksheet, snapshot.headers, rowId, userEntered, FORMULA_INPUT_OPTION);
 
     patchSnapshotRow(snapshot, rowId, formatted);
     snapshot.syncedAt = new Date().toISOString();
@@ -183,6 +205,17 @@ export function createSheetsStore({ config, getConfig, log }) {
       valueInputOption: VALUE_INPUT_OPTION,
       requestBody: { values: [rowValues] },
     });
+
+    const { userEntered } = partitionChangesByInputOption(formatted, editorColumns);
+    await writeRowRanges(
+      client,
+      sheetId,
+      worksheet,
+      snapshot.headers,
+      rowId,
+      userEntered,
+      FORMULA_INPUT_OPTION,
+    );
 
     const data = snapshotRowData(snapshot.headers, rowValues);
     appendSnapshotRow(snapshot, rowId, data);

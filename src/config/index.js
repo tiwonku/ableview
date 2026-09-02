@@ -35,6 +35,7 @@ export const DEFAULTS = Object.freeze({
       RGB_1: { type: 'color' },
       RGB_2: { type: 'color' },
       RGB_3: { type: 'color' },
+      ART: { type: 'image' },
     },
   },
   match: {

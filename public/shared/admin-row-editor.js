@@ -5,7 +5,8 @@ import {
   normalizeColumnConfig,
   DEFAULT_ICON,
 } from './sheet-format.js';
-import { parseRgbCell } from './color-parse.js';
+import { applyColorSwatchStyle, isRainbowToken, parseRgbCell, RAINBOW_TOKEN } from './color-parse.js';
+import { parseImageCell } from './image-parse.js';
 import { openColorPicker } from './color-picker.js';
 import { suggestAliasStem } from './alias-stem.js';
 import { operatorCreateColumns } from './playing-clips-strip.js';
@@ -27,7 +28,9 @@ export function buildViewEditorColumns(fields, editorColumns = {}) {
   for (const field of fields ?? []) {
     if (!field?.column) continue;
     result[field.column] = editorColumns[field.column]
-      ?? (field.type === 'color' ? { type: 'color' } : { type: 'text' });
+      ?? (field.type === 'color' || field.type === 'image'
+        ? { type: field.type }
+        : { type: 'text' });
   }
   return result;
 }
@@ -349,8 +352,10 @@ function renderEditorField(column, raw, columnConfig, fieldLabel, options = {}) 
       wrap.dataset.editorType = 'color';
 
       const parsed = parseRgbCell(raw);
+      const isRainbow = parsed?.kind === 'rainbow';
       const isEmpty = state == null;
       if (isEmpty) wrap.dataset.cleared = 'true';
+      if (isRainbow) wrap.dataset.rainbow = 'true';
 
       const picker = document.createElement('input');
       picker.type = 'color';
@@ -385,14 +390,19 @@ function renderEditorField(column, raw, columnConfig, fieldLabel, options = {}) 
 
         openBtn.addEventListener('click', () => {
           const cleared = wrap.dataset.cleared === 'true';
-          const currentHex = cleared ? null : picker.value;
+          const rainbow = wrap.dataset.rainbow === 'true';
+          const currentValue = cleared ? null : rainbow ? RAINBOW_TOKEN : picker.value;
           openColorPicker({
             title: fieldLabel ?? column,
-            hex: currentHex,
-            onInput: (hex) => setColorCleared(wrap, false, hex),
+            value: currentValue,
+            onInput: (next) => {
+              if (isRainbowToken(next)) setColorRainbow(wrap);
+              else setColorCleared(wrap, false, next);
+            },
             onCancel: () => {
               if (cleared) setColorCleared(wrap, true);
-              else setColorCleared(wrap, false, currentHex);
+              else if (rainbow) setColorRainbow(wrap);
+              else setColorCleared(wrap, false, currentValue);
             },
             onClear: () => setColorCleared(wrap, true),
           });
@@ -413,6 +423,13 @@ function renderEditorField(column, raw, columnConfig, fieldLabel, options = {}) 
       meta.className = operatorColor ? 'row-editor-color-meta color-copy-value' : 'row-editor-color-meta';
       meta.textContent = isEmpty ? '—' : (parsed?.rgbText ?? '—');
       meta.dataset.role = 'color-meta';
+
+      const rainbowBtn = document.createElement('button');
+      rainbowBtn.type = 'button';
+      rainbowBtn.className = operatorColor ? 'row-editor-color-rainbow color-copy' : 'row-editor-color-rainbow';
+      rainbowBtn.textContent = 'Rainbow';
+      rainbowBtn.title = 'Set RAINBOW';
+      rainbowBtn.addEventListener('click', () => setColorRainbow(wrap));
 
       const clearBtn = document.createElement('button');
       clearBtn.type = 'button';
@@ -456,10 +473,12 @@ function renderEditorField(column, raw, columnConfig, fieldLabel, options = {}) 
         hexRow.appendChild(hexInput);
         valuesRow.appendChild(hexRow);
 
+        valuesRow.appendChild(rainbowBtn);
         valuesRow.appendChild(clearBtn);
         wrap.appendChild(valuesRow);
       } else {
         wrap.appendChild(meta);
+        wrap.appendChild(rainbowBtn);
         wrap.appendChild(clearBtn);
       }
 
@@ -498,6 +517,29 @@ function renderEditorField(column, raw, columnConfig, fieldLabel, options = {}) 
       control.appendChild(toggle);
       break;
     }
+    case 'image': {
+      const wrap = document.createElement('div');
+      wrap.className = 'row-editor-image';
+      wrap.dataset.editorType = 'image';
+
+      const preview = document.createElement('div');
+      preview.className = 'row-editor-image-preview';
+      preview.dataset.role = 'image-preview';
+      wrap.appendChild(preview);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = inputId;
+      input.className = 'row-editor-input' + (layout === 'operator' ? ' row-editor-input--operator' : '');
+      input.value = state;
+      input.dataset.editorType = 'image';
+      input.placeholder = '=IMAGE("https://…") or URL';
+      input.addEventListener('input', () => syncImagePreview(wrap));
+      wrap.appendChild(input);
+      syncImagePreview(wrap);
+      control.appendChild(wrap);
+      break;
+    }
     default: {
       const input = document.createElement('input');
       input.type = 'text';
@@ -533,6 +575,10 @@ function parseHexInput(raw) {
 function commitColorHexInput(wrap) {
   const hexInput = wrap.querySelector('[data-role="color-hex"]');
   if (!hexInput || hexInput.disabled) return;
+  if (isRainbowToken(hexInput.value)) {
+    setColorRainbow(wrap);
+    return;
+  }
   const parsed = parseHexInput(hexInput.value);
   if (!parsed) {
     syncColorClearedUi(wrap);
@@ -542,6 +588,7 @@ function commitColorHexInput(wrap) {
 }
 
 function setColorCleared(wrap, cleared, hex = null) {
+  delete wrap.dataset.rainbow;
   if (cleared) {
     wrap.dataset.cleared = 'true';
   } else {
@@ -553,26 +600,45 @@ function setColorCleared(wrap, cleared, hex = null) {
   syncColorClearedUi(wrap);
 }
 
+function setColorRainbow(wrap) {
+  delete wrap.dataset.cleared;
+  wrap.dataset.rainbow = 'true';
+  syncColorClearedUi(wrap);
+}
+
 function syncColorClearedUi(wrap) {
   const cleared = wrap.dataset.cleared === 'true';
+  const rainbow = wrap.dataset.rainbow === 'true';
   const picker = wrap.querySelector('.row-editor-color-input');
   const meta = wrap.querySelector('[data-role="color-meta"]');
   const hexInput = wrap.querySelector('[data-role="color-hex"]');
   const preview = wrap.querySelector('[data-role="color-preview"]');
   const clearBtn = wrap.querySelector('.row-editor-color-clear');
+  const rainbowBtn = wrap.querySelector('.row-editor-color-rainbow');
 
   wrap.classList.toggle('is-cleared', cleared);
+  wrap.classList.toggle('is-rainbow', rainbow);
+  rainbowBtn?.classList.toggle('is-active', rainbow);
+
   if (cleared) {
     if (meta) meta.textContent = '—';
     if (hexInput) {
       hexInput.value = '';
       hexInput.disabled = true;
     }
-    if (preview) {
-      preview.style.backgroundColor = '';
-      preview.classList.add('color-swatch--empty');
-    }
+    if (preview) applyColorSwatchStyle(preview, null);
     if (clearBtn) clearBtn.disabled = true;
+    return;
+  }
+
+  if (rainbow) {
+    if (meta) meta.textContent = RAINBOW_TOKEN;
+    if (hexInput) {
+      hexInput.disabled = false;
+      hexInput.value = RAINBOW_TOKEN;
+    }
+    if (preview) applyColorSwatchStyle(preview, parseRgbCell(RAINBOW_TOKEN));
+    if (clearBtn) clearBtn.disabled = false;
     return;
   }
 
@@ -582,11 +648,23 @@ function syncColorClearedUi(wrap) {
     hexInput.disabled = false;
     hexInput.value = parsed?.hex ?? normalizeHexForPicker(picker?.value);
   }
-  if (preview) {
-    preview.classList.remove('color-swatch--empty');
-    preview.style.backgroundColor = parsed?.css ?? '';
-  }
+  if (preview) applyColorSwatchStyle(preview, parsed);
   if (clearBtn) clearBtn.disabled = false;
+}
+
+function syncImagePreview(wrap) {
+  const host = wrap.querySelector('[data-role="image-preview"]');
+  const input = wrap.querySelector('input');
+  if (!host) return;
+  host.innerHTML = '';
+  const parsed = parseImageCell(input?.value);
+  if (!parsed) return;
+  const img = document.createElement('img');
+  img.className = 'field-image';
+  img.src = parsed.url;
+  img.alt = '';
+  img.referrerPolicy = 'no-referrer';
+  host.appendChild(img);
 }
 
 function setIconState(toggle, value) {
@@ -636,6 +714,7 @@ function readFieldValue(field) {
   const colorWrap = field.querySelector('[data-editor-type="color"]');
   if (colorWrap) {
     if (colorWrap.dataset.cleared === 'true') return '';
+    if (colorWrap.dataset.rainbow === 'true') return RAINBOW_TOKEN;
     return colorWrap.querySelector('input[type="color"]')?.value ?? '';
   }
 
@@ -658,9 +737,13 @@ function valuesEqual(value, original, field) {
   if (colorWrap) {
     const originalEmpty = !String(original ?? '').trim();
     if (colorWrap.dataset.cleared === 'true') return originalEmpty;
+    if (colorWrap.dataset.rainbow === 'true' || isRainbowToken(value)) {
+      return isRainbowToken(original);
+    }
     const hex = String(value);
     const fromOriginal = parseRgbCell(original);
-    return fromOriginal?.hex?.toUpperCase() === hex.toUpperCase();
+    return fromOriginal?.kind !== 'rainbow'
+      && fromOriginal?.hex?.toUpperCase() === hex.toUpperCase();
   }
 
   const type = field.querySelector('[data-editor-type]')?.dataset.editorType ?? 'text';
@@ -693,7 +776,11 @@ export function openOperatorColorField(root, column) {
   return false;
 }
 
-export function renderReadOnlyRowPanel(parent, { payload, onStartEdit }) {
+export function renderReadOnlyRowPanel(parent, {
+  payload,
+  onStartEdit,
+  editorColumns = {},
+}) {
   const section = document.createElement('section');
   section.className = 'admin-section';
   section.id = 'admin-row-panel';
@@ -718,16 +805,48 @@ export function renderReadOnlyRowPanel(parent, { payload, onStartEdit }) {
   const table = document.createElement('dl');
   table.className = 'row-table';
   for (const [column, raw] of Object.entries(payload.row)) {
-    const value = raw == null || String(raw).trim() === '' ? '—' : String(raw);
-
     const dt = document.createElement('dt');
     dt.textContent = column;
     table.appendChild(dt);
 
     const dd = document.createElement('dd');
-    dd.textContent = value;
+    appendReadOnlyCell(dd, raw, editorColumns[column]);
     table.appendChild(dd);
   }
   section.appendChild(table);
   parent.appendChild(section);
+}
+
+function appendReadOnlyCell(dd, raw, columnConfig) {
+  const text = raw == null ? '' : String(raw);
+  const type = columnConfig?.type;
+
+  if (type === 'color') {
+    const color = parseRgbCell(text);
+    if (color) {
+      const swatch = document.createElement('span');
+      swatch.className = 'row-table-swatch color-swatch';
+      applyColorSwatchStyle(swatch, color);
+      dd.appendChild(swatch);
+      const label = document.createElement('span');
+      label.textContent = color.rgbText;
+      dd.appendChild(label);
+      return;
+    }
+  }
+
+  if (type === 'image') {
+    const parsed = parseImageCell(text);
+    if (parsed) {
+      const img = document.createElement('img');
+      img.className = 'row-table-image field-image';
+      img.src = parsed.url;
+      img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      dd.appendChild(img);
+      return;
+    }
+  }
+
+  dd.textContent = text.trim() === '' ? '—' : text;
 }
