@@ -374,6 +374,36 @@ test('session WebSocket accepts system view and receives tracks on cue', async (
   await server.stop();
 });
 
+test('setlist receives status updates when operator views connect', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    views: {
+      band: { title: 'Band', fields: [{ column: 'Key' }] },
+      setlist: { title: 'Set', system: true },
+      admin: { title: 'Admin', system: true },
+    },
+  });
+  const server = await createViewServer({ config, bus, log: silentLog });
+
+  const set = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=setlist`);
+  const init = await waitForMessage(set.messages, set.ws);
+  assert.equal(init.system, true);
+  assert.equal(typeof init.status?.connectedViews, 'number');
+  const afterInit = await waitForMessage(set.messages, set.ws);
+  assert.equal(afterInit.type, 'status');
+
+  const band = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=band`);
+  await waitForMessage(band.messages, band.ws);
+
+  const status = await waitForMessage(set.messages, set.ws);
+  assert.equal(status.type, 'status');
+  assert.equal(status.status.connectedViews, 2);
+
+  band.ws.close();
+  set.ws.close();
+  await server.stop();
+});
+
 test('admin receives status updates when operator views connect', async () => {
   const bus = createBus();
   const config = testConfig({

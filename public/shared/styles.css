@@ -3593,6 +3593,17 @@ body.layout-session .session-main {
   border-top: 1px solid var(--border);
 }
 
+.set-note-label {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  user-select: none;
+  white-space: nowrap;
+}
+
 .set-note-input {
   flex: 1 1 14rem;
   min-width: 10rem;
@@ -3641,12 +3652,114 @@ body.layout-setlist .setlist-main {
 .setlist-live {
   flex-shrink: 0;
   border-radius: 0.5rem;
-  padding: clamp(0.4rem, 1dvh, 0.65rem) clamp(0.7rem, 1.4vw, 0.95rem);
+  padding: clamp(0.45rem, 1.1dvh, 0.75rem) clamp(0.7rem, 1.4vw, 0.95rem);
   margin-bottom: var(--set-gap);
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
-  font-size: clamp(0.9rem, 1.5dvh, 1.1rem);
+}
+
+.setlist-live-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.45rem 0.85rem;
+}
+
+.setlist-live-copy {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.setlist-live-eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.setlist-live-title {
+  margin: 0;
+  font-size: clamp(1.05rem, 2.2dvh, 1.45rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.setlist-live-meta,
+.setlist-live-last,
+.setlist-live-next {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.setlist-live-next {
+  color: var(--text);
   font-weight: 600;
+}
+
+.setlist-live-actions {
+  margin-left: auto;
+}
+
+.setlist-live-actions .view-edit-btn {
+  min-width: 4.25rem;
+  min-height: 2.15rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.setlist-live-recover {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.setlist-health {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+
+.setlist-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+}
+
+.setlist-chip--warn {
+  border-color: rgba(230, 162, 60, 0.45);
+  background: rgba(230, 162, 60, 0.12);
+  color: var(--warn);
+}
+
+.setlist-chip--action {
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.setlist-chip--action:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.setlist-chip--action:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .setlist-live--live {
@@ -3654,9 +3767,17 @@ body.layout-setlist .setlist-main {
   background: rgba(62, 207, 142, 0.1);
 }
 
+.setlist-live--live .setlist-live-eyebrow {
+  color: var(--ok);
+}
+
 .setlist-live--pinned {
   border-color: rgba(91, 141, 239, 0.45);
   background: rgba(91, 141, 239, 0.12);
+}
+
+.setlist-live--pinned .setlist-live-eyebrow {
+  color: var(--accent);
 }
 
 .setlist-live--nomatch {
@@ -3664,12 +3785,8 @@ body.layout-setlist .setlist-main {
   background: rgba(230, 162, 60, 0.1);
 }
 
-.setlist-hint {
-  flex-shrink: 0;
-  margin: 0 0 var(--set-gap);
-  font-size: 0.8rem;
-  color: var(--muted);
-  line-height: 1.4;
+.setlist-live--nomatch .setlist-live-eyebrow {
+  color: var(--warn);
 }
 
 .setlist-toolbar {
@@ -3706,13 +3823,34 @@ body.layout-setlist .setlist-main {
   margin-bottom: var(--set-gap);
 }
 
-.setlist-add-label {
+.setlist-add-toggle {
+  display: inline-flex;
+  align-items: center;
   margin: 0 0 0.35rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.setlist-add-toggle::before {
+  content: '▸';
+  margin-right: 0.35rem;
+  font-size: 0.7rem;
+}
+
+.setlist-add-toggle[aria-expanded="true"]::before {
+  content: '▾';
+}
+
+.setlist-add-toggle:hover {
+  color: var(--text);
 }
 
 .setlist-add-results {

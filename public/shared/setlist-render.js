@@ -1,8 +1,11 @@
 // Setlist view: night-specific ordered sheet rows. Glance + pin override; not a match source.
 
 import { setConnectionState } from './view-render.js';
-import { resolveMatchedTitle } from './playing-clips-strip.js';
+import { hasPlayingClips, resolveMatchedTitle } from './playing-clips-strip.js';
 import { prependDopeButton } from './moment-controls.js';
+import { renderRowEditorPanel, updateEditContextBanner } from './admin-row-editor.js';
+import { renderAliasPanel } from './alias-panel.js';
+import { renderPinPanel } from './pin-panel.js';
 
 export const SETLIST_STATUSES = Object.freeze(['confirmed', 'likely', 'maybe']);
 
@@ -11,6 +14,8 @@ const STATUS_LABELS = {
   likely: 'Likely',
   maybe: 'Maybe',
 };
+
+let lastScrolledRowId = null;
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -28,6 +33,148 @@ export function currentSetlistRowId(payload) {
 
 export function itemDisplayTitle(item) {
   return String(item?.liveTitle || item?.title || '').trim() || `Row ${item?.rowId ?? '?'}`;
+}
+
+export function formatSetConfidence(confidence) {
+  if (confidence == null || Number.isNaN(Number(confidence))) return null;
+  return `${Math.round(Number(confidence) * 100)}%`;
+}
+
+export function formatSyncedAge(iso, now = Date.now()) {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const sec = Math.max(0, Math.round((now - then) / 1000));
+  if (sec < 60) return `${sec}s`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m`;
+  return `${Math.round(min / 60)}h`;
+}
+
+/**
+ * Glance model for the Set live card. Not a match source.
+ * @returns {{
+ *   tone: 'idle'|'live'|'pinned'|'nomatch',
+ *   eyebrow: string,
+ *   title: string,
+ *   meta: string,
+ *   next: string,
+ *   last: string,
+ *   onSet: boolean|null,
+ *   currentIndex: number,
+ * }}
+ */
+export function liveBoardModel(payload, { matchColumn = null, setlist = null } = {}) {
+  const items = Array.isArray(setlist?.items) ? setlist.items : [];
+  const liveRowId = currentSetlistRowId(payload);
+  const currentIndex = liveRowId
+    ? items.findIndex((item) => String(item.rowId) === liveRowId)
+    : -1;
+  const nextItem = currentIndex >= 0 ? items[currentIndex + 1] ?? null : null;
+
+  if (!payload) {
+    return {
+      tone: 'idle',
+      eyebrow: 'WAITING',
+      title: 'Waiting for Ableton…',
+      meta: '',
+      next: '',
+      last: '',
+      onSet: null,
+      currentIndex: -1,
+    };
+  }
+
+  if (payload.match?.matched !== true) {
+    const clip = payload.clipName?.trim();
+    const lastTitle = payload.lastMatched?.title?.trim();
+    return {
+      tone: 'nomatch',
+      eyebrow: 'NO MATCH',
+      title: clip || 'No confident match',
+      meta: clip ? `Playing “${clip}”` : 'No confident match',
+      next: '',
+      last: lastTitle ? `Last: ${lastTitle}` : '',
+      onSet: false,
+      currentIndex: -1,
+    };
+  }
+
+  const title = resolveMatchedTitle(payload, matchColumn) || payload.match?.matchedValue || 'Matched';
+  const clip = payload.clipName?.trim();
+  const pinned = payload.match?.viaOverride === true;
+  const parts = [];
+  if (clip && clip !== title) parts.push(`Clip “${clip}”`);
+  if (!pinned) {
+    const conf = formatSetConfidence(payload.match?.confidence);
+    if (conf) parts.push(conf);
+  }
+  if (payload.match?.viaAlias) parts.push('via alias');
+  if (pinned) parts.push('Pinned · clears on next auto match');
+  if (currentIndex >= 0) parts.push(`on set · #${currentIndex + 1}`);
+  else parts.push('Not on tonight’s set');
+
+  return {
+    tone: pinned ? 'pinned' : 'live',
+    eyebrow: pinned ? 'PINNED' : 'LIVE',
+    title,
+    meta: parts.join(' · '),
+    next: nextItem ? `Next · ${itemDisplayTitle(nextItem)}` : '',
+    last: '',
+    onSet: currentIndex >= 0,
+    currentIndex,
+  };
+}
+
+/**
+ * Compact health chips for show-night glance. `connectedViews` includes this Set tab.
+ */
+export function setHealthChips(payload, status, { simulated = null } = {}) {
+  const simOn = simulated != null ? Boolean(simulated) : Boolean(payload?.simulated);
+  const chips = [];
+
+  if (!simOn) {
+    const ingest = payload?.ableton ?? status?.ingest ?? null;
+    const live = ingest?.live ?? payload?.ingestLive !== false;
+    chips.push({
+      id: 'ableton',
+      label: live ? 'Ableton' : 'Ableton off',
+      warn: !live,
+    });
+  }
+
+  const stale = Boolean(payload?.stale);
+  const age = formatSyncedAge(payload?.syncedAt);
+  chips.push({
+    id: 'sheet',
+    label: stale ? 'Sheet stale' : (age ? `Sheet ${age}` : 'Sheet'),
+    warn: stale,
+    action: 'sync',
+  });
+
+  const matched = payload?.match?.matched === true;
+  const playing = hasPlayingClips(payload) || Boolean(payload?.clipName?.trim());
+  if (payload && !matched && playing) {
+    chips.push({ id: 'match', label: 'No match', warn: true });
+  }
+
+  if (status?.connectedViews != null) {
+    const others = Math.max(0, Number(status.connectedViews) - 1);
+    chips.push({
+      id: 'views',
+      label: others === 0 ? 'No other views' : (others === 1 ? '1 other view' : `${others} other views`),
+      warn: others === 0,
+    });
+  }
+
+  if (!simOn) {
+    const ingest = status?.ingest ?? payload?.ableton ?? null;
+    if (ingest?.cueTrackConfigured && ingest.cueTrackFound === false) {
+      chips.push({ id: 'cue-track', label: 'Cue track missing', warn: true });
+    }
+  }
+
+  return chips;
 }
 
 /** Remember setlist search / name inputs across full re-renders. */
@@ -69,28 +216,6 @@ function restoreSetlistFocus(root, focus, { autoFocusSearch = false } = {}) {
   }
 }
 
-function liveBanner(payload, matchColumn) {
-  const matched = payload?.match?.matched === true;
-  const pinned = payload?.match?.viaOverride === true;
-  if (!payload) {
-    return { text: 'Waiting for live cue…', tone: 'idle' };
-  }
-  if (!matched) {
-    const clip = payload.clipName?.trim();
-    return {
-      text: clip
-        ? `Live board: no confident match · ${clip}`
-        : 'Live board: no confident match',
-      tone: 'nomatch',
-    };
-  }
-  const title = resolveMatchedTitle(payload, matchColumn) || payload.match?.matchedValue || 'Matched';
-  return {
-    text: pinned ? `Live board (pinned): ${title}` : `Live board: ${title}`,
-    tone: pinned ? 'pinned' : 'live',
-  };
-}
-
 function secondaryLabel(result) {
   const als = result.secondary?.find((s) => s.column === 'ALS Folder');
   if (als?.value) return als.value;
@@ -98,39 +223,207 @@ function secondaryLabel(result) {
   return '';
 }
 
+function fillLiveCopy(copy, model) {
+  copy.replaceChildren();
+  copy.appendChild(el('p', 'setlist-live-eyebrow', model.eyebrow));
+  copy.appendChild(el('h2', 'setlist-live-title', model.title));
+  if (model.meta) copy.appendChild(el('p', 'setlist-live-meta', model.meta));
+  if (model.last) copy.appendChild(el('p', 'setlist-live-last', model.last));
+  if (model.next) copy.appendChild(el('p', 'setlist-live-next', model.next));
+}
+
+function fillHealthChips(host, chips, { onSyncSheet, syncing = false } = {}) {
+  host.replaceChildren();
+  for (const chip of chips) {
+    const isSync = chip.action === 'sync' && typeof onSyncSheet === 'function';
+    const node = el(
+      isSync ? 'button' : 'span',
+      `setlist-chip${chip.warn ? ' setlist-chip--warn' : ''}${isSync ? ' setlist-chip--action' : ''}`,
+      syncing && isSync ? 'Syncing…' : chip.label,
+    );
+    if (isSync) {
+      node.type = 'button';
+      node.title = 'Sync Google Sheet now';
+      node.disabled = syncing;
+      node.addEventListener('click', () => onSyncSheet());
+    }
+    host.appendChild(node);
+  }
+}
+
+function renderNoMatchActions(parent, { onStartCreate, onStartAlias, onStartPin, onPinLast }) {
+  if (!onStartCreate && !onStartAlias && !onStartPin && !onPinLast) return;
+  const actions = el('div', 'setlist-live-recover');
+  if (onPinLast) {
+    const btn = el('button', 'admin-editor-btn admin-editor-btn--primary', 'Pin last cue');
+    btn.type = 'button';
+    btn.addEventListener('click', () => onPinLast());
+    actions.appendChild(btn);
+  }
+  if (onStartPin) {
+    const btn = el('button', 'admin-editor-btn', 'Pin from set');
+    btn.type = 'button';
+    btn.addEventListener('click', () => onStartPin());
+    actions.appendChild(btn);
+  }
+  if (onStartCreate) {
+    const btn = el('button', 'admin-editor-btn admin-editor-btn--primary', 'Add cue row');
+    btn.type = 'button';
+    btn.addEventListener('click', () => onStartCreate());
+    actions.appendChild(btn);
+  }
+  if (onStartAlias) {
+    const btn = el('button', 'admin-editor-btn', 'Add as alias');
+    btn.type = 'button';
+    btn.addEventListener('click', () => onStartAlias());
+    actions.appendChild(btn);
+  }
+  parent.appendChild(actions);
+}
+
+function renderLiveActions(parent, {
+  matched,
+  pinned,
+  busy,
+  getMomentWho,
+  onStartEdit,
+  onStartPin,
+  onClearPin,
+}) {
+  const actions = el('div', 'view-edit-actions setlist-live-actions');
+  if (getMomentWho != null) prependDopeButton(actions, getMomentWho);
+  if (!busy && matched && onStartPin) {
+    const changeBtn = el('button', 'view-edit-btn', 'Change cue');
+    changeBtn.type = 'button';
+    changeBtn.title = 'Pin a different cue onto the live board';
+    changeBtn.addEventListener('click', onStartPin);
+    actions.appendChild(changeBtn);
+  }
+  if (!busy && pinned && onClearPin) {
+    const clearBtn = el('button', 'view-edit-btn view-edit-btn--unpin', 'Clear pin');
+    clearBtn.type = 'button';
+    clearBtn.title = 'Return the live board to automatic matching';
+    clearBtn.addEventListener('click', onClearPin);
+    actions.appendChild(clearBtn);
+  }
+  if (!busy && matched && onStartEdit) {
+    const editBtn = el('button', 'view-edit-btn view-edit-btn--edit', 'Edit');
+    editBtn.type = 'button';
+    editBtn.title = 'Edit this cue-sheet row';
+    editBtn.addEventListener('click', onStartEdit);
+    actions.appendChild(editBtn);
+  }
+  if (actions.childNodes.length) parent.appendChild(actions);
+}
+
+function renderLiveCard(root, ctx, model) {
+  const {
+    payload,
+    status,
+    simulated = null,
+    syncing = false,
+    editSession = null,
+    aliasSession = null,
+    pinSession = null,
+    getMomentWho = null,
+    onStartEdit,
+    onStartCreate,
+    onStartAlias,
+    onStartPin,
+    onPinLast,
+    onClearPin,
+    onSyncSheet,
+  } = ctx;
+
+  const matched = payload?.match?.matched === true;
+  const pinned = payload?.match?.viaOverride === true;
+  const busy = Boolean(editSession || aliasSession || pinSession);
+  const showNoMatch = Boolean(payload) && !matched && !busy
+    && (hasPlayingClips(payload) || payload.clipName?.trim());
+
+  const card = el('section', `setlist-live setlist-live--${model.tone}`);
+  card.id = 'setlist-live';
+  card.setAttribute('aria-label', 'Live board');
+
+  const top = el('div', 'setlist-live-top');
+  const copy = el('div', 'setlist-live-copy');
+  copy.dataset.role = 'setlist-live-copy';
+  fillLiveCopy(copy, model);
+  top.appendChild(copy);
+  renderLiveActions(top, {
+    matched,
+    pinned,
+    busy,
+    getMomentWho,
+    onStartEdit,
+    onStartPin,
+    onClearPin,
+  });
+  card.appendChild(top);
+
+  const health = el('div', 'setlist-health');
+  health.dataset.role = 'setlist-health';
+  fillHealthChips(health, setHealthChips(payload, status, { simulated }), { onSyncSheet, syncing });
+  card.appendChild(health);
+
+  if (showNoMatch) {
+    renderNoMatchActions(card, {
+      onStartCreate,
+      onStartAlias,
+      onStartPin,
+      onPinLast: payload?.lastMatched?.rowId ? onPinLast : undefined,
+    });
+  }
+
+  root.appendChild(card);
+  return card;
+}
+
+export function updateSetlistLiveChrome(root, ctx) {
+  const {
+    payload,
+    setlist,
+    matchColumn = null,
+    connected,
+    lastUpdate,
+    simulated = null,
+    sessionLog = null,
+    status = null,
+    syncing = false,
+    editSession = null,
+    onSyncSheet,
+  } = ctx;
+
+  setConnectionState(connected, lastUpdate, payload, simulated, sessionLog);
+
+  const card = root?.querySelector?.('#setlist-live');
+  if (card) {
+    const model = liveBoardModel(payload, { matchColumn, setlist });
+    card.className = `setlist-live setlist-live--${model.tone}`;
+    const copy = card.querySelector('[data-role="setlist-live-copy"]');
+    if (copy) fillLiveCopy(copy, model);
+    const health = card.querySelector('[data-role="setlist-health"]');
+    if (health) {
+      fillHealthChips(health, setHealthChips(payload, status, { simulated }), { onSyncSheet, syncing });
+    }
+  }
+
+  if (editSession) updateEditContextBanner(root, editSession, payload);
+}
+
+function scrollCurrentIntoView(root, liveRowId) {
+  if (!liveRowId) {
+    lastScrolledRowId = null;
+    return;
+  }
+  if (liveRowId === lastScrolledRowId) return;
+  lastScrolledRowId = liveRowId;
+  root.querySelector('.setlist-item--current')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
 /**
  * @param {HTMLElement} root
- * @param {{
- *   title?: string,
- *   payload?: object|null,
- *   setlist?: object|null,
- *   matchColumn?: string|null,
- *   connected?: boolean,
- *   lastUpdate?: Date|null,
- *   simulated?: boolean|null,
- *   sessionLog?: object|null,
- *   addQuery?: string,
- *   addResults?: Array,
- *   addSearching?: boolean,
- *   nameDraft?: string,
- *   saveState?: string,
- *   saveError?: string|null,
- *   focusRestore?: object|null,
- *   autoFocusSearch?: boolean,
- *   onAddQueryChange?: (q: string) => void,
- *   onAddRow?: (row: object) => void,
- *   onRemove?: (rowId: string) => void,
- *   onStatus?: (rowId: string, status: string) => void,
- *   onMove?: (rowId: string, direction: -1|1) => void,
- *   onReorder?: (rowIds: string[]) => void,
- *   onSwitch?: (name: string) => void,
- *   onCreate?: (name: string) => void,
- *   onDuplicate?: (name: string) => void,
- *   onDelete?: () => void,
- *   onNameDraftChange?: (name: string) => void,
- *   onPin?: (rowId: string) => void,
- *   onClearPin?: () => void,
- * }} ctx
+ * @param {object} ctx
  */
 export function renderSetlist(root, ctx) {
   const {
@@ -145,12 +438,21 @@ export function renderSetlist(root, ctx) {
     addQuery = '',
     addResults = [],
     addSearching = false,
+    addOpen = false,
     nameDraft = '',
     saveState = 'idle',
     saveError = null,
+    syncing = false,
     focusRestore = null,
     autoFocusSearch = false,
+    editSession = null,
+    aliasSession = null,
+    aliasPanel = null,
+    pinSession = null,
+    pinPanel = null,
+    editorColumns = {},
     onAddQueryChange,
+    onAddOpenChange,
     onAddRow,
     onRemove,
     onStatus,
@@ -164,6 +466,14 @@ export function renderSetlist(root, ctx) {
     onPin,
     onClearPin,
     getMomentWho = null,
+    onStartEdit,
+    onStartCreate,
+    onStartAlias,
+    onStartPin,
+    onPinLast,
+    onCancelEdit,
+    onSaveEdit,
+    onSyncSheet,
   } = ctx;
 
   setConnectionState(connected, lastUpdate, payload, simulated, sessionLog);
@@ -174,29 +484,39 @@ export function renderSetlist(root, ctx) {
   const heading = el('h1', 'view-title', title || 'Set');
   const titleRow = el('div', 'view-title-row');
   titleRow.appendChild(heading);
-  if (getMomentWho != null) {
-    const actions = el('div', 'view-edit-actions');
-    prependDopeButton(actions, getMomentWho);
-    titleRow.appendChild(actions);
-  }
   root.appendChild(titleRow);
 
-  const banner = liveBanner(payload, matchColumn);
-  const bannerEl = el('div', `setlist-live setlist-live--${banner.tone}`, banner.text);
-  root.appendChild(bannerEl);
+  const model = liveBoardModel(payload, { matchColumn, setlist });
+  renderLiveCard(root, ctx, model);
 
-  const hint = el(
-    'p',
-    'setlist-hint',
-    'This list is tonight’s plan — it does not change matching. Pin only when you want this row on the live board until the next automatic match.',
-  );
-  root.appendChild(hint);
+  const sessionBusy = Boolean(editSession || aliasSession || pinSession);
+  if (pinSession && pinPanel) {
+    renderPinPanel(root, pinPanel);
+    return;
+  }
+  if (aliasSession && aliasPanel) {
+    renderAliasPanel(root, aliasPanel);
+    return;
+  }
+  if (editSession && onCancelEdit && onSaveEdit) {
+    renderRowEditorPanel(root, {
+      session: editSession,
+      editorColumns,
+      livePayload: payload,
+      onCancel: onCancelEdit,
+      onSave: onSaveEdit,
+      saveState,
+      saveError,
+    });
+    return;
+  }
+
+  const busy = saveState === 'saving' || sessionBusy;
 
   const toolbar = el('div', 'setlist-toolbar');
 
   const library = Array.isArray(setlist?.library) ? setlist.library : [];
   const currentName = setlist?.name ?? '';
-  const busy = saveState === 'saving';
 
   const select = el('select', 'setlist-select');
   select.dataset.setlistField = 'library';
@@ -267,52 +587,60 @@ export function renderSetlist(root, ctx) {
     root.appendChild(el('p', 'admin-editor-error', saveError));
   }
 
+  const items = Array.isArray(setlist?.items) ? setlist.items : [];
+  const showAdd = addOpen === true || items.length === 0;
+
   const addSection = el('section', 'setlist-add');
-  addSection.appendChild(el('p', 'setlist-add-label', 'Add from cue sheet'));
+  const addToggle = el('button', 'setlist-add-toggle', 'Add from cue sheet');
+  addToggle.type = 'button';
+  addToggle.setAttribute('aria-expanded', showAdd ? 'true' : 'false');
+  addToggle.addEventListener('click', () => onAddOpenChange?.(!showAdd));
+  addSection.appendChild(addToggle);
 
-  const searchInput = el('input', 'alias-search-input');
-  searchInput.type = 'search';
-  searchInput.placeholder = 'Search song title, aliases, ALS folder…';
-  searchInput.value = addQuery ?? '';
-  searchInput.autocomplete = 'off';
-  searchInput.dataset.setlistField = 'search';
-  searchInput.disabled = busy;
-  searchInput.addEventListener('input', () => onAddQueryChange?.(searchInput.value));
-  addSection.appendChild(searchInput);
+  if (showAdd) {
+    const searchInput = el('input', 'alias-search-input');
+    searchInput.type = 'search';
+    searchInput.placeholder = 'Search song title, aliases, ALS folder…';
+    searchInput.value = addQuery ?? '';
+    searchInput.autocomplete = 'off';
+    searchInput.dataset.setlistField = 'search';
+    searchInput.disabled = busy;
+    searchInput.addEventListener('input', () => onAddQueryChange?.(searchInput.value));
+    addSection.appendChild(searchInput);
 
-  const resultsList = el('div', 'alias-search-results setlist-add-results');
-  const onList = new Set((setlist?.items ?? []).map((item) => String(item.rowId)));
-  if (addSearching) {
-    resultsList.appendChild(el('p', 'alias-search-empty', 'Searching…'));
-  } else if (!String(addQuery ?? '').trim()) {
-    resultsList.appendChild(el('p', 'alias-search-empty', 'Type to search the cue sheet.'));
-  } else if (!addResults.length) {
-    resultsList.appendChild(el('p', 'alias-search-empty', 'No rows matched.'));
-  } else {
-    for (const result of addResults) {
-      const already = onList.has(String(result.rowId));
-      const btn = el('button', 'alias-search-result');
-      btn.type = 'button';
-      btn.disabled = busy || already;
-      btn.addEventListener('click', () => {
-        if (!already) onAddRow?.(result);
-      });
-      btn.appendChild(el('span', 'alias-search-result-title', result.title));
-      const meta = el(
-        'span',
-        'alias-search-result-meta',
-        already ? `Already on set · Row ${result.rowId}` : `Row ${result.rowId}`,
-      );
-      const sub = secondaryLabel(result);
-      if (sub && !already) meta.textContent += ` · ${sub}`;
-      btn.appendChild(meta);
-      resultsList.appendChild(btn);
+    const resultsList = el('div', 'alias-search-results setlist-add-results');
+    const onList = new Set(items.map((item) => String(item.rowId)));
+    if (addSearching) {
+      resultsList.appendChild(el('p', 'alias-search-empty', 'Searching…'));
+    } else if (!String(addQuery ?? '').trim()) {
+      resultsList.appendChild(el('p', 'alias-search-empty', 'Type to search the cue sheet.'));
+    } else if (!addResults.length) {
+      resultsList.appendChild(el('p', 'alias-search-empty', 'No rows matched.'));
+    } else {
+      for (const result of addResults) {
+        const already = onList.has(String(result.rowId));
+        const btn = el('button', 'alias-search-result');
+        btn.type = 'button';
+        btn.disabled = busy || already;
+        btn.addEventListener('click', () => {
+          if (!already) onAddRow?.(result);
+        });
+        btn.appendChild(el('span', 'alias-search-result-title', result.title));
+        const meta = el(
+          'span',
+          'alias-search-result-meta',
+          already ? `Already on set · Row ${result.rowId}` : `Row ${result.rowId}`,
+        );
+        const sub = secondaryLabel(result);
+        if (sub && !already) meta.textContent += ` · ${sub}`;
+        btn.appendChild(meta);
+        resultsList.appendChild(btn);
+      }
     }
+    addSection.appendChild(resultsList);
   }
-  addSection.appendChild(resultsList);
   root.appendChild(addSection);
 
-  const items = Array.isArray(setlist?.items) ? setlist.items : [];
   const liveRowId = currentSetlistRowId(payload);
   const pinned = payload?.match?.viaOverride === true;
 
@@ -371,18 +699,19 @@ export function renderSetlist(root, ctx) {
       row.appendChild(indexEl);
 
       const body = el('div', 'setlist-item-body');
-      const titleRow = el('div', 'setlist-item-title-row');
-      titleRow.appendChild(el('div', 'setlist-item-title', itemDisplayTitle(item)));
+      const titleRowInner = el('div', 'setlist-item-title-row');
+      titleRowInner.appendChild(el('div', 'setlist-item-title', itemDisplayTitle(item)));
       if (isCurrent) {
-        titleRow.appendChild(el('span', 'setlist-badge setlist-badge--now', pinned ? 'Pinned now' : 'Now'));
+        titleRowInner.appendChild(el('span', 'setlist-badge setlist-badge--now', pinned ? 'Pinned now' : 'Now'));
       }
       if (item.missing) {
-        titleRow.appendChild(el('span', 'setlist-badge setlist-badge--missing', 'Missing from sheet'));
+        titleRowInner.appendChild(el('span', 'setlist-badge setlist-badge--missing', 'Missing from sheet'));
       }
-      body.appendChild(titleRow);
+      body.appendChild(titleRowInner);
 
-      const meta = el('div', 'setlist-item-meta', `Row ${item.rowId}`);
-      body.appendChild(meta);
+      const metaParts = [`Row ${item.rowId}`];
+      if (item.subtitle) metaParts.push(item.subtitle);
+      body.appendChild(el('div', 'setlist-item-meta', metaParts.join(' · ')));
       row.appendChild(body);
 
       const actions = el('div', 'setlist-item-actions');
@@ -445,5 +774,6 @@ export function renderSetlist(root, ctx) {
 
   queueMicrotask(() => {
     restoreSetlistFocus(root, focusRestore, { autoFocusSearch });
+    scrollCurrentIntoView(root, liveRowId);
   });
 }

@@ -84,11 +84,15 @@ export async function createViewServer({
     }
   }
 
+  function wantsStatus(viewId) {
+    return viewId === 'admin' || viewId === 'setlist';
+  }
+
   function broadcastStatus() {
     const status = buildStatus();
     const data = JSON.stringify({ type: 'status', status });
     for (const [ws, { viewId }] of clients) {
-      if (viewId === 'admin' && ws.readyState === ws.OPEN) ws.send(data);
+      if (wantsStatus(viewId) && ws.readyState === ws.OPEN) ws.send(data);
     }
   }
 

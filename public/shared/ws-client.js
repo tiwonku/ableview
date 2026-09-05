@@ -12,6 +12,7 @@ import { renderSession } from './session-render.js';
 import {
   renderSetlist,
   captureSetlistFocus,
+  updateSetlistLiveChrome,
 } from './setlist-render.js';
 import {
   collectEditorChanges,
@@ -107,8 +108,10 @@ export function connectView({
   let setlistAddQuery = '';
   let setlistAddResults = [];
   let setlistAddSearching = false;
+  let setlistAddOpen = null;
   let setlistNameDraft = '';
   let setlistAutoFocusSearch = false;
+  let setlistSyncing = false;
   let sessionLogGen = 0;
   let unmountSessionLog = null;
 
@@ -134,6 +137,22 @@ export function connectView({
     }, RECONNECT_MS);
   }
 
+  function setlistChromeCtx() {
+    return {
+      payload: lastPayload,
+      setlist: lastSetlist,
+      matchColumn,
+      connected,
+      lastUpdate,
+      simulated: serverSimulated,
+      sessionLog: lastSessionLog,
+      status: lastStatus,
+      syncing: setlistSyncing,
+      editSession,
+      onSyncSheet: syncSheet,
+    };
+  }
+
   function updateLiveChromeDuringEdit() {
     if ((!editSession && !aliasSession && !pinSession) || !root) return;
     const chrome = {
@@ -142,6 +161,10 @@ export function connectView({
       lastUpdate,
       editSession,
     };
+    if (currentViewId === 'setlist') {
+      updateSetlistLiveChrome(root, setlistChromeCtx());
+      return;
+    }
     if (viewConfig.system) {
       updateAdminLiveChrome(root, { ...chrome, status: lastStatus, matchColumn });
     } else {
@@ -215,6 +238,10 @@ export function connectView({
         updateLiveChromeDuringEdit();
         return;
       }
+      if (currentViewId === 'setlist' && !showingSettings && !statusOnly) {
+        updateSetlistLiveChrome(root, setlistChromeCtx());
+        return;
+      }
       render();
       return;
     }
@@ -233,7 +260,7 @@ export function connectView({
         return;
       }
       if (currentViewId === 'setlist' && !setlistCueChanged(prevPayload, lastPayload)) {
-        setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
+        updateSetlistLiveChrome(root, setlistChromeCtx());
         return;
       }
       render();
@@ -517,7 +544,30 @@ export function connectView({
     }
   }
 
+  async function syncSheet() {
+    if (setlistSyncing) return;
+    setlistSyncing = true;
+    if (currentViewId === 'setlist' && !showingSettings && !statusOnly) {
+      updateSetlistLiveChrome(root, setlistChromeCtx());
+    }
+    try {
+      const res = await fetch('/api/sheets/sync', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Sync failed');
+      saveError = null;
+    } catch (err) {
+      saveError = err.message ?? 'Sync failed';
+    } finally {
+      setlistSyncing = false;
+      if (currentViewId === 'setlist' && !showingSettings && !statusOnly) {
+        if (saveError) render();
+        else updateSetlistLiveChrome(root, setlistChromeCtx());
+      }
+    }
+  }
+
   function scheduleSetlistSearch(query) {
+    if (String(query ?? '').trim()) setlistAddOpen = true;
     setlistAddQuery = query;
     setlistAddSearching = true;
     render();
@@ -826,12 +876,31 @@ export function connectView({
         addQuery: setlistAddQuery,
         addResults: setlistAddResults,
         addSearching: setlistAddSearching,
+        addOpen: setlistAddOpen != null ? setlistAddOpen : !(lastSetlist?.items?.length),
         nameDraft: setlistNameDraft,
         saveState,
         saveError,
+        syncing: setlistSyncing,
         focusRestore: setlistFocus,
         autoFocusSearch: autoFocusSetlistSearch,
+        editSession,
+        aliasSession,
+        aliasPanel,
+        pinSession,
+        pinPanel,
+        editorColumns,
         onAddQueryChange: scheduleSetlistSearch,
+        onAddOpenChange: (open) => {
+          setlistAddOpen = open === true;
+          if (!open) {
+            setlistAddQuery = '';
+            setlistAddResults = [];
+            setlistAddSearching = false;
+          } else {
+            setlistAutoFocusSearch = true;
+          }
+          render();
+        },
         onAddRow: addSetlistRow,
         onRemove: (rowId) => mutateSetlist(`/api/setlist/items/${encodeURIComponent(rowId)}`, { method: 'DELETE' }),
         onStatus: (rowId, status) => mutateSetlist(
@@ -850,6 +919,14 @@ export function connectView({
         },
         onPin: postPin,
         onClearPin: clearPin,
+        onStartEdit: startEdit,
+        onStartCreate: startCreate,
+        onStartAlias: startAlias,
+        onStartPin: startPin,
+        onPinLast: pinLastCue,
+        onCancelEdit: cancelEdit,
+        onSaveEdit: saveEdit,
+        onSyncSheet: syncSheet,
         getMomentWho,
       });
       return;
@@ -1063,6 +1140,7 @@ export function connectView({
     setlistAddQuery = '';
     setlistAddResults = [];
     setlistAddSearching = false;
+    setlistAddOpen = null;
     applyHistory(nextId, href, historyMode);
     reconnectNow();
   }

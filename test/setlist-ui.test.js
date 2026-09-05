@@ -25,10 +25,13 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
   assert.match(html, /id="session-log"/);
   assert.doesNotMatch(settingsHtml, /id="session-log"/);
   assert.match(renderSrc, /title \|\| 'Set'/);
-  assert.match(renderSrc, /Pin only when you want this row on the live board/);
+  assert.match(renderSrc, /liveBoardModel/);
+  assert.match(renderSrc, /Change cue/);
   assert.match(renderSrc, /Clear pin/);
   assert.match(renderSrc, /Delete set/);
   assert.match(renderSrc, /onDelete/);
+  assert.match(renderSrc, /onStartEdit/);
+  assert.match(renderSrc, /setHealthChips/);
   assert.match(renderSrc, /getMomentWho/);
   assert.match(renderSrc, /prependDopeButton/);
   const sessionLogSrc = readFileSync(
@@ -43,4 +46,13 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
   assert.match(clientSrc, /body: \{ delete: true \}/);
   assert.match(clientSrc, /function setlistCueChanged/);
   assert.match(clientSrc, /mergePinResults/);
+  assert.match(clientSrc, /updateSetlistLiveChrome/);
+  assert.match(clientSrc, /onStartEdit: startEdit/);
+  assert.match(clientSrc, /\/api\/sheets\/sync/);
+  const momentSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/moment-controls.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(momentSrc, /set-note-label/);
+  assert.match(momentSrc, /textContent = 'Note'/);
 });

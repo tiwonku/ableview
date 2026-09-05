@@ -210,11 +210,15 @@ export function createSetlistStore({
     const snapshot = typeof getSnapshot === 'function' ? getSnapshot() : null;
     const found = findSheetRow(snapshot, item.rowId);
     const liveTitle = titleFromRow(found, snapshot?.matchColumn);
+    const als = found?.data && typeof found.data === 'object'
+      ? String(found.data['ALS Folder'] ?? '').trim()
+      : '';
     return {
       rowId: item.rowId,
       title: item.title,
       status: item.status,
       liveTitle: liveTitle || null,
+      subtitle: als || null,
       missing: !found,
     };
   }

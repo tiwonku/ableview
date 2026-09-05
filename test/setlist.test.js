@@ -96,6 +96,7 @@ test('add / reorder / status / remove persist to disk', () => {
   assert.equal(state.items[0].status, 'confirmed');
   assert.equal(state.items[1].status, 'maybe');
   assert.equal(state.items[0].missing, false);
+  assert.equal(state.items[0].subtitle, null);
 
   store.reorder(['7', '5']);
   store.setItemStatus('7', 'likely');
@@ -120,6 +121,23 @@ test('unknown sheet row is rejected', () => {
   const { store } = tempStore();
   store.start();
   assert.throws(() => store.addItem('99'), /row not found/);
+});
+
+test('hydrate exposes ALS Folder as subtitle without persisting it', () => {
+  const { store, dir } = tempStore({
+    snapshot: {
+      matchColumn: 'Song Title',
+      rows: [
+        { rowId: '5', data: { 'Song Title': 'Song A', 'ALS Folder': 'Ableton/HotRox' } },
+      ],
+    },
+  });
+  store.start();
+  store.addItem('5');
+  const state = store.getState();
+  assert.equal(state.items[0].subtitle, 'Ableton/HotRox');
+  const saved = JSON.parse(readFileSync(join(dir, 'default.json'), 'utf8'));
+  assert.equal(saved.items[0].subtitle, undefined);
 });
 
 test('hydrate marks missing rows when the sheet snapshot drops them', () => {

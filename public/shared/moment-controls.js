@@ -134,11 +134,17 @@ export function mountSetNoteRow(host, { getWho } = {}) {
   row.className = 'set-note-bar';
   row.dataset.role = 'set-note-bar';
 
+  const label = document.createElement('label');
+  label.className = 'set-note-label';
+  label.htmlFor = 'setNoteInput';
+  label.textContent = 'Note';
+
   const input = document.createElement('input');
   input.type = 'text';
+  input.id = 'setNoteInput';
   input.className = 'settings-input set-note-input';
   input.maxLength = 200;
-  input.placeholder = 'Note';
+  input.placeholder = 'Type a moment…';
   input.setAttribute('aria-label', 'Moment note');
   input.autocomplete = 'off';
 
@@ -168,6 +174,7 @@ export function mountSetNoteRow(host, { getWho } = {}) {
     }
   });
 
+  row.appendChild(label);
   row.appendChild(input);
   row.appendChild(send);
   host.appendChild(row);
