@@ -67,10 +67,14 @@ export function registerMomentsRoutes(app, { sessionLog, log }) {
 
 export function buildSessionLogBroadcast(sessionLog) {
   const snap = sessionLog.getStatus();
+  const moments = typeof sessionLog.getMomentsStatus === 'function'
+    ? sessionLog.getMomentsStatus()
+    : null;
   return {
     enabled: snap.enabled === true,
     sessionName: snap.sessionName ?? null,
     lastLoggedAt: snap.lastLoggedAt ?? null,
     momentCount: snap.momentCount ?? 0,
+    lastMoment: moments?.lastMoment ?? null,
   };
 }

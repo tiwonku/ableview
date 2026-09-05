@@ -34,7 +34,10 @@ export function formatSessionLogStatusLine(status) {
   }
   const parts = [name || 'Logging on'];
   if (status.lineCount != null) parts.push(plural(status.lineCount, 'line'));
-  if (status.momentCount != null) parts.push(plural(status.momentCount, 'moment'));
+  if (status.momentCount != null) {
+    const who = String(status.lastMoment?.who ?? '').trim();
+    parts.push(who ? `${plural(status.momentCount, 'moment')} · ${who}` : plural(status.momentCount, 'moment'));
+  }
   if (status.lastLoggedAt) parts.push(`last ${formatShortTime(status.lastLoggedAt)}`);
   return parts.join(' · ');
 }
@@ -234,6 +237,9 @@ export function mountSessionLogPanel(selector) {
       sessionName: sessionLog.sessionName ?? status?.sessionName ?? 'test',
       lastLoggedAt: sessionLog.lastLoggedAt ?? status?.lastLoggedAt ?? null,
       momentCount: sessionLog.momentCount ?? status?.momentCount ?? 0,
+      lastMoment: sessionLog.lastMoment !== undefined
+        ? sessionLog.lastMoment
+        : (status?.lastMoment ?? null),
     });
   }
 

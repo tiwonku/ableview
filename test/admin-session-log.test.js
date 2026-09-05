@@ -67,6 +67,16 @@ test('formatSessionLogStatusLine is a compact one-liner', () => {
     }),
     'show-night.jsonl · 42 lines · 3 moments',
   );
+  assert.equal(
+    formatSessionLogStatusLine({
+      enabled: true,
+      sessionName: 'show-night',
+      lineCount: 42,
+      momentCount: 3,
+      lastMoment: { who: 'keys' },
+    }),
+    'show-night.jsonl · 42 lines · 3 moments · keys',
+  );
 });
 
 test('ensureSessionLogHost reuses an existing session-log node', () => {
