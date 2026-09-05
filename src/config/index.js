@@ -66,7 +66,7 @@ export const DEFAULTS = Object.freeze({
   },
   moments: {
     autoStartOnMoment: true,
-    kinds: ['dope'],
+    kinds: ['dope', 'typed'],
     debounceMs: 0,
   },
   oscOut: {

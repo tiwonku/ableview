@@ -29,6 +29,13 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
   assert.match(renderSrc, /Clear pin/);
   assert.match(renderSrc, /Delete set/);
   assert.match(renderSrc, /onDelete/);
+  assert.match(renderSrc, /getMomentWho/);
+  assert.match(renderSrc, /prependDopeButton/);
+  const sessionLogSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/admin-session-log.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(sessionLogSrc, /mountSetNoteRow/);
   assert.match(clientSrc, /currentViewId === 'setlist'/);
   assert.match(clientSrc, /renderSetlist/);
   assert.match(clientSrc, /syncSessionLogPanel/);

@@ -3,6 +3,7 @@
 import { setConnectionState } from './view-render.js';
 import { renderAliasPanel } from './alias-panel.js';
 import { renderRowEditorPanel } from './admin-row-editor.js';
+import { prependDopeButton } from './moment-controls.js';
 import {
   matchForTrack,
   isAliasTargetTrack,
@@ -80,6 +81,7 @@ export function renderSession(root, ctx) {
     onStartCreate,
     onCancelEdit,
     onSaveEdit,
+    getMomentWho = null,
   } = ctx;
 
   setConnectionState(connected, lastUpdate, payload);
@@ -90,7 +92,17 @@ export function renderSession(root, ctx) {
   const heading = document.createElement('h1');
   heading.className = 'view-title';
   heading.textContent = title || 'Session';
-  root.appendChild(heading);
+
+  const titleRow = document.createElement('div');
+  titleRow.className = 'view-title-row';
+  titleRow.appendChild(heading);
+  if (getMomentWho != null) {
+    const actions = document.createElement('div');
+    actions.className = 'view-edit-actions';
+    prependDopeButton(actions, getMomentWho);
+    titleRow.appendChild(actions);
+  }
+  root.appendChild(titleRow);
 
   const sceneBanner = formatSceneBanner(payload?.scene, payload);
   if (sceneBanner) {

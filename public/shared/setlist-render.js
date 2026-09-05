@@ -2,6 +2,7 @@
 
 import { setConnectionState } from './view-render.js';
 import { resolveMatchedTitle } from './playing-clips-strip.js';
+import { prependDopeButton } from './moment-controls.js';
 
 export const SETLIST_STATUSES = Object.freeze(['confirmed', 'likely', 'maybe']);
 
@@ -162,6 +163,7 @@ export function renderSetlist(root, ctx) {
     onNameDraftChange,
     onPin,
     onClearPin,
+    getMomentWho = null,
   } = ctx;
 
   setConnectionState(connected, lastUpdate, payload, simulated, sessionLog);
@@ -170,7 +172,14 @@ export function renderSetlist(root, ctx) {
   root.className = 'setlist-main';
 
   const heading = el('h1', 'view-title', title || 'Set');
-  root.appendChild(heading);
+  const titleRow = el('div', 'view-title-row');
+  titleRow.appendChild(heading);
+  if (getMomentWho != null) {
+    const actions = el('div', 'view-edit-actions');
+    prependDopeButton(actions, getMomentWho);
+    titleRow.appendChild(actions);
+  }
+  root.appendChild(titleRow);
 
   const banner = liveBanner(payload, matchColumn);
   const bannerEl = el('div', `setlist-live setlist-live--${banner.tone}`, banner.text);

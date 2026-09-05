@@ -9,7 +9,7 @@ const TIMECODE_DEFAULTS = Object.freeze({
 
 const MOMENTS_DEFAULTS = Object.freeze({
   autoStartOnMoment: true,
-  kinds: ['dope'],
+  kinds: ['dope', 'typed'],
   debounceMs: 0,
 });
 
@@ -520,7 +520,7 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   bottomRow.appendChild(timecodeGroup);
 
   const momentsGroup = el('fieldset', 'settings-group');
-  momentsGroup.appendChild(el('legend', null, 'Moments (Stream Deck)'));
+  momentsGroup.appendChild(el('legend', null, 'Moments'));
   const momentsAuto = settings.moments?.autoStartOnMoment !== false;
   const momentsAutoCheck = el('input');
   momentsAutoCheck.type = 'checkbox';
@@ -537,14 +537,14 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   momentsGroup.appendChild(momentsAutoRow);
   momentsGroup.appendChild(fieldRow(
     'Allowed kinds (comma-separated)',
-    textInput('momentsKinds', (settings.moments?.kinds ?? ['dope']).join(', ')),
+    textInput('momentsKinds', (settings.moments?.kinds ?? ['dope', 'typed']).join(', ')),
   ));
   momentsGroup.appendChild(fieldRow(
     'Debounce (ms, 0 = off)',
     numberInput('momentsDebounceMs', settings.moments?.debounceMs ?? 0, { min: 0, step: 50 }),
   ));
   const momentsHint = el('p', 'settings-sim-hint');
-  momentsHint.textContent = 'Crew Stream Deck buttons POST to /api/moments via Companion. When auto-start is on, the first tap creates a timestamp session name and updates operator views live. Moment count appears on the Set view log bar.';
+  momentsHint.textContent = 'Dope on every view and notes on Set POST to /api/moments (same API as Companion Stream Deck buttons). When auto-start is on, the first tap creates a timestamp session name and updates operator views live. Moment count appears on the Set view log bar.';
   momentsGroup.appendChild(momentsHint);
   bottomRow.appendChild(momentsGroup);
 

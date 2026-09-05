@@ -31,6 +31,14 @@ export class NoteTooLongError extends Error {
   }
 }
 
+export class NoteRequiredError extends Error {
+  constructor() {
+    super('typed moments require a note');
+    this.name = 'NoteRequiredError';
+    this.code = 'note_required';
+  }
+}
+
 export class MomentDebouncedError extends Error {
   constructor(retryAfterMs) {
     super('Duplicate moment suppressed by debounce');
@@ -42,6 +50,15 @@ export class MomentDebouncedError extends Error {
 
 const WHO_MAX = 64;
 const NOTE_MAX = 200;
+/** First-class UI kinds — always accepted, even if omitted from config allowlist. */
+export const BUILTIN_MOMENT_KINDS = Object.freeze(['dope', 'typed']);
+
+export function effectiveMomentKinds(allowedKinds) {
+  const extra = Array.isArray(allowedKinds)
+    ? allowedKinds.map((k) => String(k).trim()).filter(Boolean)
+    : [];
+  return [...new Set([...BUILTIN_MOMENT_KINDS, ...extra])];
+}
 
 export function normalizeWho(raw) {
   if (raw == null) return null;
@@ -62,12 +79,14 @@ export function normalizeNote(raw) {
 }
 
 export function resolveKind(raw, allowedKinds) {
-  const kinds = Array.isArray(allowedKinds) && allowedKinds.length > 0
-    ? allowedKinds
-    : ['dope'];
+  const kinds = effectiveMomentKinds(allowedKinds);
   const kind = (raw == null || raw === '') ? 'dope' : String(raw).trim();
   if (!kinds.includes(kind)) throw new UnknownKindError(kind);
   return kind;
+}
+
+export function assertNoteForKind(kind, note) {
+  if (kind === 'typed' && !note) throw new NoteRequiredError();
 }
 
 export function momentDebounceKey(kind, who) {

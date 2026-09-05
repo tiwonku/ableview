@@ -5,6 +5,7 @@ import {
   UnknownKindError,
   WhoTooLongError,
   NoteTooLongError,
+  NoteRequiredError,
   MomentDebouncedError,
 } from '../session-log/moments.js';
 
@@ -24,6 +25,9 @@ function mapMomentError(err, reply) {
     return reply.code(400).send({ ok: false, feedbackState: 'error', error: err.code });
   }
   if (err instanceof NoteTooLongError) {
+    return reply.code(400).send({ ok: false, feedbackState: 'error', error: err.code });
+  }
+  if (err instanceof NoteRequiredError) {
     return reply.code(400).send({ ok: false, feedbackState: 'error', error: err.code });
   }
   if (err instanceof MomentDebouncedError) {

@@ -1,6 +1,7 @@
 // Compact session-log bar on the Set view. GET/PATCH /api/session-log — runtime, not config.json.
 
 import { subscribeSessionLog } from './session-log-live.js';
+import { mountSetNoteRow } from './moment-controls.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -108,6 +109,7 @@ export function mountSessionLogPanel(selector) {
 
   const shell = el('div', 'set-log-bar');
   root.appendChild(shell);
+  mountSetNoteRow(root, { getWho: () => 'setlist' });
 
   async function fetchStatus() {
     const res = await fetch('/api/session-log');

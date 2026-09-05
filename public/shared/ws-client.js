@@ -195,11 +195,6 @@ export function connectView({
 
     if (msg.type === 'sessionLog' && msg.sessionLog) {
       applySessionLogState(msg.sessionLog);
-      if (editSession || aliasSession || pinSession) {
-        updateLiveChromeDuringEdit();
-        return;
-      }
-      render();
       return;
     }
 
@@ -805,6 +800,8 @@ export function connectView({
       pinPanel.focusRestore = aliasFocus;
       pinPanel.autoFocusSearch = autoFocusSearch;
     }
+    const getMomentWho = () => currentViewId;
+
     if (currentViewId === 'session') {
       renderSession(root, {
         ...ctx,
@@ -818,6 +815,7 @@ export function connectView({
         onStartCreate: startCreate,
         onCancelEdit: cancelEdit,
         onSaveEdit: saveEdit,
+        getMomentWho,
       });
       return;
     }
@@ -852,6 +850,7 @@ export function connectView({
         },
         onPin: postPin,
         onClearPin: clearPin,
+        getMomentWho,
       });
       return;
     }
@@ -874,6 +873,7 @@ export function connectView({
         onStartPin: startPin,
         onPinLast: pinLastCue,
         onClearPin: clearPin,
+        getMomentWho,
       });
     } else {
       renderView(root, {
@@ -897,6 +897,7 @@ export function connectView({
         onStartAlias: viewConfig.editable ? startAlias : undefined,
         onCancelEdit: cancelEdit,
         onSaveEdit: saveEdit,
+        getMomentWho,
       });
     }
   }

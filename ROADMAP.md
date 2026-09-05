@@ -40,6 +40,7 @@ post-v2026.
 | **OSC clock rebroadcast** | UDP fan-out of Live transport: tempo, 1-based beat-in-bar, bar, `is_playing`, signature. Multiple destinations from admin settings. Clip/cue triggers still not sent. | ✅ done |
 | **bestMatch over watched tracks** | Match all playing watched clips; bpm-stem normalize (no key regex); optional ALS Folder soft key; Session per-deck match/confidence/winner. Cue track optional. | ✅ done |
 | **Setlist editor / viewer** | Named JSON setlists of cue-sheet rows; dedicated `/views/setlist` glance + editor; pin uses existing override. Auto-saves; switch/save-as for other nights. | ✅ done |
+| **In-app moments** | Dope button on every view (`who` = view id) + typed note row on Set (below Log). Same `POST /api/moments` as Companion; green/red flash feedback. | ✅ done |
 
 ---
 

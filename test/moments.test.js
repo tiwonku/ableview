@@ -11,8 +11,10 @@ import { generateAutoSessionName } from '../src/session-log/auto-session-name.js
 import {
   SessionLogDisabledError,
   MomentDebouncedError,
+  NoteRequiredError,
   normalizeWho,
   resolveKind,
+  effectiveMomentKinds,
 } from '../src/session-log/moments.js';
 
 const silentLog = createLogger();
@@ -159,6 +161,41 @@ test('getMomentsStatus reflects last moment and count', () => {
   assert.equal(status.momentCount, 2);
   assert.equal(status.lastMoment.kind, 'dope');
   assert.equal(status.lastMoment.who, 'keys');
+  logger.stop();
+});
+
+test('typed moment requires a note and does not auto-start on reject', () => {
+  const { logger, dir } = tempLogger({ moments: { kinds: ['dope'] } });
+  logger.start();
+  assert.throws(() => logger.logMoment({ kind: 'typed' }), NoteRequiredError);
+  assert.throws(() => logger.logMoment({ kind: 'typed', note: '   ' }), NoteRequiredError);
+  const files = readdirSync(dir).filter((f) => f.endsWith('.jsonl'));
+  assert.equal(files.length, 0);
+
+  logger.applyPatch({ enabled: true, sessionName: 'show' });
+  const result = logger.logMoment({ kind: 'typed', who: 'setlist', note: 'crowd surge' });
+  assert.equal(result.kind, 'typed');
+  assert.equal(result.who, 'setlist');
+  const lines = readLines(dir, 'show');
+  assert.equal(lines[0].kind, 'typed');
+  assert.equal(lines[0].note, 'crowd surge');
+  logger.stop();
+});
+
+test('typed is accepted even when omitted from config kinds', () => {
+  assert.deepEqual(effectiveMomentKinds(['dope', 'not_dope']), ['dope', 'typed', 'not_dope']);
+  assert.equal(resolveKind('typed', ['dope']), 'typed');
+});
+
+test('dope still logs with a null note', () => {
+  const { logger, dir } = tempLogger();
+  logger.start();
+  logger.applyPatch({ enabled: true, sessionName: 'show' });
+  logger.logMoment({ kind: 'dope', who: 'visuals' });
+  const lines = readLines(dir, 'show');
+  assert.equal(lines[0].kind, 'dope');
+  assert.equal(lines[0].who, 'visuals');
+  assert.equal(lines[0].note, null);
   logger.stop();
 });
 

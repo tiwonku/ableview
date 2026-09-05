@@ -1141,6 +1141,58 @@ body.layout-operator .clip-name--pinned {
   background: rgba(230, 162, 60, 0.28);
 }
 
+.view-title-row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.view-title-row .view-title {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.view-title-row .view-edit-actions {
+  margin-left: auto;
+}
+
+.clip-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 1rem;
+}
+
+.clip-head-row .clip-head {
+  margin-bottom: 0;
+}
+
+.moment-feedback--pending {
+  border-color: var(--warn) !important;
+  background: rgba(230, 162, 60, 0.4) !important;
+  color: #ffd591 !important;
+}
+
+.moment-feedback--success {
+  border-color: var(--ok) !important;
+  background: var(--ok) !important;
+  color: #0b1a12 !important;
+}
+
+.moment-feedback--warning {
+  border-color: var(--warn) !important;
+  background: var(--warn) !important;
+  color: #1a1208 !important;
+}
+
+.moment-feedback--error {
+  border-color: var(--danger) !important;
+  background: var(--danger) !important;
+  color: #fff !important;
+}
+
 .last-fields-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3207,6 +3259,10 @@ body.layout-session .session-main {
   overflow: hidden;
 }
 
+.session-main .view-title-row {
+  margin: 0 0 clamp(0.15rem, 0.5dvh, 0.4rem);
+}
+
 .session-main .view-title {
   flex-shrink: 0;
   margin: 0 0 clamp(0.15rem, 0.5dvh, 0.4rem);
@@ -3527,6 +3583,21 @@ body.layout-session .session-main {
   color: var(--danger);
 }
 
+.set-note-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.65rem;
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--border);
+}
+
+.set-note-input {
+  flex: 1 1 14rem;
+  min-width: 10rem;
+}
+
 /* Setlist view — night-specific ordered sheet rows */
 
 html:has(body.layout-setlist) {
@@ -3555,6 +3626,10 @@ body.layout-setlist .setlist-main {
   padding-bottom: max(clamp(0.4rem, 1dvh, 0.75rem), env(safe-area-inset-bottom, 0px));
   padding-left: max(clamp(0.65rem, 2vw, 1.15rem), env(safe-area-inset-left, 0px));
   overflow: hidden;
+}
+
+.setlist-main .view-title-row {
+  margin: 0 0 clamp(0.15rem, 0.5dvh, 0.4rem);
 }
 
 .setlist-main .view-title {

@@ -77,7 +77,7 @@
   },
   "moments": {
     "autoStartOnMoment": true,
-    "kinds": ["dope", "not_dope"],
+    "kinds": ["dope", "not_dope", "typed"],
     "debounceMs": 0
   },
   "oscOut": {

@@ -96,7 +96,7 @@ test('GET /api/moments returns disabled status by default', async () => {
   assert.equal(body.sessionLogEnabled, false);
   assert.equal(body.lastMoment, null);
   assert.equal(body.momentCount, 0);
-  assert.deepEqual(body.kinds, ['dope']);
+  assert.deepEqual(body.kinds, ['dope', 'typed']);
 
   await stopTestServer(ctx);
 });
@@ -164,6 +164,38 @@ test('POST /api/moments returns 400 for unknown kind', async () => {
   const body = await res.json();
   assert.equal(body.error, 'unknown_kind');
   assert.equal(body.feedbackState, 'error');
+
+  await stopTestServer(ctx);
+});
+
+test('POST /api/moments typed requires a note', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ableview-moments-api-'));
+  const ctx = await createTestServer(dir);
+  await fetch(`http://127.0.0.1:${ctx.server.port}/api/session-log`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: true, sessionName: 'show' }),
+  });
+
+  const missing = await fetch(`http://127.0.0.1:${ctx.server.port}/api/moments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'typed', who: 'setlist' }),
+  });
+  assert.equal(missing.status, 400);
+  assert.equal((await missing.json()).error, 'note_required');
+
+  const ok = await fetch(`http://127.0.0.1:${ctx.server.port}/api/moments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'typed', who: 'setlist', note: 'bass drop' }),
+  });
+  assert.equal(ok.status, 200);
+  const body = await ok.json();
+  assert.equal(body.kind, 'typed');
+  assert.equal(body.who, 'setlist');
+  const lines = readFileSync(join(dir, 'show.jsonl'), 'utf8').trim().split('\n');
+  assert.equal(JSON.parse(lines[0]).note, 'bass drop');
 
   await stopTestServer(ctx);
 });

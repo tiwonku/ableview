@@ -19,7 +19,9 @@ import {
   normalizeWho,
   normalizeNote,
   resolveKind,
+  assertNoteForKind,
   momentDebounceKey,
+  effectiveMomentKinds,
 } from './moments.js';
 
 export { SessionLogDisabledError } from './moments.js';
@@ -301,6 +303,11 @@ export function createSessionLogger({
     const cfg = momentsConfig();
     let sessionLogStarted = false;
 
+    const kind = resolveKind(rawKind, cfg.kinds);
+    const who = normalizeWho(rawWho);
+    const note = normalizeNote(rawNote);
+    assertNoteForKind(kind, note);
+
     if (!enabled) {
       if (cfg.autoStartOnMoment !== false) {
         enableLogging(generateAutoSessionName(), { notify: false });
@@ -309,10 +316,6 @@ export function createSessionLogger({
         throw new SessionLogDisabledError();
       }
     }
-
-    const kind = resolveKind(rawKind, cfg.kinds);
-    const who = normalizeWho(rawWho);
-    const note = normalizeNote(rawNote);
 
     const debounceMs = cfg.debounceMs ?? 0;
     if (debounceMs > 0) {
@@ -370,7 +373,7 @@ export function createSessionLogger({
       sessionLogEnabled: status.enabled === true,
       sessionName: status.sessionName,
       momentCount: status.enabled ? momentCount : 0,
-      kinds: cfg.kinds ?? ['dope'],
+      kinds: effectiveMomentKinds(cfg.kinds),
       lastMoment: lastMoment ? { ...lastMoment } : null,
     };
   }
