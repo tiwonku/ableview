@@ -133,6 +133,11 @@
       "title": "Visuals",
       "fields": [
         {
+          "column": "ART",
+          "label": "Album Art",
+          "type": "image"
+        },
+        {
           "column": "RGB_1",
           "label": "Color 1",
           "type": "color"
@@ -148,17 +153,12 @@
           "type": "color"
         },
         {
-          "column": "Notch"
-        },
-        {
-          "column": "Ghost Cloud"
-        },
-        {
           "column": "Viz Notes",
           "display": "note"
         },
         {
-          "column": "CS Panels",
+          "column": "VIBE TAGS",
+          "label": "Vibe Tags",
           "display": "note"
         }
       ]
