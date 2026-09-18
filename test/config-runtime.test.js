@@ -218,6 +218,10 @@ test('GET and PATCH /api/config/settings', async () => {
   const nicsBody = await nicsRes.json();
   assert.ok(Array.isArray(nicsBody.interfaces));
   assert.equal(nicsBody.interfaces[0].address, '0.0.0.0');
+  assert.equal(nicsBody.httpPort, server.port);
+  assert.equal(nicsBody.share.port, server.port);
+  assert.ok(nicsBody.share.views.some((v) => v.id === 'band'));
+  assert.equal(nicsBody.share.origins.some((o) => o.address === '0.0.0.0'), false);
 
   const badRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
     method: 'PATCH',

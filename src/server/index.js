@@ -12,6 +12,7 @@ import { registerMatchRoutes } from './match-api.js';
 import { registerSetlistRoutes } from './setlist-api.js';
 import { listIpv4Interfaces } from '../sacn/nics.js';
 import { DEFAULT_LIVE_COLOR_COLUMNS } from '../core/live-colors.js';
+import { buildSharePayload } from '../../public/shared/share-links.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
@@ -190,8 +191,26 @@ export async function createViewServer({
     registerConfigRoutes(app, { configRuntime, log });
   }
 
+  function listeningHttpPort() {
+    const bound = app.server.address();
+    if (typeof bound === 'object' && bound && Number.isInteger(bound.port)) {
+      return bound.port;
+    }
+    return config.server.httpPort;
+  }
+
   app.get('/api/net/interfaces', async (_req, reply) => {
-    return reply.send({ interfaces: listIpv4Interfaces() });
+    const interfaces = listIpv4Interfaces();
+    const httpPort = listeningHttpPort();
+    return reply.send({
+      httpPort,
+      interfaces,
+      share: buildSharePayload({
+        httpPort,
+        interfaces,
+        views: config.views,
+      }),
+    });
   });
 
   if (sheetsActions) {

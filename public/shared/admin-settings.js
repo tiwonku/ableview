@@ -1,5 +1,22 @@
 // Admin settings panel (M7). Fetches/patches /api/config/settings.
 
+import { copyTextToClipboard } from './clipboard.js';
+import {
+  defaultShareViewId,
+  listedViews,
+  shareFromNetResponse,
+  shareUrl,
+} from './share-links.js';
+
+const FALLBACK_SHARE_VIEWS = Object.freeze({
+  band: { title: 'Band' },
+  visuals: { title: 'Visuals' },
+  lighting: { title: 'Lighting' },
+  session: { title: 'Session' },
+  setlist: { title: 'Set' },
+  admin: { title: 'Admin' },
+});
+
 const TIMECODE_DEFAULTS = Object.freeze({
   enabled: false,
   port: 6454,
@@ -364,6 +381,125 @@ function destRow(dest = { host: '', port: 11010 }) {
   return row;
 }
 
+function fallbackHttpPort() {
+  if (typeof location === 'undefined') return 8080;
+  const n = Number(location.port);
+  if (Number.isInteger(n) && n > 0) return n;
+  if (location.protocol === 'https:') return 443;
+  return 80;
+}
+
+function shareFromInterfaces(data) {
+  return shareFromNetResponse(data, {
+    fallbackPort: fallbackHttpPort(),
+    fallbackViews: FALLBACK_SHARE_VIEWS,
+  });
+}
+
+function shareLinkRow(nic, viewId) {
+  const row = el('div', nic.recommended ? 'share-link-row is-preferred' : 'share-link-row');
+  row.dataset.role = 'share-link-row';
+  row.dataset.origin = nic.origin;
+
+  const meta = el('div', 'share-link-meta');
+  meta.appendChild(el('span', 'share-link-nic', `${nic.name} · ${nic.address}`));
+  if (nic.recommended) {
+    meta.appendChild(el('span', 'share-link-badge', 'recommended'));
+  }
+  row.appendChild(meta);
+
+  const actions = el('div', 'share-link-actions');
+  const input = el('input');
+  input.type = 'text';
+  input.readOnly = true;
+  input.className = 'settings-input share-link-url';
+  input.dataset.role = 'share-url';
+  input.value = shareUrl(nic.origin, viewId);
+  input.setAttribute('aria-label', `Share URL for ${nic.name}`);
+  input.addEventListener('focus', () => input.select());
+  actions.appendChild(input);
+
+  const btn = el('button', 'settings-sync share-link-copy', 'Copy');
+  btn.type = 'button';
+  btn.addEventListener('click', async () => {
+    try {
+      await copyTextToClipboard(input.value);
+      btn.textContent = 'Copied';
+      btn.classList.add('copied');
+      window.setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 1200);
+    } catch {
+      input.focus();
+      input.select();
+      btn.textContent = 'Select';
+      window.setTimeout(() => {
+        btn.textContent = 'Copy';
+      }, 1600);
+    }
+  });
+  actions.appendChild(btn);
+  row.appendChild(actions);
+  return row;
+}
+
+export function updateShareUrls(root, viewId) {
+  if (!root) return;
+  for (const row of root.querySelectorAll('[data-role="share-link-row"]')) {
+    const origin = row.dataset.origin;
+    const input = row.querySelector('[data-role="share-url"]');
+    if (origin && input) input.value = shareUrl(origin, viewId);
+  }
+}
+
+function renderSharePanel(share, shareViewId, onViewChange) {
+  const group = el('fieldset', 'settings-group share-links');
+  group.dataset.role = 'share-links';
+  group.appendChild(el('legend', null, 'Operator links'));
+
+  const hint = el('p', 'settings-sim-hint');
+  hint.textContent = 'Copy a URL for phones and laptops on this network. If this box has two NICs, use the operator VLAN — not the Ableton Link VLAN.';
+  group.appendChild(hint);
+
+  const views = share?.views?.length ? share.views : listedViews(FALLBACK_SHARE_VIEWS);
+  const selected = views.some((v) => v.id === shareViewId) ? shareViewId : defaultShareViewId(views);
+
+  if (views.length) {
+    const select = el('select', 'settings-input');
+    select.setAttribute('aria-label', 'View to share');
+    for (const view of views) {
+      const opt = el('option', null, view.title ?? view.id);
+      opt.value = view.id;
+      if (view.id === selected) opt.selected = true;
+      select.appendChild(opt);
+    }
+    select.addEventListener('change', () => onViewChange?.(select.value));
+    group.appendChild(fieldRow('View', select));
+  }
+
+  const origins = share?.origins ?? [];
+  if (!origins.length) {
+    const empty = el('p', 'settings-sim-hint share-links-empty');
+    empty.textContent = 'No LAN address found. Connect this machine to the operator network, then reload Settings.';
+    group.appendChild(empty);
+    return group;
+  }
+
+  const list = el('div', 'share-link-list');
+  for (const nic of origins) list.appendChild(shareLinkRow(nic, selected));
+  group.appendChild(list);
+
+  const portHint = el('p', 'settings-field-hint');
+  const port = share?.port;
+  portHint.textContent = Number.isInteger(port) && port > 0
+    ? `HTTP port ${port} (HTTP_PORT in .env). Other devices need TCP ${port} to this IP.`
+    : 'Other devices must reach this IP on the AbleView HTTP port.';
+  group.appendChild(portHint);
+
+  return group;
+}
+
 function renderOscOutGroup(settings) {
   const group = el('fieldset', 'settings-group');
   group.appendChild(el('legend', null, 'OSC clock out'));
@@ -590,7 +726,7 @@ function renderSacnGroup(settings, sacnStatus, nics) {
   return group;
 }
 
-function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, nics }) {
+function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, nics, share, shareViewId, onShareViewChange }) {
   root.innerHTML = '';
 
   const heading = el('h2', 'section-title', 'Settings');
@@ -605,6 +741,10 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
     banner.textContent = status.message;
     root.appendChild(banner);
   }
+
+  const shareRow = el('div', 'settings-row settings-row-single share-links-row');
+  shareRow.appendChild(renderSharePanel(share, shareViewId, onShareViewChange));
+  root.appendChild(shareRow);
 
   const form = el('form', 'settings-form');
   form.noValidate = true;
@@ -837,6 +977,8 @@ export function mountSettingsPanel(rootSelector) {
   let timecodeStatus = null;
   let sacnStatus = null;
   let nics = [{ name: 'All interfaces', address: '0.0.0.0' }];
+  let share = { port: 8080, views: [], origins: [] };
+  let shareViewId = 'band';
   let pollTimer = null;
   let stopped = false;
 
@@ -852,6 +994,12 @@ export function mountSettingsPanel(rootSelector) {
       timecodeStatus,
       sacnStatus,
       nics,
+      share,
+      shareViewId,
+      onShareViewChange: (id) => {
+        shareViewId = id;
+        updateShareUrls(root, shareViewId);
+      },
     });
   }
 
@@ -895,6 +1043,10 @@ export function mountSettingsPanel(rootSelector) {
       if (!res.ok) return;
       const data = await res.json();
       if (Array.isArray(data.interfaces) && data.interfaces.length) nics = data.interfaces;
+      share = shareFromInterfaces(data);
+      if (!share.views.some((v) => v.id === shareViewId)) {
+        shareViewId = defaultShareViewId(share.views);
+      }
     } catch {
       // keep default
     }

@@ -20,3 +20,14 @@ test('attachSettingsOverlay is a no-op without an app root', () => {
   assert.equal(typeof unmount, 'function');
   unmount();
 });
+
+test('settings panel includes operator LAN share links', () => {
+  const src = readFileSync(
+    fileURLToPath(new URL('../public/shared/admin-settings.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(src, /Operator links/);
+  assert.match(src, /shareFromNetResponse/);
+  assert.match(src, /copyTextToClipboard/);
+  assert.match(src, /\/api\/net\/interfaces/);
+});
