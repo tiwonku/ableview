@@ -30,13 +30,16 @@ function baseConfig(overrides = {}) {
   return { ...config, ...overrides };
 }
 
-test('pickEditableSettings returns ingest, sim, sheets, match, timecode, moments, and oscOut', () => {
+test('pickEditableSettings returns ingest, sim, sheets, match, timecode, sacn, moments, and oscOut', () => {
   const config = baseConfig();
   const settings = pickEditableSettings(config);
-  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'moments', 'oscOut', 'sheets', 'sim', 'timecode']);
+  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'moments', 'oscOut', 'sacn', 'sheets', 'sim', 'timecode']);
   assert.equal(settings.ingest.abletonHost, '127.0.0.1');
   assert.equal(settings.sim.enabled, false);
   assert.equal(settings.timecode.enabled, false);
+  assert.equal(settings.sacn.enabled, false);
+  assert.equal(settings.sacn.universe, 191);
+  assert.equal(settings.sacn.slots.main.startChannel, 500);
   assert.equal(settings.moments.autoStartOnMoment, true);
   assert.equal(settings.oscOut.enabled, false);
   assert.deepEqual(settings.oscOut.destinations, []);
@@ -188,6 +191,33 @@ test('GET and PATCH /api/config/settings', async () => {
   assert.equal(oscReplace.status, 200);
   const oscReplaceBody = await oscReplace.json();
   assert.deepEqual(oscReplaceBody.settings.oscOut.destinations, [{ host: '10.0.0.8', port: 8000 }]);
+
+  const sacnRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sacn: {
+        enabled: true,
+        universe: 191,
+        interfaceAddress: '10.100.10.4',
+        slots: { main: { startChannel: 500 } },
+      },
+    }),
+  });
+  assert.equal(sacnRes.status, 200);
+  const sacnBody = await sacnRes.json();
+  assert.equal(sacnBody.settings.sacn.enabled, true);
+  assert.equal(sacnBody.settings.sacn.universe, 191);
+  assert.equal(sacnBody.settings.sacn.interfaceAddress, '10.100.10.4');
+  assert.equal(sacnBody.settings.sacn.slots.main.startChannel, 500);
+  assert.equal(sacnBody.settings.sacn.slots.secondary.startChannel, 503);
+  assert.deepEqual(sacnBody.reloaded, ['sacn']);
+
+  const nicsRes = await fetch(`http://127.0.0.1:${server.port}/api/net/interfaces`);
+  assert.equal(nicsRes.status, 200);
+  const nicsBody = await nicsRes.json();
+  assert.ok(Array.isArray(nicsBody.interfaces));
+  assert.equal(nicsBody.interfaces[0].address, '0.0.0.0');
 
   const badRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
     method: 'PATCH',

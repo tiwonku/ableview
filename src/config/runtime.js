@@ -1,9 +1,40 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { validateConfig } from './index.js';
+import { DEFAULT_LIVE_COLOR_COLUMNS, DEFAULT_LIVE_COLOR_SLOTS } from '../core/live-colors.js';
+
+function serializeSacn(sacn) {
+  const src = sacn ?? {};
+  const slots = {};
+  for (const id of ['main', 'secondary', 'accent']) {
+    const slot = src.slots?.[id] ?? DEFAULT_LIVE_COLOR_SLOTS[id];
+    slots[id] = {
+      startChannel: slot?.startChannel ?? DEFAULT_LIVE_COLOR_SLOTS[id].startChannel,
+      label: slot?.label ?? DEFAULT_LIVE_COLOR_SLOTS[id].label,
+    };
+  }
+  return {
+    enabled: src.enabled === true,
+    port: src.port ?? 5568,
+    bindAddress: src.bindAddress ?? '0.0.0.0',
+    interfaceAddress: src.interfaceAddress ?? '0.0.0.0',
+    multicast: src.multicast !== false,
+    universe: src.universe ?? 191,
+    staleMs: src.staleMs ?? 1000,
+    ignorePreview: src.ignorePreview !== false,
+    slots,
+    viewColumns: { ...DEFAULT_LIVE_COLOR_COLUMNS, ...(src.viewColumns ?? {}) },
+    log: {
+      changeDelta: src.log?.changeDelta ?? 4,
+      settleMs: src.log?.settleMs ?? 200,
+      motionIntervalMs: src.log?.motionIntervalMs ?? 400,
+      minIntervalMs: src.log?.minIntervalMs ?? 100,
+    },
+  };
+}
 
 /** Sections editable from the admin settings panel (M7). */
-export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match', 'timecode', 'moments', 'oscOut'];
+export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match', 'timecode', 'sacn', 'moments', 'oscOut'];
 
 function deepMerge(base, override) {
   if (override === undefined) return base;
@@ -30,6 +61,7 @@ export function serializeFileConfig(config) {
     match: { ...config.match },
     server: { wsHeartbeatSeconds: config.server.wsHeartbeatSeconds },
     timecode: { ...config.timecode },
+    sacn: serializeSacn(config.sacn),
     sessionLog: { ...config.sessionLog },
     setlist: { ...config.setlist },
     moments: { ...config.moments },
@@ -50,6 +82,7 @@ export function pickEditableSettings(config) {
     sheets: { ...config.sheets },
     match: { ...config.match },
     timecode: { ...config.timecode },
+    sacn: serializeSacn(config.sacn),
     moments: { ...config.moments },
     oscOut: {
       enabled: config.oscOut?.enabled === true,

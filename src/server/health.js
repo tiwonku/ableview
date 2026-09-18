@@ -6,6 +6,7 @@ export function buildHealthReport({
   getConnectedViewCount,
   getIngestStatus,
   getTimecodeStatus,
+  getLiveColorsStatus,
   lastCuePayload = null,
 }) {
   const sheets = getSheetSnapshot();
@@ -32,6 +33,7 @@ export function buildHealthReport({
   }
 
   const timecode = getTimecodeStatus?.() ?? null;
+  const liveColors = getLiveColorsStatus?.() ?? null;
 
   return {
     status: checks.length === 0 ? 'ok' : 'degraded',
@@ -50,6 +52,17 @@ export function buildHealthReport({
           live: timecode.live === true,
           lastSeenAt: timecode.lastSeenAt ?? null,
           timecode: timecode.timecode ?? null,
+        }
+      : null,
+    sacn: liveColors
+      ? {
+          enabled: liveColors.enabled === true,
+          live: liveColors.live === true,
+          lastSeenAt: liveColors.lastSeenAt ?? null,
+          universe: liveColors.universe ?? null,
+          sourceName: liveColors.sourceName ?? null,
+          sourceAddress: liveColors.sourceAddress ?? null,
+          colors: liveColors.colors ?? null,
         }
       : null,
     sheets: {

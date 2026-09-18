@@ -7,6 +7,7 @@ import { createSheetsStore } from './sheets/index.js';
 import { createMatcher } from './match/index.js';
 import { createViewServer } from './server/index.js';
 import { createTimecodeListener } from './timecode/index.js';
+import { createSacnListener } from './sacn/index.js';
 import { createOscOutput } from './outputs/osc.js';
 import { createSessionLogger } from './session-log/index.js';
 import { createSetlistStore } from './setlist/index.js';
@@ -49,6 +50,12 @@ async function main() {
     getConfig,
     bus,
     log: log.child({ module: 'timecode' }),
+  });
+
+  const sacn = createSacnListener({
+    getConfig,
+    bus,
+    log: log.child({ module: 'sacn' }),
   });
 
   const oscOut = createOscOutput({
@@ -110,6 +117,7 @@ async function main() {
       getSheetSnapshot: sheets.getSnapshot,
       getIngestStatus: () => ingest.getIngestStatus(),
       getTimecodeStatus: () => timecode.getStatus(),
+      getLiveColorsStatus: () => sacn.getStatus(),
     }),
     sessionLog,
   });
@@ -137,6 +145,22 @@ async function main() {
         log.error(
           { err: err.message, bindAddress: getConfig().timecode?.bindAddress, port: getConfig().timecode?.port },
           'timecode listener failed to restart — check listen IP/port (use 0.0.0.0 unless this PC has multiple NICs)',
+        );
+      }
+    }
+    if (sections.includes('sacn')) {
+      try {
+        await sacn.start();
+      } catch (err) {
+        log.error(
+          {
+            err: err.message,
+            bindAddress: getConfig().sacn?.bindAddress,
+            interfaceAddress: getConfig().sacn?.interfaceAddress,
+            port: getConfig().sacn?.port,
+            universe: getConfig().sacn?.universe,
+          },
+          'sACN listener failed to restart — pick the lighting NIC and confirm universe/port',
         );
       }
     }
@@ -168,6 +192,20 @@ async function main() {
       'timecode listener failed to start — check listen IP/port (use 0.0.0.0 unless this PC has multiple NICs)',
     );
   }
+  try {
+    await sacn.start();
+  } catch (err) {
+    log.error(
+      {
+        err: err.message,
+        bindAddress: getConfig().sacn?.bindAddress,
+        interfaceAddress: getConfig().sacn?.interfaceAddress,
+        port: getConfig().sacn?.port,
+        universe: getConfig().sacn?.universe,
+      },
+      'sACN listener failed to start — pick the lighting NIC and confirm universe/port',
+    );
+  }
   log.info({ source: ingest.source.name, simulated: ingest.simulated, httpPort: viewServer.port }, 'AbleView started');
 
   const shutdown = async (signal) => {
@@ -176,6 +214,7 @@ async function main() {
     setlist.stop();
     oscOut.stop();
     timecode.stop();
+    sacn.stop();
     ingest.stop();
     sheets.stop();
     await viewServer.stop();

@@ -10,6 +10,8 @@ import { registerSessionLogRoutes } from './session-log-api.js';
 import { registerMomentsRoutes, buildSessionLogBroadcast } from './moments-api.js';
 import { registerMatchRoutes } from './match-api.js';
 import { registerSetlistRoutes } from './setlist-api.js';
+import { listIpv4Interfaces } from '../sacn/nics.js';
+import { DEFAULT_LIVE_COLOR_COLUMNS } from '../core/live-colors.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
@@ -39,9 +41,23 @@ export async function createViewServer({
     return count;
   }
 
+  function compactLiveColors(status) {
+    if (!status) return null;
+    return {
+      enabled: status.enabled === true,
+      live: status.live === true,
+      lastSeenAt: status.lastSeenAt ?? null,
+      universe: status.universe ?? null,
+      sourceName: status.sourceName ?? null,
+      sourceAddress: status.sourceAddress ?? null,
+      colors: status.colors ?? null,
+    };
+  }
+
   function buildStatus() {
     const ingest = getHealthContext?.()?.getIngestStatus?.() ?? null;
     const timecode = getHealthContext?.()?.getTimecodeStatus?.() ?? null;
+    const liveColors = getHealthContext?.()?.getLiveColorsStatus?.() ?? null;
     return {
       connectedViews: getConnectedViewCount(),
       ingest: ingest
@@ -61,6 +77,7 @@ export async function createViewServer({
             timecode: timecode.timecode ?? null,
           }
         : null,
+      liveColors: compactLiveColors(liveColors),
     };
   }
 
@@ -132,6 +149,20 @@ export async function createViewServer({
     timecodeBroadcastTimer.unref?.();
   });
 
+  let liveColorsBroadcastTimer = null;
+  let lastLiveColors = getHealthContext?.()?.getLiveColorsStatus?.() ?? null;
+  bus.on(EVENTS.LIVE_COLORS, (status) => {
+    lastLiveColors = status;
+    if (liveColorsBroadcastTimer) return;
+    liveColorsBroadcastTimer = setTimeout(() => {
+      liveColorsBroadcastTimer = null;
+      const payload = compactLiveColors(lastLiveColors);
+      const columns = getLiveConfig().sacn?.viewColumns ?? DEFAULT_LIVE_COLOR_COLUMNS;
+      broadcast({ type: 'liveColors', liveColors: payload, liveColorColumns: columns });
+    }, 16);
+    liveColorsBroadcastTimer.unref?.();
+  });
+
   const app = Fastify({ logger: false });
 
   app.get('/', async (req, reply) => {
@@ -148,6 +179,7 @@ export async function createViewServer({
       getConnectedViewCount,
       getIngestStatus: ctx.getIngestStatus,
       getTimecodeStatus: ctx.getTimecodeStatus,
+      getLiveColorsStatus: ctx.getLiveColorsStatus,
       lastCuePayload: lastPayload,
     });
     const code = report.status === 'ok' ? 200 : 503;
@@ -157,6 +189,10 @@ export async function createViewServer({
   if (configRuntime) {
     registerConfigRoutes(app, { configRuntime, log });
   }
+
+  app.get('/api/net/interfaces', async (_req, reply) => {
+    return reply.send({ interfaces: listIpv4Interfaces() });
+  });
 
   if (sheetsActions) {
     registerSheetsRoutes(app, { sheetsActions, log });
@@ -244,6 +280,10 @@ export async function createViewServer({
     if (setlistStore) {
       init.setlist = setlistStore.getState();
     }
+    init.liveColors = compactLiveColors(
+      lastLiveColors ?? getHealthContext?.()?.getLiveColorsStatus?.() ?? null,
+    );
+    init.liveColorColumns = getLiveConfig().sacn?.viewColumns ?? DEFAULT_LIVE_COLOR_COLUMNS;
     if (viewConfig.system) {
       init.system = true;
       init.status = buildStatus();
@@ -305,6 +345,7 @@ export async function createViewServer({
     broadcastSetlist,
     async stop() {
       if (timecodeBroadcastTimer) clearTimeout(timecodeBroadcastTimer);
+      if (liveColorsBroadcastTimer) clearTimeout(liveColorsBroadcastTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       for (const ws of clients.keys()) ws.close();
       await new Promise((resolve) => wss.close(resolve));

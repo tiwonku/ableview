@@ -1,6 +1,7 @@
 // Shared view rendering (spec §9.4). Maps CuePayload + field config → DOM.
 
 import { applyColorSwatchStyle, parseRgbCell } from './color-parse.js';
+import { renderLiveColorHost } from './live-color-overlay.js';
 import { parseImageCell } from './image-parse.js';
 import { closeColorPicker } from './color-picker.js';
 import {
@@ -736,6 +737,7 @@ function renderColorField(field, payload, { onPickColor } = {}) {
 
   const card = document.createElement('div');
   card.className = 'field field-color field--color';
+  if (column) card.dataset.liveColumn = column;
 
   const labelEl = document.createElement('p');
   labelEl.className = 'field-label';
@@ -747,6 +749,7 @@ function renderColorField(field, payload, { onPickColor } = {}) {
     empty.className = 'field-value empty';
     empty.textContent = '—';
     card.appendChild(empty);
+    if (column) card.appendChild(renderLiveColorHost(column));
     return card;
   }
 
@@ -774,6 +777,7 @@ function renderColorField(field, payload, { onPickColor } = {}) {
   }
 
   card.appendChild(body);
+  if (column) card.appendChild(renderLiveColorHost(column));
   return card;
 }
 
@@ -1002,6 +1006,26 @@ function formatTimecodeStat(timecodeStatus) {
     return { value: `${tc.display}${suffix}`, warn: false };
   }
   return { value: `${tc.display}${suffix} · stale`, warn: true };
+}
+
+function formatRgbTriplet(c) {
+  if (!c || !Number.isInteger(c.r)) return '—';
+  return `${c.r},${c.g},${c.b}`;
+}
+
+function formatSacnStat(liveColors) {
+  if (!liveColors?.enabled) {
+    return { value: 'Disabled', warn: false };
+  }
+  const uni = liveColors.universe != null ? `U${liveColors.universe}` : 'sACN';
+  const colors = liveColors.colors;
+  const rgb = colors
+    ? `${formatRgbTriplet(colors.main)} · ${formatRgbTriplet(colors.secondary)} · ${formatRgbTriplet(colors.accent)}`
+    : 'no data';
+  if (liveColors.live) {
+    return { value: `Live ${uni} · ${rgb}`, warn: false };
+  }
+  return { value: `No signal ${uni}`, warn: true };
 }
 
 function cueTrackStat(ableton) {
@@ -1234,6 +1258,10 @@ function renderAdminStats(parent, payload, status) {
   {
     const tc = formatTimecodeStat(status?.timecode);
     addStat(parent, 'Timecode', tc.value, { warn: tc.warn });
+  }
+  {
+    const sacn = formatSacnStat(status?.liveColors);
+    addStat(parent, 'GrandMA sACN', sacn.value, { warn: sacn.warn });
   }
   if (payload?.simulated !== true) {
     const ableton = payload?.ableton ?? status?.ingest ?? null;

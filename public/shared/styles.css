@@ -837,6 +837,43 @@ body.layout-operator .clip-name--pinned {
   outline-offset: 1px;
 }
 
+.color-live {
+  margin-top: 0.55rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+.color-live-kicker {
+  margin: 0 0 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.color-swatch--live {
+  aspect-ratio: auto;
+  height: 2.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.color-live-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.color-live--live .color-live-kicker {
+  color: var(--accent, #7dffb3);
+}
+
+.color-live--stale .color-live-kicker,
+.color-live--stale .color-live-meta {
+  color: #e6b450;
+}
+
 .color-copy-kind {
   flex-shrink: 0;
   min-width: 2rem;
@@ -1768,6 +1805,37 @@ select.settings-input option {
   font-weight: 600;
 }
 
+.sacn-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.85rem;
+}
+
+.sacn-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sacn-chip-swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 0.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  flex: 0 0 auto;
+}
+
+.sacn-chip-swatch--empty {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.08) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+}
+
 .settings-sync-row {
   margin-top: 0.25rem;
 }
@@ -2695,6 +2763,26 @@ body.layout-operator .colors-row .color-copy-value {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+body.layout-operator .colors-row .color-live {
+  margin-top: clamp(0.25rem, 0.5dvh, 0.4rem);
+  padding-top: clamp(0.25rem, 0.5dvh, 0.4rem);
+}
+
+body.layout-operator .colors-row .color-live-kicker {
+  font-size: clamp(0.58rem, 1dvh, 0.7rem);
+  margin-bottom: 0.2rem;
+}
+
+body.layout-operator .colors-row .color-swatch--live {
+  height: clamp(1.35rem, 3.2dvh, 2.1rem);
+  max-height: 2.1rem;
+  margin-bottom: 0.2rem;
+}
+
+body.layout-operator .colors-row .color-live-meta {
+  font-size: clamp(0.62rem, 1.1dvh, 0.75rem);
 }
 
 /* Operator row editor: keep widgets inside the same cards as read mode. */

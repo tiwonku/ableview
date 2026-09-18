@@ -98,6 +98,28 @@ test('buildHealthReport includes timecode status when provided', () => {
   assert.equal(report.timecode.timecode.display, '01:00:00:00');
 });
 
+test('buildHealthReport includes sACN live colors when provided', () => {
+  const report = buildHealthReport({
+    simulated: false,
+    getSheetSnapshot: () => sheetSnapshot(),
+    getConnectedViewCount: () => 0,
+    getIngestStatus: () => ({ live: true, lastSeenAt: Date.now() }),
+    getLiveColorsStatus: () => ({
+      enabled: true,
+      live: true,
+      lastSeenAt: Date.now(),
+      universe: 191,
+      sourceAddress: '10.100.10.3',
+      colors: { main: { r: 255, g: 0, b: 0 }, secondary: null, accent: null },
+    }),
+    lastCuePayload: makeCuePayload({ clipName: 'Song A' }),
+  });
+
+  assert.equal(report.sacn.enabled, true);
+  assert.equal(report.sacn.universe, 191);
+  assert.equal(report.sacn.colors.main.r, 255);
+});
+
 test('GET /health returns JSON and 503 when degraded', async () => {
   const bus = createBus();
   const server = await createViewServer({

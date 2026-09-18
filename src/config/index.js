@@ -54,6 +54,32 @@ export const DEFAULTS = Object.freeze({
     bindAddress: '0.0.0.0',
     staleMs: 500,
   },
+  sacn: {
+    enabled: false,
+    port: 5568,
+    bindAddress: '0.0.0.0',
+    interfaceAddress: '0.0.0.0',
+    multicast: true,
+    universe: 191,
+    staleMs: 1000,
+    ignorePreview: true,
+    slots: {
+      main: { startChannel: 500, label: 'Color Main' },
+      secondary: { startChannel: 503, label: 'Color secondary' },
+      accent: { startChannel: 506, label: 'Color accent' },
+    },
+    viewColumns: {
+      RGB_1: 'main',
+      RGB_2: 'secondary',
+      RGB_3: 'accent',
+    },
+    log: {
+      changeDelta: 4,
+      settleMs: 200,
+      motionIntervalMs: 400,
+      minIntervalMs: 100,
+    },
+  },
   sessionLog: {
     directory: './data/sessions',
     autoStart: false,
@@ -165,6 +191,66 @@ export function validateConfig(config) {
   if (tc.staleMs != null && !(tc.staleMs >= 0)) errors.push('timecode.staleMs must be >= 0');
   if (tc.bindAddress != null && typeof tc.bindAddress !== 'string') {
     errors.push('timecode.bindAddress must be a string');
+  }
+
+  const sacn = config.sacn ?? {};
+  if (!port(sacn.port ?? 5568)) errors.push('sacn.port must be a valid port');
+  if (sacn.staleMs != null && !(sacn.staleMs >= 0)) errors.push('sacn.staleMs must be >= 0');
+  if (sacn.bindAddress != null && typeof sacn.bindAddress !== 'string') {
+    errors.push('sacn.bindAddress must be a string');
+  }
+  if (sacn.interfaceAddress != null && typeof sacn.interfaceAddress !== 'string') {
+    errors.push('sacn.interfaceAddress must be a string');
+  }
+  if (sacn.universe != null) {
+    const u = sacn.universe;
+    if (!(Number.isInteger(u) && u >= 1 && u <= 63999)) {
+      errors.push('sacn.universe must be an integer 1–63999');
+    }
+  }
+  if (sacn.multicast != null && typeof sacn.multicast !== 'boolean') {
+    errors.push('sacn.multicast must be a boolean');
+  }
+  if (sacn.ignorePreview != null && typeof sacn.ignorePreview !== 'boolean') {
+    errors.push('sacn.ignorePreview must be a boolean');
+  }
+  const slotIds = ['main', 'secondary', 'accent'];
+  if (sacn.slots != null) {
+    if (!sacn.slots || typeof sacn.slots !== 'object' || Array.isArray(sacn.slots)) {
+      errors.push('sacn.slots must be an object');
+    } else {
+      for (const id of slotIds) {
+        const slot = sacn.slots[id];
+        if (slot == null) continue;
+        const ch = slot.startChannel;
+        if (!(Number.isInteger(ch) && ch >= 1 && ch <= 510)) {
+          errors.push(`sacn.slots.${id}.startChannel must be an integer 1–510`);
+        }
+        if (slot.label != null && typeof slot.label !== 'string') {
+          errors.push(`sacn.slots.${id}.label must be a string`);
+        }
+      }
+    }
+  }
+  if (sacn.viewColumns != null) {
+    if (!sacn.viewColumns || typeof sacn.viewColumns !== 'object' || Array.isArray(sacn.viewColumns)) {
+      errors.push('sacn.viewColumns must be an object');
+    } else {
+      for (const [col, slot] of Object.entries(sacn.viewColumns)) {
+        if (!slotIds.includes(slot)) {
+          errors.push(`sacn.viewColumns.${col} must be one of: ${slotIds.join(', ')}`);
+        }
+      }
+    }
+  }
+  const sacnLog = sacn.log ?? {};
+  for (const key of ['changeDelta', 'settleMs', 'motionIntervalMs', 'minIntervalMs']) {
+    if (sacnLog[key] != null && !(Number.isFinite(sacnLog[key]) && sacnLog[key] >= 0)) {
+      errors.push(`sacn.log.${key} must be >= 0`);
+    }
+  }
+  if (sacnLog.changeDelta != null && sacnLog.changeDelta > 255) {
+    errors.push('sacn.log.changeDelta must be <= 255');
   }
 
   const sl = config.sessionLog ?? {};

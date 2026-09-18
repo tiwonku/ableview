@@ -7,6 +7,28 @@ const TIMECODE_DEFAULTS = Object.freeze({
   staleMs: 500,
 });
 
+const SACN_DEFAULTS = Object.freeze({
+  enabled: false,
+  port: 5568,
+  bindAddress: '0.0.0.0',
+  interfaceAddress: '0.0.0.0',
+  multicast: true,
+  universe: 191,
+  staleMs: 1000,
+  ignorePreview: true,
+  slots: {
+    main: { startChannel: 500, label: 'Color Main' },
+    secondary: { startChannel: 503, label: 'Color secondary' },
+    accent: { startChannel: 506, label: 'Color accent' },
+  },
+  log: {
+    changeDelta: 4,
+    settleMs: 200,
+    motionIntervalMs: 400,
+    minIntervalMs: 100,
+  },
+});
+
 const MOMENTS_DEFAULTS = Object.freeze({
   autoStartOnMoment: true,
   kinds: ['dope', 'typed'],
@@ -23,6 +45,7 @@ function normalizeSettings(raw) {
   return {
     ...raw,
     timecode: { ...TIMECODE_DEFAULTS, ...raw.timecode },
+    sacn: normalizeSacn(raw.sacn),
     moments: { ...MOMENTS_DEFAULTS, ...raw.moments },
     oscOut: {
       ...OSCOUT_DEFAULTS,
@@ -31,6 +54,20 @@ function normalizeSettings(raw) {
         ? raw.oscOut.destinations.map((d) => ({ host: d.host ?? '', port: d.port ?? 11010 }))
         : [],
     },
+  };
+}
+
+function normalizeSacn(raw) {
+  const slots = { ...SACN_DEFAULTS.slots, ...(raw?.slots ?? {}) };
+  return {
+    ...SACN_DEFAULTS,
+    ...raw,
+    slots: {
+      main: { ...SACN_DEFAULTS.slots.main, ...slots.main },
+      secondary: { ...SACN_DEFAULTS.slots.secondary, ...slots.secondary },
+      accent: { ...SACN_DEFAULTS.slots.accent, ...slots.accent },
+    },
+    log: { ...SACN_DEFAULTS.log, ...(raw?.log ?? {}) },
   };
 }
 
@@ -151,6 +188,96 @@ function renderTimecodeStatusBox(timecodeStatus, settings) {
   }
 
   return box;
+}
+
+function rgbChip(label, color) {
+  const wrap = el('span', 'sacn-chip');
+  const swatch = el('span', 'sacn-chip-swatch');
+  if (color && Number.isInteger(color.r)) {
+    swatch.style.background = `rgb(${color.r}, ${color.g}, ${color.b})`;
+    wrap.appendChild(swatch);
+    wrap.appendChild(document.createTextNode(`${label} ${color.r},${color.g},${color.b}`));
+  } else {
+    swatch.classList.add('sacn-chip-swatch--empty');
+    wrap.appendChild(swatch);
+    wrap.appendChild(document.createTextNode(`${label} —`));
+  }
+  return wrap;
+}
+
+function renderSacnStatusBox(sacnStatus, settings) {
+  const box = el('div', 'ableton-session sacn-session');
+  box.dataset.role = 'sacn-session';
+  box.appendChild(el('p', 'ableton-session-title', 'GrandMA colors (sACN)'));
+
+  const enabled = settings?.sacn?.enabled === true;
+  if (!enabled) {
+    box.classList.add('ableton-session--sim');
+    box.appendChild(el(
+      'p',
+      'ableton-session-line',
+      'sACN listener is off. Enable below and save to receive live RGB from GrandMA.',
+    ));
+    return box;
+  }
+
+  if (!sacnStatus) {
+    box.appendChild(el('p', 'ableton-session-line', 'Loading sACN status…'));
+    return box;
+  }
+
+  const live = sacnStatus.live === true;
+  const signalLine = el('p', `ableton-session-line${live ? '' : ' warn'}`);
+  const seen = formatIngestSeen(sacnStatus.lastSeenAt);
+  const uni = sacnStatus.universe ?? settings.sacn?.universe ?? 191;
+  const from = sacnStatus.sourceAddress ? ` from ${sacnStatus.sourceAddress}` : '';
+  if (live) {
+    const name = sacnStatus.sourceName ? ` · ${sacnStatus.sourceName}` : '';
+    signalLine.textContent = `Live universe ${uni}${from}${name}${seen ? ` (last packet ${seen})` : ''}`;
+  } else {
+    signalLine.textContent = `No signal on universe ${uni} — pick the lighting NIC and confirm GrandMA is sending`;
+  }
+  box.appendChild(signalLine);
+
+  const chips = el('p', 'ableton-session-line sacn-chips');
+  const colors = sacnStatus.colors ?? {};
+  chips.appendChild(rgbChip('Main', colors.main));
+  chips.appendChild(rgbChip('Sec', colors.secondary));
+  chips.appendChild(rgbChip('Accent', colors.accent));
+  box.appendChild(chips);
+
+  if (live) box.classList.add('ableton-session--ok');
+  else box.classList.add('ableton-session--warn');
+  return box;
+}
+
+function nicSelect(name, value, nics) {
+  const select = el('select', 'settings-input');
+  select.name = name;
+  const list = Array.isArray(nics) && nics.length
+    ? nics
+    : [{ name: 'All interfaces', address: '0.0.0.0' }];
+  const current = value || '0.0.0.0';
+  let found = false;
+  for (const nic of list) {
+    const label = nic.address === '0.0.0.0'
+      ? nic.name
+      : `${nic.name} (${nic.address})`;
+    const opt = el('option', null, label);
+    opt.value = nic.address;
+    if (nic.address === current) {
+      opt.selected = true;
+      found = true;
+    }
+    select.appendChild(opt);
+  }
+  if (!found && current) {
+    const opt = el('option', null, current);
+    opt.value = current;
+    opt.selected = true;
+    select.appendChild(opt);
+  }
+  return select;
 }
 
 function renderAbletonSessionBox(ingestStatus, simulated) {
@@ -333,6 +460,7 @@ function settingsFromForm(form, current) {
       bindAddress: fd.get('timecodeBindAddress')?.trim() ?? current.timecode?.bindAddress ?? '0.0.0.0',
       staleMs: Number(fd.get('timecodeStaleMs')),
     },
+    sacn: sacnFromForm(fd, current),
     moments: {
       autoStartOnMoment: fd.get('momentsAutoStart') === 'on',
       kinds: (fd.get('momentsKinds')?.trim() ?? 'dope')
@@ -342,6 +470,39 @@ function settingsFromForm(form, current) {
       debounceMs: Number(fd.get('momentsDebounceMs')),
     },
     oscOut: oscOutFromForm(fd),
+  };
+}
+
+function sacnFromForm(fd, current) {
+  const slots = current.sacn?.slots ?? SACN_DEFAULTS.slots;
+  return {
+    enabled: fd.get('sacnEnabled') === 'on',
+    port: Number(fd.get('sacnPort')),
+    interfaceAddress: fd.get('sacnInterfaceAddress')?.trim() || '0.0.0.0',
+    universe: Number(fd.get('sacnUniverse')),
+    staleMs: Number(fd.get('sacnStaleMs')),
+    multicast: true,
+    ignorePreview: true,
+    slots: {
+      main: {
+        ...slots.main,
+        startChannel: Number(fd.get('sacnMainChannel')),
+      },
+      secondary: {
+        ...slots.secondary,
+        startChannel: Number(fd.get('sacnSecondaryChannel')),
+      },
+      accent: {
+        ...slots.accent,
+        startChannel: Number(fd.get('sacnAccentChannel')),
+      },
+    },
+    log: {
+      changeDelta: Number(fd.get('sacnChangeDelta')),
+      settleMs: Number(fd.get('sacnSettleMs')),
+      motionIntervalMs: Number(fd.get('sacnMotionIntervalMs')),
+      minIntervalMs: current.sacn?.log?.minIntervalMs ?? SACN_DEFAULTS.log.minIntervalMs,
+    },
   };
 }
 
@@ -362,7 +523,74 @@ function oscOutFromForm(fd) {
   };
 }
 
-function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus }) {
+function renderSacnGroup(settings, sacnStatus, nics) {
+  const group = el('fieldset', 'settings-group');
+  group.appendChild(el('legend', null, 'GrandMA colors (sACN)'));
+  group.appendChild(renderSacnStatusBox(sacnStatus, settings));
+
+  const enabled = settings.sacn?.enabled === true;
+  const check = el('input');
+  check.type = 'checkbox';
+  check.name = 'sacnEnabled';
+  check.id = 'sacnEnabled';
+  check.checked = enabled;
+  check.className = 'settings-checkbox';
+  const row = el('div', 'settings-field settings-field-checkbox');
+  row.appendChild(check);
+  const label = el('label', 'settings-checkbox-label');
+  label.htmlFor = 'sacnEnabled';
+  label.textContent = 'Receive live RGB over sACN (E1.31)';
+  row.appendChild(label);
+  group.appendChild(row);
+
+  group.appendChild(fieldRow(
+    'Network interface',
+    nicSelect('sacnInterfaceAddress', settings.sacn?.interfaceAddress ?? '0.0.0.0', nics),
+  ));
+  group.appendChild(fieldRow(
+    'UDP port',
+    numberInput('sacnPort', settings.sacn?.port ?? 5568, { min: 1, max: 65535 }),
+  ));
+  group.appendChild(fieldRow(
+    'Universe',
+    numberInput('sacnUniverse', settings.sacn?.universe ?? 191, { min: 1, max: 63999 }),
+  ));
+  group.appendChild(fieldRow(
+    'Main RGB start channel',
+    numberInput('sacnMainChannel', settings.sacn?.slots?.main?.startChannel ?? 500, { min: 1, max: 510 }),
+  ));
+  group.appendChild(fieldRow(
+    'Secondary RGB start channel',
+    numberInput('sacnSecondaryChannel', settings.sacn?.slots?.secondary?.startChannel ?? 503, { min: 1, max: 510 }),
+  ));
+  group.appendChild(fieldRow(
+    'Accent RGB start channel',
+    numberInput('sacnAccentChannel', settings.sacn?.slots?.accent?.startChannel ?? 506, { min: 1, max: 510 }),
+  ));
+  group.appendChild(fieldRow(
+    'Stale after (ms)',
+    numberInput('sacnStaleMs', settings.sacn?.staleMs ?? 1000, { min: 0, step: 50 }),
+  ));
+  group.appendChild(fieldRow(
+    'Log change delta (0–255)',
+    numberInput('sacnChangeDelta', settings.sacn?.log?.changeDelta ?? 4, { min: 0, max: 255 }),
+  ));
+  group.appendChild(fieldRow(
+    'Log settle (ms)',
+    numberInput('sacnSettleMs', settings.sacn?.log?.settleMs ?? 200, { min: 0, step: 50 }),
+  ));
+  group.appendChild(fieldRow(
+    'Chase sample interval (ms)',
+    numberInput('sacnMotionIntervalMs', settings.sacn?.log?.motionIntervalMs ?? 400, { min: 50, step: 50 }),
+  ));
+
+  const hint = el('p', 'settings-sim-hint');
+  hint.textContent = 'Pick the same NIC sACNView uses. Defaults are Jake’s map: universe 191, channels 500–508 (8-bit RGB). Operator swatches follow packets in realtime; the session log only writes settled looks plus sparse samples during chases. Preview packets are ignored.';
+  group.appendChild(hint);
+  return group;
+}
+
+function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, nics }) {
   root.innerHTML = '';
 
   const heading = el('h2', 'section-title', 'Settings');
@@ -519,6 +747,9 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
 
   bottomRow.appendChild(timecodeGroup);
 
+  const sacnRow = el('div', 'settings-row settings-row-single');
+  sacnRow.appendChild(renderSacnGroup(settings, sacnStatus, nics));
+
   const momentsGroup = el('fieldset', 'settings-group');
   momentsGroup.appendChild(el('legend', null, 'Moments'));
   const momentsAuto = settings.moments?.autoStartOnMoment !== false;
@@ -564,6 +795,7 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
 
   grid.appendChild(topRow);
   grid.appendChild(bottomRow);
+  grid.appendChild(sacnRow);
   grid.appendChild(clockRow);
   form.appendChild(grid);
 
@@ -598,10 +830,13 @@ export function mountSettingsPanel(rootSelector) {
   let settings = null;
   let status = null;
   let serverSupportsTimecode = true;
+  let serverSupportsSacn = true;
   let sheetStatus = null;
   let syncStatus = null;
   let ingestStatus = null;
   let timecodeStatus = null;
+  let sacnStatus = null;
+  let nics = [{ name: 'All interfaces', address: '0.0.0.0' }];
   let pollTimer = null;
   let stopped = false;
 
@@ -615,6 +850,8 @@ export function mountSettingsPanel(rootSelector) {
       syncStatus,
       ingestStatus,
       timecodeStatus,
+      sacnStatus,
+      nics,
     });
   }
 
@@ -632,6 +869,13 @@ export function mountSettingsPanel(rootSelector) {
     existing.replaceWith(next);
   }
 
+  function refreshSacnSessionBox() {
+    const existing = root.querySelector('[data-role="sacn-session"]');
+    if (!existing || !settings) return;
+    const next = renderSacnStatusBox(sacnStatus, settings);
+    existing.replaceWith(next);
+  }
+
   async function loadSheetStatus() {
     const res = await fetch('/api/sheets/status');
     if (res.ok) sheetStatus = await res.json();
@@ -642,6 +886,18 @@ export function mountSettingsPanel(rootSelector) {
     const data = await res.json().catch(() => null);
     if (data?.ingest) ingestStatus = data.ingest;
     if (data?.timecode) timecodeStatus = data.timecode;
+    if (data?.sacn) sacnStatus = data.sacn;
+  }
+
+  async function loadNics() {
+    try {
+      const res = await fetch('/api/net/interfaces');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.interfaces) && data.interfaces.length) nics = data.interfaces;
+    } catch {
+      // keep default
+    }
   }
 
   async function load() {
@@ -649,12 +905,18 @@ export function mountSettingsPanel(rootSelector) {
     if (!res.ok) throw new Error(`Failed to load settings (${res.status})`);
     const data = await res.json();
     serverSupportsTimecode = data.settings?.timecode !== undefined;
+    serverSupportsSacn = data.settings?.sacn !== undefined;
     settings = normalizeSettings(data.settings);
-    await Promise.all([loadSheetStatus(), loadHealthStatus()]);
+    await Promise.all([loadSheetStatus(), loadHealthStatus(), loadNics()]);
     if (!serverSupportsTimecode) {
       status = {
         ok: false,
         message: 'This AbleView process does not expose timecode settings yet — restart the server (npm start or your service), then reload this page.',
+      };
+    } else if (!serverSupportsSacn) {
+      status = {
+        ok: false,
+        message: 'This AbleView process does not expose sACN color settings yet — restart the server (npm start or your service), then reload this page.',
       };
     }
     render();
@@ -674,12 +936,22 @@ export function mountSettingsPanel(rootSelector) {
       return;
     }
     serverSupportsTimecode = data.settings?.timecode !== undefined;
+    serverSupportsSacn = data.settings?.sacn !== undefined;
     settings = normalizeSettings(data.settings);
     const reloaded = data.reloaded?.length ? ` Reloaded: ${data.reloaded.join(', ')}.` : '';
     if (patch.timecode && !data.reloaded?.includes('timecode')) {
       status = {
         ok: false,
         message: `Other settings saved, but timecode was not applied (reload list: ${data.reloaded?.join(', ') || 'none'}). Restart AbleView, reload this page, and save again.`,
+      };
+      await Promise.all([loadSheetStatus(), wait(400).then(() => loadHealthStatus())]);
+      render();
+      return;
+    }
+    if (patch.sacn && !data.reloaded?.includes('sacn')) {
+      status = {
+        ok: false,
+        message: `Other settings saved, but sACN was not applied (reload list: ${data.reloaded?.join(', ') || 'none'}). Restart AbleView, reload this page, and save again.`,
       };
       await Promise.all([loadSheetStatus(), wait(400).then(() => loadHealthStatus())]);
       render();
@@ -727,11 +999,13 @@ export function mountSettingsPanel(rootSelector) {
     if (stopped || !settings) return;
     const prevIngest = JSON.stringify(ingestStatus);
     const prevTimecode = JSON.stringify(timecodeStatus);
+    const prevSacn = JSON.stringify(sacnStatus);
     loadHealthStatus()
       .then(() => {
         if (stopped) return;
         if (JSON.stringify(ingestStatus) !== prevIngest) refreshAbletonSessionBox();
         if (JSON.stringify(timecodeStatus) !== prevTimecode) refreshTimecodeSessionBox();
+        if (JSON.stringify(sacnStatus) !== prevSacn) refreshSacnSessionBox();
       })
       .catch(() => {});
   }, 3000);

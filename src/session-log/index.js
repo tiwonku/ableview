@@ -23,6 +23,7 @@ import {
   momentDebounceKey,
   effectiveMomentKinds,
 } from './moments.js';
+import { createLiveColorGate } from './live-color.js';
 
 export { SessionLogDisabledError } from './moments.js';
 export { generateAutoSessionName } from './auto-session-name.js';
@@ -104,6 +105,9 @@ export function createSessionLogger({
 
   let onNowPlaying = null;
   let onCuePayload = null;
+  let onLiveColors = null;
+  let lastCueForColor = null;
+  let liveColorGate = null;
 
   function sessionConfig() {
     return getConfig().sessionLog ?? {};
@@ -132,6 +136,8 @@ export function createSessionLogger({
     lastMatchKey = null;
     lastLaunchKey = null;
     launchSummary = emptyLaunchSummary();
+    lastCueForColor = null;
+    liveColorGate?.reset();
   }
 
   function persistSidecar() {
@@ -240,6 +246,10 @@ export function createSessionLogger({
   }
 
   function handleCuePayload(payload) {
+    lastCueForColor = {
+      clipName: payload?.clipName ?? null,
+      rowId: payload?.match?.rowId ?? null,
+    };
     const ck = clipKey(payload);
     const mk = matchKey(payload);
 
@@ -274,6 +284,28 @@ export function createSessionLogger({
 
     lastClipKey = ck;
     lastMatchKey = mk;
+  }
+
+  function appendLiveColorRecord({ reason, colors, universe }) {
+    if (!enabled) return;
+    const envelope = timestampEnvelope();
+    const simulated = typeof getSimulated === 'function' ? getSimulated() === true : false;
+    appendRecord({
+      ...envelope,
+      event: 'live_color',
+      reason,
+      universe,
+      colors,
+      clipName: lastCueForColor?.clipName ?? null,
+      rowId: lastCueForColor?.rowId ?? null,
+      simulated,
+      sessionName,
+    });
+  }
+
+  function handleLiveColors(status) {
+    if (!enabled) return;
+    liveColorGate?.handleStatus(status);
   }
 
   function disableLogging() {
@@ -449,10 +481,17 @@ export function createSessionLogger({
       persistSidecar();
     }
 
+    liveColorGate = createLiveColorGate({
+      getLogConfig: () => getConfig().sacn?.log,
+      onRecord: appendLiveColorRecord,
+    });
+
     onNowPlaying = (event) => handleNowPlaying(event);
     onCuePayload = (payload) => handleCuePayload(payload);
+    onLiveColors = (status) => handleLiveColors(status);
     bus.on(EVENTS.NOW_PLAYING, onNowPlaying);
     bus.on(EVENTS.CUE_PAYLOAD, onCuePayload);
+    bus.on(EVENTS.LIVE_COLORS, onLiveColors);
   }
 
   function stop() {
@@ -464,6 +503,12 @@ export function createSessionLogger({
       bus.off(EVENTS.CUE_PAYLOAD, onCuePayload);
       onCuePayload = null;
     }
+    if (onLiveColors) {
+      bus.off(EVENTS.LIVE_COLORS, onLiveColors);
+      onLiveColors = null;
+    }
+    liveColorGate?.stop();
+    liveColorGate = null;
     disableLogging();
   }
 
@@ -477,5 +522,6 @@ export function createSessionLogger({
     setOnSessionLogChange,
     handleNowPlaying,
     handleCuePayload,
+    handleLiveColors,
   };
 }

@@ -31,6 +31,7 @@ import {
 } from './playing-clips-strip.js';
 import { mountViewNav, viewIdFromPath } from './view-nav.js';
 import { isKioskMode, kioskLinkAction, mountKioskControls } from './kiosk-controls.js';
+import { applyLiveColorOverlay, DEFAULT_LIVE_COLOR_COLUMNS } from './live-color-overlay.js';
 
 const RECONNECT_MS = 1500;
 const ALIAS_SEARCH_DEBOUNCE_MS = 180;
@@ -86,6 +87,8 @@ export function connectView({
   let viewsList = null;
   let lastPayload = null;
   let lastStatus = null;
+  let lastLiveColors = null;
+  let liveColorColumns = { ...DEFAULT_LIVE_COLOR_COLUMNS };
   let lastSessionLog = null;
   let lastUpdate = null;
   let connected = false;
@@ -200,6 +203,8 @@ export function connectView({
         lastSetlist = msg.setlist;
         if (!setlistNameDraft) setlistNameDraft = msg.setlist.name ?? '';
       }
+      if (msg.liveColors) lastLiveColors = msg.liveColors;
+      if (msg.liveColorColumns) liveColorColumns = msg.liveColorColumns;
       applySimState(msg.simulated === true);
       if (msg.payload) {
         lastPayload = msg.payload;
@@ -207,6 +212,24 @@ export function connectView({
         onPayload?.(lastPayload);
       }
       render();
+      return;
+    }
+
+    if (msg.type === 'liveColors') {
+      if (msg.liveColors) lastLiveColors = msg.liveColors;
+      if (msg.liveColorColumns) liveColorColumns = msg.liveColorColumns;
+      if (lastStatus) lastStatus = { ...lastStatus, liveColors: lastLiveColors };
+      if (viewConfig?.system && currentViewId === 'admin' && !showingSettings && !editSession && !aliasSession && !pinSession) {
+        updateAdminLiveChrome(root, {
+          payload: lastPayload,
+          connected,
+          lastUpdate,
+          status: lastStatus,
+          matchColumn,
+          editSession,
+        });
+      }
+      paintLiveColors();
       return;
     }
 
@@ -867,6 +890,7 @@ export function connectView({
         onSaveEdit: saveEdit,
         getMomentWho,
       });
+      paintLiveColors();
       return;
     }
     if (currentViewId === 'setlist') {
@@ -929,6 +953,7 @@ export function connectView({
         onSyncSheet: syncSheet,
         getMomentWho,
       });
+      paintLiveColors();
       return;
     }
     if (viewConfig.system) {
@@ -977,6 +1002,12 @@ export function connectView({
         getMomentWho,
       });
     }
+    paintLiveColors();
+  }
+
+  function paintLiveColors() {
+    if (!root || statusOnly || showingSettings) return;
+    applyLiveColorOverlay(root, lastLiveColors, liveColorColumns);
   }
 
   function setConnected(next) {

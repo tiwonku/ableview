@@ -65,6 +65,32 @@
     "bindAddress": "0.0.0.0",
     "staleMs": 500
   },
+  "sacn": {
+    "enabled": false,
+    "port": 5568,
+    "bindAddress": "0.0.0.0",
+    "interfaceAddress": "0.0.0.0",
+    "multicast": true,
+    "universe": 191,
+    "staleMs": 1000,
+    "ignorePreview": true,
+    "slots": {
+      "main": { "startChannel": 500, "label": "Color Main" },
+      "secondary": { "startChannel": 503, "label": "Color secondary" },
+      "accent": { "startChannel": 506, "label": "Color accent" }
+    },
+    "viewColumns": {
+      "RGB_1": "main",
+      "RGB_2": "secondary",
+      "RGB_3": "accent"
+    },
+    "log": {
+      "changeDelta": 4,
+      "settleMs": 200,
+      "motionIntervalMs": 400,
+      "minIntervalMs": 100
+    }
+  },
   "sessionLog": {
     "directory": "./data/sessions",
     "autoStart": false,
@@ -106,9 +132,6 @@
     "visuals": {
       "title": "Visuals",
       "fields": [
-        {
-          "column": "Video World"
-        },
         {
           "column": "RGB_1",
           "label": "Color 1",

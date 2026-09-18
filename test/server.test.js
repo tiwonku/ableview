@@ -335,6 +335,68 @@ test('admin init and status include timecode when provided', async () => {
   }
 });
 
+test('init and liveColors broadcast include GrandMA sACN colors', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    views: {
+      lighting: {
+        title: 'Lighting',
+        fields: [
+          { column: 'RGB_1', label: 'Color 1', type: 'color' },
+        ],
+      },
+      admin: { title: 'Admin', system: true },
+    },
+  });
+  let liveStatus = {
+    enabled: true,
+    live: true,
+    lastSeenAt: Date.now(),
+    universe: 191,
+    sourceName: 'full-ma',
+    sourceAddress: '10.100.10.3',
+    colors: {
+      main: { r: 1, g: 2, b: 3 },
+      secondary: { r: 4, g: 5, b: 6 },
+      accent: { r: 7, g: 8, b: 9 },
+    },
+  };
+  const server = await createViewServer({
+    config,
+    bus,
+    log: silentLog,
+    getHealthContext: () => ({
+      getLiveColorsStatus: () => liveStatus,
+    }),
+  });
+
+  const { ws, messages } = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=lighting`);
+  try {
+    const init = await waitForMessage(messages, ws);
+    assert.equal(init.liveColors?.enabled, true);
+    assert.equal(init.liveColors?.universe, 191);
+    assert.deepEqual(init.liveColors?.colors?.main, { r: 1, g: 2, b: 3 });
+    assert.equal(init.liveColorColumns.RGB_1, 'main');
+
+    liveStatus = {
+      ...liveStatus,
+      colors: {
+        main: { r: 255, g: 128, b: 0 },
+        secondary: { r: 0, g: 40, b: 255 },
+        accent: { r: 12, g: 12, b: 12 },
+      },
+    };
+    bus.emit(EVENTS.LIVE_COLORS, liveStatus);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const msg = messages.find((m) => m.type === 'liveColors' && m.liveColors?.colors?.main?.r === 255);
+    assert.ok(msg, 'expected liveColors broadcast');
+    assert.equal(msg.liveColors.colors.accent.b, 12);
+  } finally {
+    ws.close();
+    await server.stop();
+  }
+});
+
 test('session WebSocket accepts system view and receives tracks on cue', async () => {
   const bus = createBus();
   const config = testConfig({
