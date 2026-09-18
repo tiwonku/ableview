@@ -1,9 +1,10 @@
 // Shared view rendering (spec §9.4). Maps CuePayload + field config → DOM.
 
 import { applyColorSwatchStyle, parseRgbCell } from './color-parse.js';
-import { renderLiveColorHost } from './live-color-overlay.js';
+import { renderLiveColorHost, DEFAULT_LIVE_COLOR_COLUMNS } from './live-color-overlay.js';
 import { parseImageCell } from './image-parse.js';
 import { closeColorPicker } from './color-picker.js';
+import { flashableColorColumns } from './flash-look.js';
 import {
   getFieldValue,
   fieldLabel,
@@ -290,6 +291,10 @@ export function renderView(root, {
   onPinLast,
   onClearPin,
   getMomentWho = null,
+  onStartFlashLook,
+  flashLookReady = false,
+  flashLookTitle = '',
+  liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
 }) {
   closeColorPicker();
   root.innerHTML = '';
@@ -325,6 +330,11 @@ export function renderView(root, {
     onClearPin: pinned && !busy ? onClearPin : undefined,
     onStartPin: matched && !busy ? onStartPin : undefined,
     getMomentWho,
+    onStartFlashLook: !busy ? onStartFlashLook : undefined,
+    flashLookReady,
+    flashLookTitle,
+    fields,
+    liveColorColumns,
   });
   if (editActions) clipRow.appendChild(editActions);
   root.appendChild(clipRow);
@@ -498,6 +508,11 @@ function renderViewEditActions({
   onClearPin,
   onStartPin,
   getMomentWho = null,
+  onStartFlashLook,
+  flashLookReady = false,
+  flashLookTitle = '',
+  fields = [],
+  liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
 }) {
   const showSave = Boolean(editSession && onCancelEdit && onSaveEdit);
   const showEdit = !editSession && matched && editable && onStartEdit;
@@ -505,7 +520,12 @@ function renderViewEditActions({
   const showClear = !editSession && typeof onClearPin === 'function';
   const showChange = !editSession && typeof onStartPin === 'function';
   const showDope = getMomentWho != null;
-  if (!showSave && !showEdit && !showToggle && !showClear && !showChange && !showDope) return null;
+  const showFlash = !editSession
+    && matched
+    && editable
+    && typeof onStartFlashLook === 'function'
+    && flashableColorColumns(fields, liveColorColumns).length > 0;
+  if (!showSave && !showEdit && !showToggle && !showClear && !showChange && !showDope && !showFlash) return null;
 
   const actions = document.createElement('div');
   actions.className = 'view-edit-actions';
@@ -537,6 +557,21 @@ function renderViewEditActions({
   if (showToggle) {
     actions.appendChild(renderCuePaneToggle(cuePane, onCuePaneChange));
     return actions;
+  }
+
+  if (showFlash) {
+    const flashBtn = document.createElement('button');
+    flashBtn.type = 'button';
+    flashBtn.className = 'view-edit-btn view-edit-btn--flash';
+    flashBtn.dataset.role = 'flash-look';
+    flashBtn.textContent = 'Flash';
+    flashBtn.disabled = !flashLookReady;
+    flashBtn.title = flashLookTitle || 'Write GrandMA colors to this cue';
+    flashBtn.addEventListener('click', () => {
+      if (flashBtn.disabled) return;
+      onStartFlashLook();
+    });
+    actions.appendChild(flashBtn);
   }
 
   if (showChange) {

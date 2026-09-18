@@ -28,10 +28,24 @@ import {
   operatorCreateColumns,
   resolveCreateClipName,
   canStartCreate,
+  resolveMatchedTitle,
 } from './playing-clips-strip.js';
 import { mountViewNav, viewIdFromPath } from './view-nav.js';
 import { isKioskMode, kioskLinkAction, mountKioskControls } from './kiosk-controls.js';
 import { applyLiveColorOverlay, DEFAULT_LIVE_COLOR_COLUMNS } from './live-color-overlay.js';
+import {
+  buildFlashLookSlots,
+  canFlashLook,
+  flashLookDisabledReason,
+  flashableColorColumns,
+  isLiveColorMoving,
+} from './flash-look.js';
+import {
+  abortFlashLookIfRowChanged,
+  closeFlashLook,
+  openFlashLook,
+  syncFlashLookButton,
+} from './flash-look-overlay.js';
 
 const RECONNECT_MS = 1500;
 const ALIAS_SEARCH_DEBOUNCE_MS = 180;
@@ -88,6 +102,7 @@ export function connectView({
   let lastPayload = null;
   let lastStatus = null;
   let lastLiveColors = null;
+  let prevLiveColors = null;
   let liveColorColumns = { ...DEFAULT_LIVE_COLOR_COLUMNS };
   let lastSessionLog = null;
   let lastUpdate = null;
@@ -216,7 +231,10 @@ export function connectView({
     }
 
     if (msg.type === 'liveColors') {
-      if (msg.liveColors) lastLiveColors = msg.liveColors;
+      if (msg.liveColors) {
+        prevLiveColors = lastLiveColors;
+        lastLiveColors = msg.liveColors;
+      }
       if (msg.liveColorColumns) liveColorColumns = msg.liveColorColumns;
       if (lastStatus) lastStatus = { ...lastStatus, liveColors: lastLiveColors };
       if (viewConfig?.system && currentViewId === 'admin' && !showingSettings && !editSession && !aliasSession && !pinSession) {
@@ -295,8 +313,69 @@ export function connectView({
     render();
   }
 
+  function flashLookColumns() {
+    return flashableColorColumns(viewConfig?.fields, liveColorColumns);
+  }
+
+  function flashLookProps() {
+    if (viewConfig?.editable === false) return {};
+    const columns = flashLookColumns();
+    return {
+      onStartFlashLook: startFlashLook,
+      flashLookReady: canFlashLook(lastLiveColors, columns, liveColorColumns),
+      flashLookTitle: flashLookDisabledReason(lastLiveColors, columns, liveColorColumns),
+      liveColorColumns,
+    };
+  }
+
+  function startFlashLook() {
+    if (editSession || aliasSession || pinSession) return;
+    if (viewConfig?.editable === false) return;
+    if (!lastPayload?.match?.matched || lastPayload.match.rowId == null) return;
+    const columns = flashLookColumns();
+    if (!columns.length) return;
+    if (!canFlashLook(lastLiveColors, columns, liveColorColumns)) return;
+
+    const slots = buildFlashLookSlots({
+      fields: viewConfig.fields,
+      row: lastPayload.row,
+      liveColors: lastLiveColors,
+      columnMap: liveColorColumns,
+      columns,
+    });
+    openFlashLook({
+      rowId: lastPayload.match.rowId,
+      cueTitle: resolveMatchedTitle(lastPayload, matchColumn) || lastPayload.clipName || 'this cue',
+      slots,
+      moving: isLiveColorMoving(prevLiveColors, lastLiveColors),
+      onWrite: saveFlashLook,
+    });
+  }
+
+  async function saveFlashLook({ rowId, changes }) {
+    if (!rowId || !changes || Object.keys(changes).length === 0) {
+      return { ok: false, error: 'Nothing to write' };
+    }
+    if (String(lastPayload?.match?.rowId) !== String(rowId)) {
+      return { ok: false, error: 'Cue changed — Flash cancelled' };
+    }
+    try {
+      const res = await fetch(`/api/sheets/rows/${encodeURIComponent(rowId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changes),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `Save failed (${res.status})`);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message ?? 'Save failed' };
+    }
+  }
+
   function startEdit(openColorColumn) {
     if (!lastPayload?.match?.matched || !lastPayload.row) return;
+    closeFlashLook();
     if (pinSession) cancelPin();
     if (aliasSession) cancelAlias();
     const column = typeof openColorColumn === 'string' ? openColorColumn : null;
@@ -314,6 +393,7 @@ export function connectView({
     const clipName = resolveCreateClipName(lastPayload, clipNameOverride);
     if (!canStartCreate(lastPayload, clipNameOverride)) return;
     if (!matchColumn) return;
+    closeFlashLook();
     if (aliasSession) cancelAlias();
     if (pinSession) cancelPin();
 
@@ -343,6 +423,7 @@ export function connectView({
       : (lastPayload?.clipName?.trim() ?? '');
     if (!clipName) return;
     if (typeof clipNameOverride !== 'string' && lastPayload?.match?.matched === true) return;
+    closeFlashLook();
     if (editSession) cancelEdit();
     if (pinSession) cancelPin();
 
@@ -403,6 +484,7 @@ export function connectView({
   }
 
   function startPin() {
+    closeFlashLook();
     if (editSession) cancelEdit();
     if (aliasSession) cancelAlias();
     pinSession = createPinSession();
@@ -840,6 +922,9 @@ export function connectView({
 
   function render() {
     closeColorPicker();
+    abortFlashLookIfRowChanged(
+      lastPayload?.match?.matched === true ? lastPayload.match.rowId : null,
+    );
     if (!viewConfig) return;
     const ctx = {
       ...viewConfig,
@@ -1000,6 +1085,7 @@ export function connectView({
         onCancelEdit: cancelEdit,
         onSaveEdit: saveEdit,
         getMomentWho,
+        ...flashLookProps(),
       });
     }
     paintLiveColors();
@@ -1008,6 +1094,11 @@ export function connectView({
   function paintLiveColors() {
     if (!root || statusOnly || showingSettings) return;
     applyLiveColorOverlay(root, lastLiveColors, liveColorColumns);
+    const columns = flashLookColumns();
+    syncFlashLookButton(root, {
+      ready: canFlashLook(lastLiveColors, columns, liveColorColumns),
+      title: flashLookDisabledReason(lastLiveColors, columns, liveColorColumns),
+    });
   }
 
   function setConnected(next) {
@@ -1129,6 +1220,7 @@ export function connectView({
     if (showingSettings && unmountSettings) return;
     showingSettings = true;
     closeColorPicker();
+    closeFlashLook();
     editSession = null;
     aliasSession = null;
     pinSession = null;
@@ -1162,6 +1254,7 @@ export function connectView({
       return;
     }
     currentViewId = nextId;
+    closeFlashLook();
     editSession = null;
     aliasSession = null;
     pinSession = null;

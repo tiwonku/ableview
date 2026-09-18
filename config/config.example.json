@@ -179,9 +179,6 @@
           "display": "note"
         },
         {
-          "column": "Notch"
-        },
-        {
           "column": "RGB_1",
           "label": "Color 1",
           "type": "color"

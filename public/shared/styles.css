@@ -1168,6 +1168,16 @@ body.layout-operator .clip-name--pinned {
   color: #fff;
 }
 
+.view-edit-btn--flash {
+  border-color: var(--ok);
+  background: rgba(62, 207, 142, 0.18);
+  color: #7dffb3;
+}
+
+.view-edit-btn--flash:hover:not(:disabled) {
+  background: rgba(62, 207, 142, 0.3);
+}
+
 .view-edit-btn--unpin {
   border-color: var(--warn);
   background: rgba(230, 162, 60, 0.18);
@@ -3353,6 +3363,297 @@ body.color-picker-open {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+
+.flash-look-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(0.5rem, env(safe-area-inset-top, 0px)) max(0.75rem, env(safe-area-inset-right, 0px)) max(0.5rem, env(safe-area-inset-bottom, 0px)) max(0.75rem, env(safe-area-inset-left, 0px));
+}
+
+.flash-look-overlay[hidden] {
+  display: none !important;
+}
+
+body.flash-look-open {
+  overflow: hidden;
+}
+
+.flash-look-backdrop {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.78);
+  cursor: pointer;
+}
+
+.flash-look-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.4rem, 1.2dvh, 0.85rem);
+  width: min(72rem, 100%);
+  max-height: min(92dvh, 100%);
+  min-height: 0;
+  padding: clamp(0.55rem, 1.4dvh, 1rem) clamp(0.7rem, 1.4vw, 1.15rem) clamp(0.65rem, 1.6dvh, 1.1rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.flash-look-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.flash-look-titles {
+  min-width: 0;
+}
+
+.flash-look-kicker {
+  margin: 0 0 0.1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7dffb3;
+}
+
+.flash-look-title {
+  margin: 0;
+  font-size: clamp(1rem, 2.4dvh, 1.35rem);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flash-look-close {
+  flex-shrink: 0;
+  min-height: var(--chrome-btn-min);
+  padding: 0.45rem 1rem;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.flash-look-close:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.flash-look-compare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: clamp(0.45rem, 1.4vw, 1.15rem);
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.flash-look-arrow {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font-size: clamp(1.35rem, 4dvh, 2rem);
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.flash-look-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: clamp(0.25rem, 0.8dvh, 0.45rem);
+}
+
+.flash-look-side-kicker {
+  margin: 0;
+  font-size: clamp(0.62rem, 1.2dvh, 0.75rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.flash-look-side--live .flash-look-side-kicker {
+  color: #7dffb3;
+}
+
+.flash-look-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.3rem, 0.9vw, 0.65rem);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.flash-look-chip {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.2rem, 0.6dvh, 0.35rem);
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: clamp(0.35rem, 1dvh, 0.55rem);
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+button.flash-look-chip--live {
+  cursor: pointer;
+}
+
+button.flash-look-chip--live:hover:not(:disabled) {
+  border-color: var(--ok);
+}
+
+button.flash-look-chip--live:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+}
+
+.flash-look-chip-label {
+  font-size: clamp(0.62rem, 1.15dvh, 0.75rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.flash-look-swatch {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: clamp(3.25rem, 18dvh, 7.5rem);
+  height: auto;
+  margin: 0;
+  border-radius: 0.4rem;
+}
+
+.flash-look-chip-meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(0.68rem, 1.3dvh, 0.85rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flash-look-hint,
+.flash-look-warn,
+.flash-look-error {
+  margin: 0;
+  flex-shrink: 0;
+  font-size: clamp(0.75rem, 1.5dvh, 0.9rem);
+  line-height: 1.3;
+}
+
+.flash-look-hint {
+  color: var(--muted);
+}
+
+.flash-look-warn {
+  color: #ffd591;
+}
+
+.flash-look-error {
+  color: #ffb4b4;
+}
+
+.flash-look-actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.flash-look-btn {
+  flex: 1 1 0;
+  min-height: clamp(2.6rem, 7.5dvh, 3.4rem);
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: clamp(0.95rem, 2.1dvh, 1.1rem);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.flash-look-btn--primary {
+  flex: 2 1 0;
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #0b1a12;
+}
+
+.flash-look-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.flash-look-btn:disabled,
+.flash-look-close:disabled,
+button.flash-look-chip--live:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-height: 50rem) {
+  .flash-look-overlay {
+    align-items: stretch;
+  }
+
+  .flash-look-panel {
+    width: min(88rem, 100%);
+    max-height: 100%;
+    height: 100%;
+  }
+
+  .flash-look-swatch {
+    min-height: clamp(3rem, 22dvh, 8rem);
+  }
+}
+
+@media (max-width: 40rem) {
+  .flash-look-compare {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .flash-look-arrow {
+    justify-content: center;
+    transform: rotate(90deg);
+  }
+
+  .flash-look-title {
+    white-space: normal;
+  }
+
+  .flash-look-swatch {
+    min-height: clamp(2.8rem, 12dvh, 5rem);
+  }
 }
 
 @media (max-width: 40rem), (orientation: portrait) and (max-height: 56rem) {

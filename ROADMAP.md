@@ -43,6 +43,7 @@ post-v2026.
 | **Setlist editor / viewer** | Named JSON setlists of cue-sheet rows; dedicated `/views/setlist` glance + editor; pin uses existing override. Auto-saves; switch/save-as for other nights. | ✅ done |
 | **In-app moments** | Dope button on every view (`who` = view id) + typed note row on Set (below Log). Same `POST /api/moments` as Companion; green/red flash feedback. | ✅ done |
 | **GrandMA live colors (sACN)** | Receive 8-bit RGB over sACN (universe 191, channels 500–508 by default). Operator color cards overlay live GrandMA swatches in realtime; session log writes change-gated `live_color` events (`settled` / `motion`). Settings: NIC picker, universe, start channels, log knobs. | ✅ done |
+| **Flash look** | Lighting/Visuals clip-head **Flash** copies live GrandMA RGB onto the matched cue row (`RGB_1`/`RGB_2`/`RGB_3`). Confirm overlay (sheet vs GrandMA); write all 3 or tap one slot. Short/wide layout for Xeneon Edge. | ✅ done |
 
 ---
 
