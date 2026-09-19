@@ -262,6 +262,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       authoritativeClip: authoritativeClipOf(),
       tempo,
       beat,
+      songTime: songTimeOf(),
       isPlaying,
       pendingLaunch,
       scene,
@@ -277,6 +278,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
       tracks,
       event.tempo,
       event.beat,
+      event.songTime ?? null,
       event.isPlaying,
       event.signatureNumerator ?? null,
       event.signatureDenominator ?? null,
@@ -525,6 +527,7 @@ export function createAbletonOscSource({ config, getIngestConfig, bus, log }) {
         if (songTime == null || Math.floor(Number(songTime)) < Number(beat)) {
           songTime = beat;
         }
+        requestSongTime();
         if (anyArrangementPlaying()) resolveArrangementTracks();
         return emitNowPlaying();
       case '/live/song/get/signature_numerator':

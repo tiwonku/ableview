@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import dotenv from 'dotenv';
+import { BREATH_CURVES, DEFAULT_BREATH } from '../../public/shared/breath-math.js';
 
 export const DEFAULTS = Object.freeze({
   ingest: {
@@ -98,6 +99,7 @@ export const DEFAULTS = Object.freeze({
   oscOut: {
     enabled: false,
     destinations: [],
+    breath: { ...DEFAULT_BREATH },
   },
   views: {},
 });
@@ -312,6 +314,45 @@ export function validateConfig(config) {
       });
     }
   }
+  const breath = oscOut.breath;
+  if (breath != null) {
+    if (!breath || typeof breath !== 'object' || Array.isArray(breath)) {
+      errors.push('oscOut.breath must be an object');
+    } else {
+      if (breath.enabled != null && typeof breath.enabled !== 'boolean') {
+        errors.push('oscOut.breath.enabled must be a boolean');
+      }
+      if (breath.rateHz != null) {
+        const hz = breath.rateHz;
+        if (!(Number.isInteger(hz) && hz >= 1 && hz <= 60)) {
+          errors.push('oscOut.breath.rateHz must be an integer 1–60');
+        }
+      }
+      if (breath.cycleBeats != null && !(Number.isFinite(breath.cycleBeats) && breath.cycleBeats > 0)) {
+        errors.push('oscOut.breath.cycleBeats must be > 0');
+      }
+      if (breath.phaseOffsetBeats != null && !Number.isFinite(breath.phaseOffsetBeats)) {
+        errors.push('oscOut.breath.phaseOffsetBeats must be a number');
+      }
+      for (const key of ['min', 'max', 'rise', 'peakHold', 'fall', 'troughHold']) {
+        if (breath[key] == null) continue;
+        if (!Number.isFinite(breath[key]) || breath[key] < 0) {
+          errors.push(`oscOut.breath.${key} must be a number >= 0`);
+        }
+      }
+      if (breath.min != null && breath.min > 1) errors.push('oscOut.breath.min must be <= 1');
+      if (breath.max != null && breath.max > 1) errors.push('oscOut.breath.max must be <= 1');
+      if (breath.min != null && breath.max != null && breath.max < breath.min) {
+        errors.push('oscOut.breath.max must be >= oscOut.breath.min');
+      }
+      if (breath.riseCurve != null && !BREATH_CURVES.includes(breath.riseCurve)) {
+        errors.push(`oscOut.breath.riseCurve must be one of: ${BREATH_CURVES.join(', ')}`);
+      }
+      if (breath.fallCurve != null && !BREATH_CURVES.includes(breath.fallCurve)) {
+        errors.push(`oscOut.breath.fallCurve must be one of: ${BREATH_CURVES.join(', ')}`);
+      }
+    }
+  }
 
   const views = config.views ?? {};
   for (const [viewId, view] of Object.entries(views)) {
@@ -384,6 +425,9 @@ export function loadConfig({ configPath = './config/config.json', envPath = '.en
 
   if (!config.views.setlist) {
     config.views.setlist = { title: 'Set', system: true };
+  }
+  if (!config.views.breath) {
+    config.views.breath = { title: 'Breath', system: true };
   }
 
   // Secrets and machine-specific settings come from the environment (§8).

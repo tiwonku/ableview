@@ -5,7 +5,7 @@ export const BREATH_CURVES = Object.freeze(['linear', 'easeIn', 'easeOut', 'ease
 
 export const DEFAULT_BREATH = Object.freeze({
   enabled: false,
-  rateHz: 30,
+  rateHz: 60,
   cycleBeats: 8,
   phaseOffsetBeats: 0,
   min: 0,
@@ -26,7 +26,14 @@ export const INITIAL_BREATH_TRANSPORT = Object.freeze({
   frozenBeat: null,
   signatureNumerator: 4,
   signatureDenominator: 4,
+  lastIntBeat: null,
+  lastSongTime: null,
 });
+
+/** Snap interpolator only for seeks, not for the same beat restated. */
+export const BREATH_SEEK_BEATS = 1.5;
+/** Ignore Ableton restates that are already within this window of the ramp. */
+export const BREATH_HOLD_BEATS = 0.5;
 
 function finiteOr(value, fallback) {
   const n = Number(value);
@@ -206,6 +213,29 @@ export function interpolateSongBeat({
   return Number(songBeat) + (elapsedMs / 1000) * (bpm / 60);
 }
 
+function finiteOrNull(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function currentInterp(state, now, playing = state.isPlaying) {
+  return interpolateSongBeat({
+    songBeat: state.songBeat,
+    tempo: state.tempo,
+    isPlaying: playing === true,
+    receivedAt: state.receivedAt,
+    now,
+    frozenBeat: state.frozenBeat,
+  });
+}
+
+function adopt(next, position, now, { freeze = false } = {}) {
+  next.songBeat = position;
+  next.receivedAt = now;
+  next.frozenBeat = freeze ? position : null;
+}
+
 export function applyBreathTransport(prev, event, now) {
   const next = {
     songBeat: prev?.songBeat ?? null,
@@ -215,65 +245,76 @@ export function applyBreathTransport(prev, event, now) {
     frozenBeat: prev?.frozenBeat ?? null,
     signatureNumerator: prev?.signatureNumerator ?? 4,
     signatureDenominator: prev?.signatureDenominator ?? 4,
+    lastIntBeat: prev?.lastIntBeat ?? null,
+    lastSongTime: prev?.lastSongTime ?? null,
   };
 
-  const tempoIn = event?.tempo;
-  const tempoChanged = tempoIn != null && Number.isFinite(Number(tempoIn)) && Number(tempoIn) !== next.tempo;
-  if (tempoIn != null && Number.isFinite(Number(tempoIn))) next.tempo = Number(tempoIn);
+  const tempoIn = finiteOrNull(event?.tempo);
+  const tempoChanged = tempoIn != null && tempoIn !== next.tempo;
+  if (tempoIn != null) next.tempo = tempoIn;
 
-  if (event?.signatureNumerator != null && Number.isFinite(Number(event.signatureNumerator))) {
-    next.signatureNumerator = Number(event.signatureNumerator);
-  }
-  if (event?.signatureDenominator != null && Number.isFinite(Number(event.signatureDenominator))) {
-    next.signatureDenominator = Number(event.signatureDenominator);
-  }
+  const sigNum = finiteOrNull(event?.signatureNumerator);
+  const sigDen = finiteOrNull(event?.signatureDenominator);
+  if (sigNum != null) next.signatureNumerator = sigNum;
+  if (sigDen != null) next.signatureDenominator = sigDen;
 
-  const playing = event?.isPlaying === true;
+  const playingIn = event?.isPlaying;
+  const playing = playingIn === true || playingIn === 1
+    ? true
+    : playingIn === false || playingIn === 0
+      ? false
+      : next.isPlaying;
   const wasPlaying = next.isPlaying === true;
-  const beatIn = event?.beat;
-  const hasBeat = beatIn != null && Number.isFinite(Number(beatIn));
-  const beatChanged = hasBeat && Number(beatIn) !== next.songBeat;
+  const songTime = finiteOrNull(event?.songTime);
+  const intBeat = finiteOrNull(event?.beat);
+  const incoming = songTime ?? intBeat;
 
   if (wasPlaying && !playing) {
-    next.frozenBeat = interpolateSongBeat({
-      songBeat: next.songBeat,
-      tempo: next.tempo,
-      isPlaying: true,
-      receivedAt: next.receivedAt,
-      now,
-    });
+    const pos = currentInterp(next, now, true);
     next.isPlaying = false;
-    if (hasBeat && next.songBeat != null && Math.abs(Number(beatIn) - Number(next.songBeat)) > 1.5) {
-      next.songBeat = Number(beatIn);
-      next.frozenBeat = Number(beatIn);
+    next.frozenBeat = pos;
+    if (incoming != null && (pos == null || Math.abs(incoming - pos) > BREATH_SEEK_BEATS)) {
+      adopt(next, incoming, now, { freeze: true });
     }
+    if (intBeat != null) next.lastIntBeat = intBeat;
+    if (songTime != null) next.lastSongTime = songTime;
     return next;
   }
 
   if (playing) {
-    if (wasPlaying && tempoChanged && !beatChanged) {
-      next.songBeat = interpolateSongBeat({
-        songBeat: next.songBeat,
-        tempo: prev?.tempo,
-        isPlaying: true,
-        receivedAt: next.receivedAt,
-        now,
-      });
-      next.receivedAt = now;
+    if (wasPlaying && tempoChanged) {
+      const pos = currentInterp({ ...next, tempo: prev?.tempo }, now, true);
+      if (pos != null) adopt(next, pos, now);
     }
     next.isPlaying = true;
     next.frozenBeat = null;
-    if (hasBeat) {
-      next.songBeat = Number(beatIn);
-      next.receivedAt = now;
+
+    const interp = currentInterp(next, now, true);
+
+    if (songTime != null && songTime !== next.lastSongTime) {
+      if (interp == null || Math.abs(songTime - interp) > BREATH_HOLD_BEATS) {
+        adopt(next, songTime, now);
+      }
+      next.lastSongTime = songTime;
+    } else if (songTime == null && intBeat != null && intBeat !== next.lastIntBeat) {
+      if (interp == null || intBeat - interp > BREATH_HOLD_BEATS || interp - intBeat > BREATH_SEEK_BEATS) {
+        adopt(next, intBeat, now);
+      }
     }
+
+    if (intBeat != null) next.lastIntBeat = intBeat;
+    if (songTime != null) next.lastSongTime = songTime;
     return next;
   }
 
   next.isPlaying = false;
-  if (hasBeat) {
-    next.songBeat = Number(beatIn);
-    next.frozenBeat = Number(beatIn);
+  if (incoming != null) {
+    const current = next.frozenBeat ?? next.songBeat;
+    if (current == null || Math.abs(incoming - current) > BREATH_SEEK_BEATS) {
+      adopt(next, incoming, now, { freeze: true });
+    }
   }
+  if (intBeat != null) next.lastIntBeat = intBeat;
+  if (songTime != null) next.lastSongTime = songTime;
   return next;
 }

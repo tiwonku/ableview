@@ -10,6 +10,7 @@ export function makeCuePayload({
   row = null,
   tempo = null,
   beat = null,
+  songTime = null,
   isPlaying = null,
   syncedAt = null,
   stale = false,
@@ -21,6 +22,8 @@ export function makeCuePayload({
   trackMatches = [],
   scene = null,
   lastMatched = null,
+  signatureNumerator = null,
+  signatureDenominator = null,
 }) {
   const payload = {
     clipName,
@@ -37,6 +40,9 @@ export function makeCuePayload({
     trackMatches: Array.isArray(trackMatches) ? trackMatches : [],
   };
   if (scene != null) payload.scene = scene;
+  if (signatureNumerator != null) payload.signatureNumerator = signatureNumerator;
+  if (signatureDenominator != null) payload.signatureDenominator = signatureDenominator;
+  if (songTime != null) payload.songTime = songTime;
   if (row != null) payload.row = row;
   if (ableton != null) payload.ableton = ableton;
   if (lastMatched != null) payload.lastMatched = lastMatched;

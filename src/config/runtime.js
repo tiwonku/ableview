@@ -2,6 +2,35 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { validateConfig } from './index.js';
 import { DEFAULT_LIVE_COLOR_COLUMNS, DEFAULT_LIVE_COLOR_SLOTS } from '../core/live-colors.js';
+import { DEFAULT_BREATH, normalizeBreathSettings } from '../../public/shared/breath-math.js';
+
+function serializeBreath(breath) {
+  const src = normalizeBreathSettings({ ...DEFAULT_BREATH, ...breath });
+  return {
+    enabled: src.enabled,
+    rateHz: src.rateHz,
+    cycleBeats: src.cycleBeats,
+    phaseOffsetBeats: src.phaseOffsetBeats,
+    min: src.min,
+    max: src.max,
+    rise: src.rise,
+    peakHold: src.peakHold,
+    fall: src.fall,
+    troughHold: src.troughHold,
+    riseCurve: src.riseCurve,
+    fallCurve: src.fallCurve,
+  };
+}
+
+function serializeOscOut(oscOut) {
+  return {
+    enabled: oscOut?.enabled === true,
+    destinations: Array.isArray(oscOut?.destinations)
+      ? oscOut.destinations.map((d) => ({ host: d.host, port: d.port }))
+      : [],
+    breath: serializeBreath(oscOut?.breath),
+  };
+}
 
 function serializeSacn(sacn) {
   const src = sacn ?? {};
@@ -65,12 +94,7 @@ export function serializeFileConfig(config) {
     sessionLog: { ...config.sessionLog },
     setlist: { ...config.setlist },
     moments: { ...config.moments },
-    oscOut: {
-      enabled: config.oscOut?.enabled === true,
-      destinations: Array.isArray(config.oscOut?.destinations)
-        ? config.oscOut.destinations.map((d) => ({ host: d.host, port: d.port }))
-        : [],
-    },
+    oscOut: serializeOscOut(config.oscOut),
     views: { ...config.views },
   };
 }
@@ -84,12 +108,7 @@ export function pickEditableSettings(config) {
     timecode: { ...config.timecode },
     sacn: serializeSacn(config.sacn),
     moments: { ...config.moments },
-    oscOut: {
-      enabled: config.oscOut?.enabled === true,
-      destinations: Array.isArray(config.oscOut?.destinations)
-        ? config.oscOut.destinations.map((d) => ({ host: d.host, port: d.port }))
-        : [],
-    },
+    oscOut: serializeOscOut(config.oscOut),
   };
 }
 

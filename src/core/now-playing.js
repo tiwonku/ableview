@@ -12,6 +12,7 @@ export function makeNowPlaying({
   authoritativeClip = null,
   tempo = null,
   beat = null,
+  songTime = null,
   isPlaying = null,
   pendingLaunch = false,
   scene = null,
@@ -34,5 +35,6 @@ export function makeNowPlaying({
   if (scene != null) payload.scene = scene;
   if (signatureNumerator != null) payload.signatureNumerator = signatureNumerator;
   if (signatureDenominator != null) payload.signatureDenominator = signatureDenominator;
+  if (songTime != null) payload.songTime = songTime;
   return payload;
 }

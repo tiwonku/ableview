@@ -14,6 +14,7 @@ const FALLBACK_SHARE_VIEWS = Object.freeze({
   lighting: { title: 'Lighting' },
   session: { title: 'Session' },
   setlist: { title: 'Set' },
+  breath: { title: 'Breath' },
   admin: { title: 'Admin' },
 });
 
@@ -546,7 +547,7 @@ function renderOscOutGroup(settings) {
   group.appendChild(hint);
 
   const map = el('p', 'settings-field-hint oscout-addresses');
-  map.textContent = '/ableview/clock/tempo  f   ·  /ableview/clock/beat  i (1-based in-bar)  ·  /ableview/clock/bar  i  ·  /ableview/clock/beat_pulse  i (1 then 0)  ·  /ableview/clock/bar_pulse  i (1 then 0)  ·  /ableview/clock/is_playing  i  ·  /ableview/clock/signature  i i';
+  map.textContent = '/ableview/clock/tempo  f   ·  /ableview/clock/beat  i (1-based in-bar)  ·  /ableview/clock/bar  i  ·  /ableview/clock/beat_pulse  i (1 then 0)  ·  /ableview/clock/bar_pulse  i (1 then 0)  ·  /ableview/clock/is_playing  i  ·  /ableview/clock/signature  i i  ·  Breath on /views/breath  ·  /ableview/breath/value  f  ·  /ableview/breath/phase  f  ·  /ableview/breath/cycle  i  ·  /ableview/breath/inhale  i  ·  /ableview/breath/exhale  i  ·  /ableview/breath/hold  i';
   group.appendChild(map);
 
   return group;

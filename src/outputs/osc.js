@@ -1,6 +1,12 @@
 import osc from 'osc';
 import { EVENTS } from '../core/bus.js';
 import { liveTransportClock } from '../core/clock.js';
+import { createBreathRuntime } from './breath.js';
+import {
+  DEFAULT_OSC_OUT_LOCK,
+  acquireOscOutLock,
+  releaseOscOutLock,
+} from './osc-lock.js';
 
 // Clock rebroadcast (spec §11 tap point). A separate UDP port from Ableton
 // ingest — never send /live/** and never target ingest.abletonHost:oscSendPort.
@@ -16,6 +22,13 @@ export const OSC_OUT_ADDRESSES = Object.freeze({
 });
 
 export const OSC_OUT_PULSE_RESET_MS = 30;
+
+export function toOscBundle(packets) {
+  return {
+    timeTag: osc.timeTag(0),
+    packets: packets.map((p) => ({ address: p.address, args: p.args })),
+  };
+}
 
 function intArg(value) {
   return [{ type: 'i', value }];
@@ -154,11 +167,62 @@ export function clockPackets(event, prev = null, { snapshot = false } = {}) {
   return { packets, sent: next, pulses };
 }
 
-export function createOscOutput({ getConfig, bus, log, sendPacket = null }) {
+function destFingerprint(oscOut, ingest) {
+  const { destinations } = resolveDestinations(oscOut, ingest);
+  return JSON.stringify({
+    enabled: oscOut?.enabled === true,
+    dests: destinations.map((d) => `${d.host}:${d.port}`),
+  });
+}
+
+export function createOscOutput({
+  getConfig,
+  bus,
+  log,
+  sendPacket = null,
+  lockPath,
+  now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+  setIntervalFn = null,
+  clearIntervalFn = clearInterval,
+}) {
   let udp = null;
   let lastEvent = null;
   let lastSent = null;
+  let lastDestKey = null;
+  let lockHeld = false;
+  let sendBlocked = false;
   const pulseTimers = { beat: null, bar: null };
+
+  function resolvedLockPath() {
+    if (lockPath === null) return null;
+    if (typeof lockPath === 'string') return lockPath;
+    if (sendPacket) return null;
+    return DEFAULT_OSC_OUT_LOCK;
+  }
+
+  function takeLock() {
+    const file = resolvedLockPath();
+    if (!file) return true;
+    const result = acquireOscOutLock(file, {
+      pid: process.pid,
+      httpPort: getConfig().server?.httpPort ?? null,
+    });
+    if (!result.ok) {
+      log.error(
+        { ownerPid: result.existing?.pid, ownerHttpPort: result.existing?.httpPort, lockPath: file },
+        'osc output skipped — another AbleView is already sending (stop the extra process)',
+      );
+      return false;
+    }
+    lockHeld = true;
+    return true;
+  }
+
+  function dropLock() {
+    if (!lockHeld) return;
+    releaseOscOutLock(resolvedLockPath(), process.pid);
+    lockHeld = false;
+  }
 
   function enabled() {
     return getConfig().oscOut?.enabled === true;
@@ -169,8 +233,8 @@ export function createOscOutput({ getConfig, bus, log, sendPacket = null }) {
     return Number.isFinite(n) && n >= 0 ? n : OSC_OUT_PULSE_RESET_MS;
   }
 
-  function dispatch(packets) {
-    if (!packets.length) return;
+  function dispatch(packets, { bundle = false } = {}) {
+    if (sendBlocked || !packets.length) return;
     const { destinations, skippedAbleton } = resolveDestinations(
       getConfig().oscOut,
       getConfig().ingest,
@@ -181,9 +245,13 @@ export function createOscOutput({ getConfig, bus, log, sendPacket = null }) {
     if (!destinations.length) return;
 
     for (const dest of destinations) {
+      if (bundle && packets.length > 1 && udp && !sendPacket) {
+        udp.send(toOscBundle(packets), dest.host, dest.port);
+        continue;
+      }
       for (const packet of packets) {
         if (sendPacket) {
-          sendPacket({ ...packet, host: dest.host, port: dest.port });
+          sendPacket({ ...packet, host: dest.host, port: dest.port, bundle });
         } else if (udp) {
           udp.send({ address: packet.address, args: packet.args }, dest.host, dest.port);
         }
@@ -227,8 +295,21 @@ export function createOscOutput({ getConfig, bus, log, sendPacket = null }) {
     if (pulses.beat) schedulePulseReset('beat');
   }
 
+  const breath = createBreathRuntime({
+    getSettings: () => getConfig().oscOut?.breath,
+    dispatch,
+    now,
+    setIntervalFn,
+    clearIntervalFn,
+  });
+
+  function breathWanted() {
+    return enabled() && getConfig().oscOut?.breath?.enabled === true;
+  }
+
   function onNowPlaying(event) {
     lastEvent = event;
+    breath.onNowPlaying(event);
     emitFromEvent(event);
   }
 
@@ -263,25 +344,52 @@ export function createOscOutput({ getConfig, bus, log, sendPacket = null }) {
   }
 
   async function start() {
+    const cfg = getConfig();
+    const nextKey = destFingerprint(cfg.oscOut, cfg.ingest);
+    const alreadyOpen = Boolean(sendPacket || udp);
+    if (alreadyOpen && lastDestKey === nextKey && enabled()) {
+      if (lastEvent) breath.onNowPlaying(lastEvent);
+      breath.syncTimer(breathWanted());
+      return;
+    }
+
     clearPulseTimers({ reset: true });
     closeUdp();
     lastSent = null;
+    lastDestKey = nextKey;
     if (!enabled()) {
+      sendBlocked = false;
+      dropLock();
+      breath.syncTimer(false);
       log.info('osc clock output disabled');
       return;
     }
+    if (!takeLock()) {
+      sendBlocked = true;
+      lastDestKey = null;
+      breath.syncTimer(false);
+      return;
+    }
+    sendBlocked = false;
     if (!sendPacket) {
       await openUdp();
     }
-    const { destinations } = resolveDestinations(getConfig().oscOut, getConfig().ingest);
-    log.info({ destinations: destinations.length }, 'osc clock output ready');
-    if (lastEvent) emitFromEvent(lastEvent, { snapshot: true });
+    const { destinations } = resolveDestinations(cfg.oscOut, cfg.ingest);
+    log.info({ destinations: destinations.length, breath: breathWanted() }, 'osc clock output ready');
+    if (lastEvent) {
+      breath.onNowPlaying(lastEvent);
+      emitFromEvent(lastEvent, { snapshot: true });
+    }
+    breath.syncTimer(breathWanted());
   }
 
   function stop() {
     bus.off(EVENTS.NOW_PLAYING, onNowPlaying);
+    breath.stop();
     clearPulseTimers({ reset: true });
     closeUdp();
+    dropLock();
+    lastDestKey = null;
   }
 
   return { start, stop };

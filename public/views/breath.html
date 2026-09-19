@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>AbleView — Breath</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+</head>
+<body class="layout-breath">
+  <header id="status-bar" class="status-bar">
+    <span class="status-group">
+      <span class="dot" aria-hidden="true"></span>
+      <span data-role="connection">Connecting…</span>
+    </span>
+    <span class="status-group status-group--live">
+      <span data-role="transport" class="transport-indicator" hidden role="status" aria-live="polite"></span>
+      <span data-role="tempo" class="tempo-indicator" hidden role="status" aria-live="polite"></span>
+    </span>
+    <span id="sim-pill" class="status-pill sim" hidden role="status" title="Simulation mode — not live Ableton">SIM</span>
+    <span id="stale-pill" class="status-pill stale" hidden role="status" title="Sheet data from offline cache">STALE</span>
+    <span id="arr-pill" class="status-pill arrangement" hidden role="status" title="Playing from Arrangement view">ARR</span>
+    <span class="status-sep" aria-hidden="true">·</span>
+    <span data-role="last-update" title="Last cue update">—</span>
+  </header>
+  <main id="app" class="breath-main" aria-label="Breath"></main>
+  <script type="module">
+    import { connectView } from '/shared/ws-client.js';
+
+    connectView({ viewId: 'breath' });
+  </script>
+</body>
+</html>

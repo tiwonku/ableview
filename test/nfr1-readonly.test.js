@@ -62,3 +62,16 @@ test('clock OSC output never uses Ableton /live addresses', () => {
   assert.match(source, /\/ableview\/clock\/is_playing/);
   assert.match(source, /\/ableview\/clock\/signature/);
 });
+
+test('breath OSC output never uses Ableton /live addresses', () => {
+  const source = readFileSync(new URL('../src/outputs/breath.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /['"]\/live\//);
+  assert.doesNotMatch(source, /assertReadOnlyAddress/);
+  assert.doesNotMatch(source, /['"]\/ableview\/breath['"]/);
+  assert.match(source, /\/ableview\/breath\/value/);
+  assert.match(source, /\/ableview\/breath\/phase/);
+  assert.match(source, /\/ableview\/breath\/cycle/);
+  assert.match(source, /\/ableview\/breath\/inhale/);
+  assert.match(source, /\/ableview\/breath\/exhale/);
+  assert.match(source, /\/ableview\/breath\/hold/);
+});

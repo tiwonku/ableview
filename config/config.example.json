@@ -108,7 +108,21 @@
   },
   "oscOut": {
     "enabled": false,
-    "destinations": []
+    "destinations": [],
+    "breath": {
+      "enabled": false,
+      "rateHz": 60,
+      "cycleBeats": 8,
+      "phaseOffsetBeats": 0,
+      "min": 0,
+      "max": 1,
+      "rise": 0.4,
+      "peakHold": 0.1,
+      "fall": 0.4,
+      "troughHold": 0.1,
+      "riseCurve": "easeOut",
+      "fallCurve": "easeIn"
+    }
   },
   "views": {
     "band": {
@@ -204,6 +218,10 @@
     },
     "setlist": {
       "title": "Set",
+      "system": true
+    },
+    "breath": {
+      "title": "Breath",
       "system": true
     },
     "admin": {

@@ -173,6 +173,8 @@ export function mountBreathPage(root, { getPayload } = {}) {
     frozenBeat: null,
     signatureNumerator: 4,
     signatureDenominator: 4,
+    lastIntBeat: null,
+    lastSongTime: null,
   };
   let saveTimer = null;
   let saveGen = 0;
@@ -463,6 +465,7 @@ export function mountBreathPage(root, { getPayload } = {}) {
     transport = applyBreathTransport(transport, {
       tempo: payload.tempo,
       beat: payload.beat,
+      songTime: payload.songTime,
       isPlaying: payload.isPlaying,
       signatureNumerator: payload.signatureNumerator,
       signatureDenominator: payload.signatureDenominator,
