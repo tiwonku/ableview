@@ -35,13 +35,14 @@ html:fullscreen body {
   overflow: hidden;
 }
 
-/* Operator/session fill the viewport and scroll internally. Admin + settings
-   are document-scroll pages — without this, kiosk fullscreen clips them. */
-html:fullscreen:has(body:not(.layout-operator):not(.layout-session):not(.layout-setlist)) {
+/* Operator/session/admin-dashboard fill the viewport and scroll internally.
+   Admin detail + settings are document-scroll pages — without this, kiosk
+   fullscreen clips them. */
+html:fullscreen:has(body:not(.layout-operator):not(.layout-session):not(.layout-setlist):not(.layout-admin-dashboard)) {
   overflow: auto;
 }
 
-html:fullscreen body:not(.layout-operator):not(.layout-session):not(.layout-setlist) {
+html:fullscreen body:not(.layout-operator):not(.layout-session):not(.layout-setlist):not(.layout-admin-dashboard) {
   overflow: auto;
   height: auto;
   min-height: 100%;
@@ -4437,5 +4438,487 @@ body.layout-setlist .setlist-main {
   .setlist-item-actions {
     grid-column: 1 / -1;
     justify-content: flex-start;
+  }
+}
+
+/* Breath instrument (/views/breath) */
+
+.layout-breath .breath-main,
+.breath-main {
+  max-width: 64rem;
+  flex: 1;
+  padding: 1.25rem 1.25rem 2rem;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.breath-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.breath-title {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.breath-enable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+}
+
+.breath-warn {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(230, 162, 60, 0.45);
+  background: rgba(230, 162, 60, 0.1);
+  border-radius: 0.4rem;
+  color: var(--warn);
+  font-size: 0.9rem;
+}
+
+.breath-meters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.breath-wave-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.5rem 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.breath-wave {
+  display: block;
+  width: 100%;
+  height: 220px;
+}
+
+.breath-save {
+  min-height: 1.25rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.breath-save.is-error {
+  color: var(--danger);
+}
+
+.breath-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.breath-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.breath-preset {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.65rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.breath-preset:hover,
+.breath-preset:focus-visible {
+  border-color: var(--accent);
+}
+
+.breath-slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.breath-weight-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.5rem;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.breath-addresses {
+  margin-top: 0;
+}
+
+@media (max-width: 48rem) {
+  .breath-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Admin dashboard (16:9 board mode) --- */
+
+html:has(body.layout-admin-dashboard) {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.layout-admin-dashboard {
+  --dash-gap: clamp(0.4rem, 1.1dvh, 0.85rem);
+  --dash-pad: clamp(0.45rem, 1.2dvh, 0.9rem);
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body.layout-admin-dashboard #sim-controls-host {
+  display: none !important;
+}
+
+body.layout-admin-dashboard > main#app.admin-dashboard {
+  flex: 1 1 0;
+  min-height: 0;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: clamp(0.4rem, 1.1dvh, 0.75rem);
+  padding-right: max(clamp(0.65rem, 2vw, 1.15rem), env(safe-area-inset-right, 0px));
+  padding-bottom: max(clamp(0.35rem, 0.9dvh, 0.65rem), env(safe-area-inset-bottom, 0px));
+  padding-left: max(clamp(0.65rem, 2vw, 1.15rem), env(safe-area-inset-left, 0px));
+  overflow: hidden;
+}
+
+body.layout-admin-dashboard .clip-head-row {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: var(--dash-gap);
+}
+
+body.layout-admin-dashboard #admin-clip-head {
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+body.layout-admin-dashboard .clip-name {
+  font-size: clamp(1.35rem, 3.6dvh, 2.35rem);
+  margin: 0;
+}
+
+body.layout-admin-dashboard .view-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+body.layout-admin-dashboard .admin-board-toggle {
+  flex-direction: row;
+  flex-shrink: 0;
+  height: auto;
+  min-height: var(--chrome-btn-min);
+  min-width: 11.5rem;
+  align-self: stretch;
+}
+
+body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn {
+  border-bottom: 0;
+  border-right: 1px solid rgba(230, 162, 60, 0.35);
+  padding: 0.4rem 0.7rem;
+  white-space: nowrap;
+}
+
+body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
+  border-right: 0;
+}
+
+.admin-dashboard-board {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) minmax(9.5rem, 34%);
+  gap: var(--dash-gap);
+  overflow: hidden;
+}
+
+.admin-dashboard-board:has(.admin-editor),
+.admin-dashboard-board:has(.alias-panel),
+.admin-dashboard-board:has(.pin-panel),
+.admin-dashboard-board:has(.no-match-panel),
+.admin-dashboard-board:has(.no-match) {
+  grid-template-rows: minmax(0, 1fr) minmax(9.5rem, 34%);
+}
+
+.admin-dashboard-board > .admin-editor,
+.admin-dashboard-board > .alias-panel,
+.admin-dashboard-board > .pin-panel,
+.admin-dashboard-board > .no-match-panel,
+.admin-dashboard-board > .no-match {
+  min-height: 0;
+  overflow: auto;
+}
+
+.admin-dashboard-look {
+  display: grid;
+  grid-template-columns: minmax(9.5rem, 18%) minmax(0, 1fr);
+  gap: var(--dash-gap);
+  min-height: 0;
+  align-items: start;
+}
+
+.admin-dashboard-look:not(:has(.admin-dashboard-identity)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-dashboard-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.admin-dashboard-art {
+  min-width: 0;
+  min-height: 0;
+}
+
+.admin-dashboard-art .field--image {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.admin-dashboard-art .field-label {
+  display: none;
+}
+
+.admin-dashboard-art .field-image-body,
+.admin-dashboard-art .field-image {
+  display: block;
+  height: auto;
+  max-height: clamp(7rem, 16dvh, 11rem);
+  width: 100%;
+  object-fit: contain;
+  object-position: left top;
+}
+
+.admin-dashboard-mast {
+  display: flex;
+  flex-direction: column;
+  justify-content: stretch;
+  min-width: 0;
+  min-height: 0;
+}
+
+.admin-dashboard-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+}
+
+.admin-dashboard-tokens .field {
+  flex: 0 1 auto;
+  min-width: 4.5rem;
+  margin: 0;
+  padding: 0.15rem 0.35rem 0 0;
+  background: transparent;
+  border: none;
+}
+
+.admin-dashboard-tokens .field-label {
+  margin: 0 0 0.15rem;
+  font-size: clamp(0.62rem, 1.1dvh, 0.75rem);
+}
+
+.admin-dashboard-tokens .field-value {
+  margin: 0;
+  font-size: clamp(1.6rem, 4.4dvh, 2.85rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.admin-dashboard-look .colors-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--dash-gap);
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.admin-dashboard-look .field-color {
+  min-width: 0;
+  margin: 0;
+  padding: var(--dash-pad);
+}
+
+.admin-dashboard-look .color-swatch {
+  width: 100%;
+  height: clamp(2.4rem, 6.5dvh, 3.6rem);
+  max-height: 3.6rem;
+}
+
+.admin-dashboard-look .color-values {
+  display: none;
+}
+
+.admin-dashboard-notes {
+  display: grid;
+  grid-template-columns: repeat(var(--dash-note-cols, 2), minmax(0, 1fr));
+  gap: var(--dash-gap);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-dashboard-note-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--dash-pad);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.admin-dashboard-note-title {
+  flex-shrink: 0;
+  margin: 0 0 0.15rem;
+  font-size: clamp(0.68rem, 1.15dvh, 0.82rem);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.admin-dashboard-note-col .field {
+  flex: 0 0 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0.35rem 0 0.55rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.admin-dashboard-note-col .field:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.admin-dashboard-note-col .field-label {
+  margin: 0 0 0.2rem;
+  font-size: clamp(0.62rem, 1.05dvh, 0.75rem);
+}
+
+.admin-dashboard-note-col .field-value,
+.admin-dashboard-note-col .field-value--clamp {
+  appearance: none;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: clamp(0.95rem, 1.7dvh, 1.15rem);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-dashboard-note-col .field-value--clamp {
+  cursor: pointer;
+}
+
+.admin-dashboard-note-col .field-value--clamp:hover {
+  color: var(--accent);
+}
+
+.admin-dashboard-note-col .field-value--clamp:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.admin-dashboard-note-col .field-value.empty {
+  font-weight: 400;
+}
+
+.admin-dashboard-session {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-dashboard-session .session-scene-banner {
+  flex-shrink: 0;
+}
+
+.admin-dashboard-session .session-tracks {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.session-tracks--compact {
+  grid-auto-rows: minmax(7.5rem, 1fr);
+}
+
+.session-tracks--compact .session-track {
+  padding: clamp(0.4rem, 1dvh, 0.7rem);
+  gap: 0.3rem;
+}
+
+.session-tracks--compact .session-track-index {
+  display: none;
+}
+
+@media (max-width: 52rem) {
+  .admin-dashboard-look {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dashboard-identity {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .admin-dashboard-art {
+    flex: 0 0 7rem;
+  }
+
+  .admin-dashboard-art .field-image-body,
+  .admin-dashboard-art .field-image {
+    max-height: 8rem;
+  }
+
+  .admin-dashboard-notes {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dashboard-board {
+    overflow: auto;
+    grid-template-rows: auto auto minmax(14rem, auto);
   }
 }

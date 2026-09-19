@@ -30,9 +30,12 @@ import {
   renderPlayingClipsStrip,
   resolveCuePane,
   lastPanePayload,
+  hasLastMatchedRow,
 } from './playing-clips-strip.js';
 import { prependDopeButton } from './moment-controls.js';
 import { copyTextToClipboard } from './clipboard.js';
+import { buildDashboardZones } from './admin-dashboard.js';
+import { renderSceneBanner, renderSessionTracks } from './session-tracks.js';
 
 const TRANSPORT_PLAY_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5.5v13l11-6.5L8 5.5z"/></svg>`;
 const TRANSPORT_PAUSE_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M7 5h3.5v14H7V5zm6.5 0H17v14h-3.5V5z"/></svg>`;
@@ -495,6 +498,21 @@ function renderCuePaneToggle(cuePane, onCuePaneChange) {
   return group;
 }
 
+function appendLookWriteButton(actions, { onStartFlashLook, flashLookReady = false, flashLookTitle = '' }) {
+  const flashBtn = document.createElement('button');
+  flashBtn.type = 'button';
+  flashBtn.className = 'view-edit-btn view-edit-btn--flash';
+  flashBtn.dataset.role = 'flash-look';
+  flashBtn.textContent = 'Flash';
+  flashBtn.disabled = !flashLookReady;
+  flashBtn.title = flashLookTitle || 'Write GrandMA colors to this cue';
+  flashBtn.addEventListener('click', () => {
+    if (flashBtn.disabled) return;
+    onStartFlashLook();
+  });
+  actions.appendChild(flashBtn);
+}
+
 function renderViewEditActions({
   editSession,
   matched,
@@ -560,18 +578,7 @@ function renderViewEditActions({
   }
 
   if (showFlash) {
-    const flashBtn = document.createElement('button');
-    flashBtn.type = 'button';
-    flashBtn.className = 'view-edit-btn view-edit-btn--flash';
-    flashBtn.dataset.role = 'flash-look';
-    flashBtn.textContent = 'Flash';
-    flashBtn.disabled = !flashLookReady;
-    flashBtn.title = flashLookTitle || 'Write GrandMA colors to this cue';
-    flashBtn.addEventListener('click', () => {
-      if (flashBtn.disabled) return;
-      onStartFlashLook();
-    });
-    actions.appendChild(flashBtn);
+    appendLookWriteButton(actions, { onStartFlashLook, flashLookReady, flashLookTitle });
   }
 
   if (showChange) {
@@ -1087,6 +1094,304 @@ function addStat(parent, label, value, { warn = false, title = null } = {}) {
   parent.appendChild(card);
 }
 
+function renderBoardModeToggle(boardMode, onBoardModeChange) {
+  if (typeof onBoardModeChange !== 'function') return null;
+
+  const group = document.createElement('div');
+  group.className = 'cue-pane-toggle admin-board-toggle';
+  group.setAttribute('role', 'radiogroup');
+  group.setAttribute('aria-label', 'Admin layout');
+
+  for (const id of ['dashboard', 'detail']) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `cue-pane-btn cue-pane-btn--${id}`;
+    btn.setAttribute('role', 'radio');
+    btn.setAttribute('aria-checked', boardMode === id ? 'true' : 'false');
+    btn.textContent = id === 'dashboard' ? 'Dashboard' : 'Detail';
+    btn.addEventListener('click', () => {
+      if (boardMode !== id) onBoardModeChange(id);
+    });
+    group.appendChild(btn);
+  }
+
+  return group;
+}
+
+function appendAdminActionButtons(actions, {
+  busy,
+  matched,
+  pinned,
+  onStartPin,
+  onClearPin,
+  onStartEdit,
+  onStartFlashLook,
+  flashLookReady = false,
+  flashLookTitle = '',
+  showEdit = false,
+  showFlash = false,
+}) {
+  if (showFlash) {
+    appendLookWriteButton(actions, { onStartFlashLook, flashLookReady, flashLookTitle });
+  }
+  if (!busy && matched && onStartPin) {
+    const changeBtn = document.createElement('button');
+    changeBtn.type = 'button';
+    changeBtn.className = 'view-edit-btn';
+    changeBtn.textContent = 'Change cue';
+    changeBtn.addEventListener('click', onStartPin);
+    actions.appendChild(changeBtn);
+  }
+  if (!busy && pinned && onClearPin) {
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'view-edit-btn view-edit-btn--unpin';
+    clearBtn.textContent = 'Clear pin';
+    clearBtn.addEventListener('click', onClearPin);
+    actions.appendChild(clearBtn);
+  }
+  if (showEdit && !busy && matched && onStartEdit) {
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'view-edit-btn view-edit-btn--edit';
+    editBtn.innerHTML = `${EDIT_ICON}<span>Edit</span>`;
+    editBtn.addEventListener('click', onStartEdit);
+    actions.appendChild(editBtn);
+  }
+}
+
+function renderAdminClipRow(root, {
+  payload,
+  matchColumn,
+  busy,
+  pinned,
+  matched,
+  getMomentWho,
+  boardMode,
+  onBoardModeChange,
+  onStartPin,
+  onClearPin,
+  onStartEdit,
+  onStartFlashLook,
+  flashLookReady,
+  flashLookTitle,
+  showEdit = false,
+  showFlash = false,
+  noMatchHero = false,
+}) {
+  const clipRow = document.createElement('div');
+  clipRow.className = 'clip-head-row';
+
+  const clipHead = document.createElement('div');
+  clipHead.id = 'admin-clip-head';
+  clipRow.appendChild(clipHead);
+  renderAdminClipHead(clipHead, payload, matchColumn, { busy, noMatchHero });
+
+  const actions = document.createElement('div');
+  actions.className = 'view-edit-actions';
+  if (getMomentWho != null) prependDopeButton(actions, getMomentWho);
+  const toggle = renderBoardModeToggle(boardMode, onBoardModeChange);
+  if (toggle) actions.appendChild(toggle);
+  appendAdminActionButtons(actions, {
+    busy,
+    matched,
+    pinned,
+    onStartPin,
+    onClearPin,
+    onStartEdit,
+    onStartFlashLook,
+    flashLookReady,
+    flashLookTitle,
+    showEdit,
+    showFlash,
+  });
+  if (actions.childNodes.length) clipRow.appendChild(actions);
+  root.appendChild(clipRow);
+}
+
+function renderDashboardLook(parent, zones, payload) {
+  if (!zones.images.length && !zones.tokens.length && !zones.colors.length) return;
+
+  const look = document.createElement('section');
+  look.className = 'admin-dashboard-look';
+  look.setAttribute('aria-label', 'Look');
+
+  if (zones.images.length || zones.tokens.length) {
+    const identity = document.createElement('div');
+    identity.className = 'admin-dashboard-identity';
+    if (zones.images.length) {
+      const art = document.createElement('div');
+      art.className = 'admin-dashboard-art';
+      for (const field of zones.images) {
+        art.appendChild(renderImageField(field, payload));
+      }
+      identity.appendChild(art);
+    }
+    if (zones.tokens.length) {
+      const tokens = document.createElement('div');
+      tokens.className = 'admin-dashboard-tokens';
+      for (const field of zones.tokens) {
+        tokens.appendChild(renderTextField(field, payload, 'token', 'hero'));
+      }
+      identity.appendChild(tokens);
+    }
+    look.appendChild(identity);
+  }
+
+  if (zones.colors.length) {
+    const mast = document.createElement('div');
+    mast.className = 'admin-dashboard-mast';
+    mast.appendChild(renderColorGroup(zones.colors, payload));
+    look.appendChild(mast);
+  }
+
+  parent.appendChild(look);
+}
+
+function renderDashboardNotes(parent, zones, payload) {
+  if (!zones.noteGroups.length) return;
+
+  const notes = document.createElement('section');
+  notes.className = 'admin-dashboard-notes';
+  notes.style.setProperty('--dash-note-cols', String(zones.noteGroups.length));
+  notes.setAttribute('aria-label', 'Cue notes');
+
+  for (const group of zones.noteGroups) {
+    const col = document.createElement('article');
+    col.className = 'admin-dashboard-note-col';
+    const heading = document.createElement('h2');
+    heading.className = 'admin-dashboard-note-title';
+    heading.textContent = group.title;
+    col.appendChild(heading);
+    for (const field of group.fields) {
+      const display = resolveFieldDisplay(field, getFieldValue(field, payload), { layout: 'hero' });
+      col.appendChild(renderTextField(field, payload, display === 'token' ? 'text' : display));
+    }
+    notes.appendChild(col);
+  }
+
+  parent.appendChild(notes);
+}
+
+function renderAdminDashboard(root, ctx) {
+  const {
+    payload,
+    connected,
+    lastUpdate,
+    matchColumn = null,
+    editSession = null,
+    aliasSession = null,
+    aliasPanel = null,
+    editorColumns = {},
+    saveState = 'idle',
+    saveError = null,
+    onStartEdit,
+    onStartCreate,
+    onStartAlias,
+    onCancelEdit,
+    onSaveEdit,
+    pinSession = null,
+    pinPanel = null,
+    onStartPin,
+    onPinLast,
+    onClearPin,
+    getMomentWho = null,
+    operatorViews = [],
+    boardMode = 'dashboard',
+    onBoardModeChange,
+    onStartFlashLook,
+    flashLookReady = false,
+    flashLookTitle = '',
+  } = ctx;
+
+  closeColorPicker();
+  root.innerHTML = '';
+
+  const busy = Boolean(editSession || aliasSession || pinSession);
+  const pinned = payload?.match?.viaOverride === true;
+  const matched = payload?.match?.matched === true;
+  const zones = buildDashboardZones(operatorViews);
+  const showFlash = !busy && matched && typeof onStartFlashLook === 'function';
+
+  renderAdminClipRow(root, {
+    payload,
+    matchColumn,
+    busy,
+    pinned,
+    matched,
+    getMomentWho,
+    boardMode,
+    onBoardModeChange,
+    onStartPin,
+    onClearPin,
+    onStartEdit,
+    onStartFlashLook,
+    flashLookReady,
+    flashLookTitle,
+    showEdit: true,
+    showFlash,
+    noMatchHero: true,
+  });
+
+  const board = document.createElement('div');
+  board.className = 'admin-dashboard-board';
+
+  const showNoMatch = payload && !matched && !busy
+    && (hasPlayingClips(payload) || payload.clipName?.trim());
+
+  if (pinSession && pinPanel) {
+    renderPinPanel(board, pinPanel);
+  } else if (aliasSession && aliasPanel) {
+    renderAliasPanel(board, aliasPanel);
+  } else if (editSession) {
+    renderRowEditorPanel(board, {
+      session: editSession,
+      editorColumns,
+      livePayload: payload,
+      onCancel: onCancelEdit,
+      onSave: onSaveEdit,
+      saveState,
+      saveError,
+    });
+  } else {
+    const showZones = matched || hasLastMatchedRow(payload);
+    const zonePayload = matched ? payload : lastPanePayload(payload);
+    if (showNoMatch && !showZones) {
+      renderNoMatchPanel(board, {
+        payload,
+        editable: true,
+        aliasSession,
+        createSession: null,
+        onStartCreate,
+        onStartAlias,
+        onStartPin,
+        onPinLast,
+      });
+    }
+    if (showZones && zonePayload) {
+      renderDashboardLook(board, zones, zonePayload);
+      renderDashboardNotes(board, zones, zonePayload);
+    }
+  }
+
+  const sessionPane = document.createElement('section');
+  sessionPane.className = 'admin-dashboard-session';
+  sessionPane.setAttribute('aria-label', 'Session');
+  renderSceneBanner(sessionPane, payload);
+  renderSessionTracks(sessionPane, {
+    payload,
+    aliasSession,
+    editSession,
+    onStartAlias,
+    onStartCreate,
+    compact: true,
+  });
+  board.appendChild(sessionPane);
+
+  root.appendChild(board);
+  updateStatusBar({ connected, lastUpdate, payload });
+}
+
 export function renderAdmin(root, {
   title,
   payload,
@@ -1112,7 +1417,49 @@ export function renderAdmin(root, {
   onPinLast,
   onClearPin,
   getMomentWho = null,
+  boardMode = 'detail',
+  onBoardModeChange,
+  operatorViews = [],
+  onStartFlashLook,
+  flashLookReady = false,
+  flashLookTitle = '',
 }) {
+  if (boardMode === 'dashboard') {
+    renderAdminDashboard(root, {
+      title,
+      payload,
+      status,
+      connected,
+      lastUpdate,
+      matchColumn,
+      aliasColumn,
+      editSession,
+      aliasSession,
+      aliasPanel,
+      editorColumns,
+      saveState,
+      saveError,
+      onStartEdit,
+      onStartCreate,
+      onStartAlias,
+      onCancelEdit,
+      onSaveEdit,
+      pinSession,
+      pinPanel,
+      onStartPin,
+      onPinLast,
+      onClearPin,
+      getMomentWho,
+      operatorViews,
+      boardMode,
+      onBoardModeChange,
+      onStartFlashLook,
+      flashLookReady,
+      flashLookTitle,
+    });
+    return;
+  }
+
   root.innerHTML = '';
 
   const titleEl = document.createElement('h1');
@@ -1124,35 +1471,18 @@ export function renderAdmin(root, {
   const pinned = payload?.match?.viaOverride === true;
   const matched = payload?.match?.matched === true;
 
-  const clipRow = document.createElement('div');
-  clipRow.className = 'clip-head-row';
-
-  const clipHead = document.createElement('div');
-  clipHead.id = 'admin-clip-head';
-  clipRow.appendChild(clipHead);
-  renderAdminClipHead(clipHead, payload, matchColumn, { busy });
-
-  const actions = document.createElement('div');
-  actions.className = 'view-edit-actions';
-  if (getMomentWho != null) prependDopeButton(actions, getMomentWho);
-  if (!busy && matched && onStartPin) {
-    const changeBtn = document.createElement('button');
-    changeBtn.type = 'button';
-    changeBtn.className = 'view-edit-btn';
-    changeBtn.textContent = 'Change cue';
-    changeBtn.addEventListener('click', onStartPin);
-    actions.appendChild(changeBtn);
-  }
-  if (!busy && pinned && onClearPin) {
-    const clearBtn = document.createElement('button');
-    clearBtn.type = 'button';
-    clearBtn.className = 'view-edit-btn view-edit-btn--unpin';
-    clearBtn.textContent = 'Clear pin';
-    clearBtn.addEventListener('click', onClearPin);
-    actions.appendChild(clearBtn);
-  }
-  if (actions.childNodes.length) clipRow.appendChild(actions);
-  root.appendChild(clipRow);
+  renderAdminClipRow(root, {
+    payload,
+    matchColumn,
+    busy,
+    pinned,
+    matched,
+    getMomentWho,
+    boardMode,
+    onBoardModeChange,
+    onStartPin,
+    onClearPin,
+  });
 
   const stats = document.createElement('div');
   stats.id = 'admin-stats';
@@ -1219,13 +1549,18 @@ export function updateAdminLiveChrome(root, { payload, status, connected, lastUp
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-function renderAdminClipHead(parent, payload, matchColumn = null, { busy = false } = {}) {
+function renderAdminClipHead(parent, payload, matchColumn = null, { busy = false, noMatchHero = false } = {}) {
   parent.innerHTML = '';
-  const hero = resolveHeroDisplay(payload, matchColumn, { busy });
+  const hero = resolveHeroDisplay(payload, matchColumn, { busy, noMatchHero });
   if (!hero.showHero) {
     return;
   }
-  renderHeroRow(parent, hero.text, payload, { empty: hero.empty, pinned: hero.pinned });
+  renderHeroRow(parent, hero.text, payload, {
+    empty: hero.empty,
+    noMatch: hero.noMatch,
+    lastMatched: hero.lastMatched,
+    pinned: hero.pinned,
+  });
 
   const clipName = payload?.clipName?.trim();
   const matched = payload?.match?.matched === true;

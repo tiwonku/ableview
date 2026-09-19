@@ -32,6 +32,13 @@ import {
 } from './playing-clips-strip.js';
 import { mountViewNav, viewIdFromPath } from './view-nav.js';
 import { isKioskMode, kioskLinkAction, mountKioskControls } from './kiosk-controls.js';
+import {
+  flattenOperatorFields,
+  parseAdminBoardMode,
+  readStoredAdminBoardMode,
+  resolveAdminBoardMode,
+  writeStoredAdminBoardMode,
+} from './admin-dashboard.js';
 import { applyLiveColorOverlay, DEFAULT_LIVE_COLOR_COLUMNS } from './live-color-overlay.js';
 import {
   buildFlashLookSlots,
@@ -46,6 +53,7 @@ import {
   openFlashLook,
   syncFlashLookButton,
 } from './flash-look-overlay.js';
+import { mountBreathPage } from './breath-render.js';
 
 const RECONNECT_MS = 1500;
 const ALIAS_SEARCH_DEBOUNCE_MS = 180;
@@ -94,6 +102,7 @@ export function connectView({
   let showingSettings = settingsActive === true;
   let settingsGen = 0;
   let unmountSettings = null;
+  let breathCtl = null;
   let socketGen = 0;
   let ws = null;
   let reconnectTimer = null;
@@ -132,6 +141,12 @@ export function connectView({
   let setlistSyncing = false;
   let sessionLogGen = 0;
   let unmountSessionLog = null;
+  let operatorViews = [];
+  let boardMode = resolveAdminBoardMode({
+    search: typeof location !== 'undefined' ? location.search : '',
+    stored: readStoredAdminBoardMode(),
+    kiosk: isKioskMode(),
+  });
 
   function applySimState(simulated) {
     serverSimulated = simulated === true;
@@ -211,6 +226,7 @@ export function connectView({
       matchColumn = msg.matchColumn ?? null;
       aliasColumn = msg.aliasColumn ?? null;
       viewsList = msg.views ?? null;
+      if (Array.isArray(msg.operatorViews)) operatorViews = msg.operatorViews;
       syncChrome();
       if (msg.status) lastStatus = msg.status;
       if (msg.sessionLog) applySessionLogState(msg.sessionLog);
@@ -304,6 +320,11 @@ export function connectView({
         updateSetlistLiveChrome(root, setlistChromeCtx());
         return;
       }
+      if (currentViewId === 'breath' && !showingSettings && !statusOnly && breathCtl) {
+        breathCtl.updateTransport(lastPayload);
+        setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
+        return;
+      }
       render();
     }
   }
@@ -313,12 +334,35 @@ export function connectView({
     render();
   }
 
+  function setBoardMode(next) {
+    const mode = next === 'dashboard' ? 'dashboard' : 'detail';
+    if (mode === boardMode) return;
+    boardMode = mode;
+    writeStoredAdminBoardMode(boardMode);
+    if (typeof location !== 'undefined' && parseAdminBoardMode(location.search)) {
+      const url = new URL(location.href);
+      url.searchParams.set('mode', boardMode);
+      history.replaceState(history.state, '', `${url.pathname}${url.search}`);
+    }
+    syncChrome();
+    render();
+  }
+
+  function flashLookFields() {
+    if (currentViewId === 'admin') return flattenOperatorFields(operatorViews);
+    return viewConfig?.fields ?? [];
+  }
+
   function flashLookColumns() {
-    return flashableColorColumns(viewConfig?.fields, liveColorColumns);
+    return flashableColorColumns(flashLookFields(), liveColorColumns);
+  }
+
+  function adminDashboardFlash() {
+    return currentViewId === 'admin' && boardMode === 'dashboard';
   }
 
   function flashLookProps() {
-    if (viewConfig?.editable === false) return {};
+    if (viewConfig?.editable === false && !adminDashboardFlash()) return {};
     const columns = flashLookColumns();
     return {
       onStartFlashLook: startFlashLook,
@@ -330,14 +374,14 @@ export function connectView({
 
   function startFlashLook() {
     if (editSession || aliasSession || pinSession) return;
-    if (viewConfig?.editable === false) return;
+    if (viewConfig?.editable === false && !adminDashboardFlash()) return;
     if (!lastPayload?.match?.matched || lastPayload.match.rowId == null) return;
     const columns = flashLookColumns();
     if (!columns.length) return;
     if (!canFlashLook(lastLiveColors, columns, liveColorColumns)) return;
 
     const slots = buildFlashLookSlots({
-      fields: viewConfig.fields,
+      fields: flashLookFields(),
       row: lastPayload.row,
       liveColors: lastLiveColors,
       columnMap: liveColorColumns,
@@ -978,6 +1022,15 @@ export function connectView({
       paintLiveColors();
       return;
     }
+    if (currentViewId === 'breath') {
+      if (!breathCtl) {
+        breathCtl = mountBreathPage(root, { getPayload: () => lastPayload });
+      } else {
+        breathCtl.updateTransport(lastPayload);
+      }
+      setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
+      return;
+    }
     if (currentViewId === 'setlist') {
       renderSetlist(root, {
         ...ctx,
@@ -1061,6 +1114,10 @@ export function connectView({
         onPinLast: pinLastCue,
         onClearPin: clearPin,
         getMomentWho,
+        boardMode: currentViewId === 'admin' ? boardMode : 'detail',
+        onBoardModeChange: currentViewId === 'admin' ? setBoardMode : undefined,
+        operatorViews,
+        ...(adminDashboardFlash() ? flashLookProps() : {}),
       });
     } else {
       renderView(root, {
@@ -1144,26 +1201,33 @@ export function connectView({
   function syncChrome() {
     const isSession = !showingSettings && currentViewId === 'session';
     const isSetlist = !showingSettings && currentViewId === 'setlist';
+    const isBreath = !showingSettings && currentViewId === 'breath';
     const isAdmin = !showingSettings && viewConfig?.system === true && currentViewId === 'admin';
     const isOperator = Boolean(viewConfig)
       && !viewConfig.system
       && !statusOnly
       && !isSession
       && !isSetlist
+      && !isBreath
       && !showingSettings;
+    const isAdminDashboard = isAdmin && boardMode === 'dashboard';
     document.body.classList.toggle('layout-operator', isOperator);
     document.body.classList.toggle('layout-session', isSession);
     document.body.classList.toggle('layout-setlist', isSetlist);
+    document.body.classList.toggle('layout-breath', isBreath);
+    document.body.classList.toggle('layout-admin-dashboard', isAdminDashboard);
     document.body.classList.toggle('layout-settings', showingSettings);
     document.title = showingSettings
       ? 'AbleView — Settings'
       : `AbleView — ${viewConfig?.title ?? currentViewId}`;
-    root?.classList.toggle('admin-main', isAdmin);
+    root?.classList.toggle('admin-main', isAdmin && !isAdminDashboard);
+    root?.classList.toggle('admin-dashboard', isAdminDashboard);
     root?.classList.toggle('settings-main', showingSettings);
     if (showingSettings) root?.setAttribute('aria-label', 'Settings');
+    else if (isAdminDashboard) root?.setAttribute('aria-label', 'Admin dashboard');
     else root?.removeAttribute('aria-label');
     const simHost = document.getElementById('sim-controls-host');
-    if (simHost) simHost.hidden = showingSettings;
+    if (simHost) simHost.hidden = showingSettings || isAdminDashboard;
     if (viewsList) {
       mountViewNav(currentViewId, viewsList, { settingsActive: showingSettings, onNavigate });
     }
@@ -1219,6 +1283,8 @@ export function connectView({
   async function enterSettings(href, historyMode) {
     if (showingSettings && unmountSettings) return;
     showingSettings = true;
+    breathCtl?.destroy();
+    breathCtl = null;
     closeColorPicker();
     closeFlashLook();
     editSession = null;
@@ -1248,6 +1314,10 @@ export function connectView({
       return;
     }
     if (showingSettings) leaveSettings();
+    if (nextId !== 'breath') {
+      breathCtl?.destroy();
+      breathCtl = null;
+    }
     if (nextId === currentViewId) {
       syncChrome();
       render();
@@ -1315,6 +1385,8 @@ export function connectView({
       unmountSessionLog?.();
       unmountSessionLog = null;
       leaveSettings();
+      breathCtl?.destroy();
+      breathCtl = null;
       window.removeEventListener('popstate', onPopState);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       ws?.close();

@@ -13,6 +13,7 @@ import { registerSetlistRoutes } from './setlist-api.js';
 import { listIpv4Interfaces } from '../sacn/nics.js';
 import { DEFAULT_LIVE_COLOR_COLUMNS } from '../core/live-colors.js';
 import { buildSharePayload } from '../../public/shared/share-links.js';
+import { collectOperatorViews } from '../../public/shared/admin-dashboard.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
@@ -312,6 +313,9 @@ export async function createViewServer({
         init.sheetHeaders = snapshot.headers ?? [];
         init.matchColumn = snapshot.matchColumn ?? getLiveConfig().sheets?.matchColumn ?? null;
         init.aliasColumn = snapshot.aliasColumn ?? getLiveConfig().sheets?.aliasColumn ?? null;
+      }
+      if (viewId === 'admin') {
+        init.operatorViews = collectOperatorViews(getLiveConfig().views);
       }
     } else {
       init.editable = viewConfig.editable !== false;

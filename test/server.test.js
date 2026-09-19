@@ -251,11 +251,14 @@ test('editable: false disables row editing on a view', async () => {
   await server.stop();
 });
 
-test('admin WebSocket init includes system flag and status', async () => {
+test('admin WebSocket init includes system flag, status, and operator views', async () => {
   const bus = createBus();
   const config = testConfig({
     views: {
       band: { title: 'Band', fields: [{ column: 'Key' }] },
+      visuals: { title: 'Visuals', fields: [{ column: 'ART', type: 'image' }] },
+      lighting: { title: 'Lighting', fields: [{ column: 'Lasers' }] },
+      session: { title: 'Session', system: true },
       admin: { title: 'Admin', system: true },
     },
   });
@@ -268,6 +271,8 @@ test('admin WebSocket init includes system flag and status', async () => {
   assert.equal(init.viewId, 'admin');
   assert.equal(init.system, true);
   assert.equal(typeof init.status?.connectedViews, 'number');
+  assert.deepEqual(init.operatorViews?.map((v) => v.id), ['band', 'visuals', 'lighting']);
+  assert.equal(init.operatorViews[1].fields[0].column, 'ART');
 
   ws.close();
   await server.stop();

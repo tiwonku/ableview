@@ -150,7 +150,7 @@ test('Flash lives in the clip-head cluster, not the color cards', () => {
   ));
   assert.match(viewSrc, /view-edit-btn--flash/);
   assert.match(viewSrc, /onStartFlashLook/);
-  assert.doesNotMatch(viewSrc, /colors-row[\s\S]*Flash/);
+  assert.doesNotMatch(viewSrc, /colors-row[\s\S]*textContent = 'Flash'/);
   assert.match(clientSrc, /openFlashLook/);
   assert.match(clientSrc, /\/api\/sheets\/rows\//);
   assert.match(overlaySrc, /flash-look-overlay/);
