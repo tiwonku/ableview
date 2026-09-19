@@ -50,6 +50,7 @@
     "minMatchCharLength": 4,
     "fuseMinConfidence": 0.75,
     "requireTokenOverlap": true,
+    "includeArrangement": false,
     "normalize": {
       "lowercase": true,
       "stripPunctuation": true,

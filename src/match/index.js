@@ -205,6 +205,18 @@ export function matchClip(clipName, snapshot, config) {
   });
 }
 
+function includeArrangementClips(config) {
+  return config.match?.includeArrangement === true;
+}
+
+function isArrangementSource(track) {
+  return track?.source === 'arrangement';
+}
+
+function skipArrangementTrack(track, config) {
+  return isArrangementSource(track) && !includeArrangementClips(config);
+}
+
 function trackClipCandidates(tracks) {
   return (tracks ?? [])
     .map((t) => ({
@@ -212,7 +224,29 @@ function trackClipCandidates(tracks) {
       trackName: t.trackName,
       clipName: t.clipName ?? null,
       slotIndex: t.slotIndex ?? null,
+      source: t.source ?? 'session',
     }));
+}
+
+/** Sheet lookup key: omit arrangement leftovers unless the show opted in. */
+function clipNameForMatch(track, config) {
+  if (skipArrangementTrack(track, config)) return null;
+  return track.clipName ?? null;
+}
+
+/**
+ * Authoritative clip for track-strategy matching. Session-first shows skip
+ * arrangement leftovers; sim / legacy events with no track source still match.
+ */
+function authoritativeClipForMatch(event, config) {
+  const clip = event?.authoritativeClip;
+  if (!clip?.trim()) return null;
+  if (includeArrangementClips(config)) return clip;
+
+  const sources = (event.tracks ?? []).filter((t) => t.clipName === clip);
+  if (sources.length === 0) return clip;
+  if (sources.some((t) => !isArrangementSource(t))) return clip;
+  return null;
 }
 
 /**
@@ -226,11 +260,12 @@ export function matchBestOfTracks(tracks, snapshot, config) {
   const scored = [];
 
   for (const track of candidates) {
-    if (!track.clipName?.trim()) {
+    const query = clipNameForMatch(track, config);
+    if (!query?.trim()) {
       trackMatches.push({
         trackIndex: track.trackIndex,
         trackName: track.trackName,
-        clipName: null,
+        clipName: track.clipName ?? null,
         matched: false,
         confidence: 0,
         rowId: null,
@@ -240,7 +275,7 @@ export function matchBestOfTracks(tracks, snapshot, config) {
       continue;
     }
 
-    const { match, row } = resolveClipMatch(track.clipName, snapshot, config);
+    const { match, row } = resolveClipMatch(query, snapshot, config);
     trackMatches.push({
       trackIndex: track.trackIndex,
       trackName: track.trackName,
@@ -326,7 +361,7 @@ export function matchNowPlaying(event, snapshot, config) {
     return payload;
   }
 
-  const payload = matchClip(event.authoritativeClip, snapshot, config);
+  const payload = matchClip(authoritativeClipForMatch(event, config), snapshot, config);
   // Still annotate watched tracks for Session when using track strategy.
   const annotated = matchBestOfTracks(tracks, snapshot, config);
   payload.trackMatches = annotated.trackMatches.map((tm) => ({
@@ -363,7 +398,7 @@ function matchIdentityKey(event) {
   return JSON.stringify({
     clip: event.authoritativeClip,
     source: event.source,
-    tracks: (event.tracks ?? []).map((t) => [t.trackIndex, t.clipName ?? null]),
+    tracks: (event.tracks ?? []).map((t) => [t.trackIndex, t.clipName ?? null, t.source ?? 'session']),
   });
 }
 

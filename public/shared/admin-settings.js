@@ -590,6 +590,7 @@ function settingsFromForm(form, current) {
     },
     match: {
       threshold: Number(fd.get('threshold')),
+      includeArrangement: fd.get('includeArrangement') === 'on',
     },
     timecode: {
       enabled: fd.get('timecodeEnabled') === 'on',
@@ -926,8 +927,21 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
     'Confidence threshold (0–1)',
     numberInput('threshold', settings.match.threshold, { min: 0, max: 1, step: 0.05 })
   ));
+  const includeArrCheck = el('input');
+  includeArrCheck.type = 'checkbox';
+  includeArrCheck.name = 'includeArrangement';
+  includeArrCheck.id = 'includeArrangement';
+  includeArrCheck.className = 'settings-checkbox';
+  includeArrCheck.checked = settings.match?.includeArrangement === true;
+  const includeArrRow = el('div', 'settings-field settings-field-checkbox');
+  includeArrRow.appendChild(includeArrCheck);
+  const includeArrLabel = el('label', 'settings-checkbox-label');
+  includeArrLabel.htmlFor = 'includeArrangement';
+  includeArrLabel.textContent = 'Match Arrangement-view clips';
+  includeArrRow.appendChild(includeArrLabel);
+  matchGroup.appendChild(includeArrRow);
   const matchHint = el('p', 'settings-sim-hint');
-  matchHint.textContent = 'Generic clips (INTRO, LAYOUT, DROP) never match a song. Fuzzy matching only runs on longer names and needs a shared word with the sheet row — no match is safer than a wrong cue.';
+  matchHint.textContent = 'Leave Arrangement matching off for Session-view shows. Stopping a Session clip can fall back to a leftover Arrangement clip that is not in the mix. Generic clips (INTRO, LAYOUT, DROP) never match a song.';
   matchGroup.appendChild(matchHint);
   bottomRow.appendChild(matchGroup);
 

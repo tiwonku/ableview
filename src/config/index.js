@@ -46,6 +46,7 @@ export const DEFAULTS = Object.freeze({
     minMatchCharLength: 4,
     fuseMinConfidence: 0.75,
     requireTokenOverlap: true,
+    includeArrangement: false,
     normalize: { lowercase: true, stripPunctuation: true, stripVersionTags: true },
   },
   server: { wsHeartbeatSeconds: 5 },
@@ -154,6 +155,9 @@ export function validateConfig(config) {
   }
   if (!(config.match.threshold >= 0 && config.match.threshold <= 1)) {
     errors.push('match.threshold must be between 0 and 1');
+  }
+  if (config.match.includeArrangement != null && typeof config.match.includeArrangement !== 'boolean') {
+    errors.push('match.includeArrangement must be a boolean');
   }
   if (config.match.fuseMinConfidence != null) {
     const floor = config.match.fuseMinConfidence;

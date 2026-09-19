@@ -31,3 +31,12 @@ test('settings panel includes operator LAN share links', () => {
   assert.match(src, /copyTextToClipboard/);
   assert.match(src, /\/api\/net\/interfaces/);
 });
+
+test('settings panel can toggle arrangement matching', () => {
+  const src = readFileSync(
+    fileURLToPath(new URL('../public/shared/admin-settings.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(src, /includeArrangement/);
+  assert.match(src, /Match Arrangement-view clips/);
+});

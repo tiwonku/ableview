@@ -76,16 +76,18 @@ test('createConfigRuntime persists patch and invokes reload handlers', async () 
 
   const result = await runtime.updateSettings({
     ingest: { abletonHost: '192.168.1.50' },
-    match: { threshold: 0.55 },
+    match: { threshold: 0.55, includeArrangement: true },
   });
 
   assert.equal(result.settings.ingest.abletonHost, '192.168.1.50');
   assert.equal(result.settings.match.threshold, 0.55);
+  assert.equal(result.settings.match.includeArrangement, true);
   assert.deepEqual(reloaded[0].sort(), ['ingest', 'match']);
 
   const onDisk = JSON.parse(readFileSync(configPath, 'utf8'));
   assert.equal(onDisk.ingest.abletonHost, '192.168.1.50');
   assert.equal(onDisk.match.threshold, 0.55);
+  assert.equal(onDisk.match.includeArrangement, true);
 
   rmSync(dir, { recursive: true, force: true });
 });

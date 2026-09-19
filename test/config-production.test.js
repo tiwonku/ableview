@@ -47,6 +47,12 @@ test('validateConfig rejects unknown field source and source+column', () => {
   assert.throws(() => validateConfig(cfg), /cannot set both source and column/);
 });
 
+test('validateConfig rejects non-boolean match.includeArrangement', () => {
+  const cfg = baseConfig();
+  cfg.match.includeArrangement = 'yes';
+  assert.throws(() => validateConfig(cfg), /includeArrangement/);
+});
+
 test('validateConfig rejects oscOut destinations without host or port', () => {
   const cfg = baseConfig();
   cfg.oscOut = { enabled: true, destinations: [{ host: '', port: 9000 }] };

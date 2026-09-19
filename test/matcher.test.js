@@ -10,7 +10,7 @@ import {
   normalizeClipName,
   parseAliases,
 } from '../src/match/normalize.js';
-import { matchClip, matchBestOfTracks, createMatcher } from '../src/match/index.js';
+import { matchClip, matchBestOfTracks, matchNowPlaying, createMatcher } from '../src/match/index.js';
 import { makeCuePayload, makeLastMatched, makeMatchResult } from '../src/core/cue-payload.js';
 
 const silentLog = createLogger();
@@ -396,6 +396,110 @@ test('bestMatch picks song deck over drums cue track', () => {
   assert.equal(winner?.trackName, 'DECK C');
   const drums = payload.trackMatches.find((t) => t.trackName === 'DECK A');
   assert.equal(drums?.matched, false);
+});
+
+test('bestMatch skips arrangement leftovers by default', () => {
+  const rows = [
+    { rowId: '90', data: { 'Clip Name': 'How We Do', Aliases: 'HWDED' } },
+  ];
+  const payload = matchBestOfTracks(
+    [
+      {
+        trackIndex: 11,
+        trackName: 'DECK A',
+        clipName: 'HWDED STAB INTRO',
+        source: 'arrangement',
+      },
+    ],
+    snapshot({ rows }),
+    testConfig()
+  );
+  assert.equal(payload.match.matched, false);
+  assert.equal(payload.clipName, null);
+  const deckA = payload.trackMatches.find((t) => t.trackName === 'DECK A');
+  assert.equal(deckA?.clipName, 'HWDED STAB INTRO');
+  assert.equal(deckA?.matched, false);
+  assert.equal(deckA?.winner, false);
+});
+
+test('bestMatch uses arrangement clips when includeArrangement is on', () => {
+  const rows = [
+    { rowId: '90', data: { 'Clip Name': 'How We Do', Aliases: 'HWDED' } },
+  ];
+  const payload = matchBestOfTracks(
+    [
+      {
+        trackIndex: 11,
+        trackName: 'DECK A',
+        clipName: 'HWDED STAB INTRO',
+        source: 'arrangement',
+      },
+    ],
+    snapshot({ rows }),
+    testConfig({ match: { ...DEFAULTS.match, threshold: 0.4, includeArrangement: true } })
+  );
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '90');
+  assert.equal(payload.clipName, 'HWDED STAB INTRO');
+  const winner = payload.trackMatches.find((t) => t.winner);
+  assert.equal(winner?.trackName, 'DECK A');
+});
+
+test('bestMatch still prefers a session clip over arrangement leftovers', () => {
+  const rows = [
+    { rowId: '90', data: { 'Clip Name': 'How We Do', Aliases: 'HWDED' } },
+    { rowId: '91', data: { 'Clip Name': 'Yellow Bird', Aliases: '' } },
+  ];
+  const payload = matchBestOfTracks(
+    [
+      {
+        trackIndex: 11,
+        trackName: 'DECK A',
+        clipName: 'HWDED STAB INTRO',
+        source: 'arrangement',
+      },
+      {
+        trackIndex: 12,
+        trackName: 'DECK B',
+        clipName: 'Yellow Bird',
+        source: 'session',
+      },
+    ],
+    snapshot({ rows }),
+    testConfig()
+  );
+  assert.equal(payload.match.matched, true);
+  assert.equal(payload.match.rowId, '91');
+  assert.equal(payload.clipName, 'Yellow Bird');
+  const winner = payload.trackMatches.find((t) => t.winner);
+  assert.equal(winner?.trackName, 'DECK B');
+});
+
+test('track strategy skips arrangement authoritative clip by default', () => {
+  const rows = [
+    { rowId: '90', data: { 'Clip Name': 'How We Do', Aliases: 'HWDED' } },
+  ];
+  const event = makeNowPlaying({
+    source: SOURCES.ABLETONOSC,
+    authoritativeClip: 'HWDED STAB INTRO',
+    tracks: [
+      {
+        trackIndex: 11,
+        trackName: 'DECK A',
+        clipName: 'HWDED STAB INTRO',
+        source: 'arrangement',
+      },
+    ],
+  });
+  const payload = matchNowPlaying(
+    event,
+    snapshot({ rows }),
+    testConfig({
+      ingest: { ...DEFAULTS.ingest, authoritative: { strategy: 'track', track: 'DECK A' } },
+    })
+  );
+  assert.equal(payload.match.matched, false);
+  assert.equal(payload.clipName, null);
 });
 
 test('bestMatch returns no match when two rows tie within confidence gap', () => {
