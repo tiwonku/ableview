@@ -19,6 +19,10 @@ function serializeBreath(breath) {
     troughHold: src.troughHold,
     riseCurve: src.riseCurve,
     fallCurve: src.fallCurve,
+    risePower: src.risePower,
+    fallPower: src.fallPower,
+    riseStraight: src.riseStraight,
+    fallStraight: src.fallStraight,
   };
 }
 

@@ -1,5 +1,7 @@
 import {
   BREATH_CURVES,
+  BREATH_POWER_MAX,
+  BREATH_POWER_MIN,
   DEFAULT_BREATH,
   INITIAL_BREATH_TRANSPORT,
   applyBreathTransport,
@@ -74,6 +76,7 @@ function waveSettingsKey(settings) {
   const s = normalizeBreathSettings(settings);
   return [
     s.min, s.max, s.rise, s.peakHold, s.fall, s.troughHold, s.riseCurve, s.fallCurve,
+    s.risePower, s.fallPower, s.riseStraight, s.fallStraight,
   ].join('|');
 }
 
@@ -495,6 +498,56 @@ export function mountBreathPage(root, { getPayload } = {}) {
   const fallW = weightInput('fall');
   const troughW = weightInput('troughHold');
 
+  function sliderNum(name, { min, max, step }) {
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.className = 'breath-slider';
+    input.dataset.key = name;
+    const num = document.createElement('input');
+    num.type = 'number';
+    num.min = String(min);
+    num.max = String(max);
+    num.step = String(step);
+    num.className = 'settings-input breath-weight-num';
+    num.dataset.key = name;
+    const wrap = el('div', 'breath-weight-row');
+    wrap.append(input, num);
+    return { wrap, input, num };
+  }
+
+  function powerInput(name) {
+    return sliderNum(name, { min: BREATH_POWER_MIN, max: BREATH_POWER_MAX, step: 0.1 });
+  }
+
+  function straightInput(name) {
+    return sliderNum(name, { min: 0, max: 1, step: 0.01 });
+  }
+
+  function syncPairNum(pair, value) {
+    pair.input.value = String(value);
+    if (document.activeElement !== pair.num) pair.num.value = String(value);
+  }
+
+  function bindPair(pair, onChange) {
+    pair.input.addEventListener('input', () => {
+      pair.num.value = pair.input.value;
+      onChange();
+    });
+    pair.num.addEventListener('input', () => {
+      const raw = pair.num.value.trim();
+      const n = Number(raw);
+      if (raw !== '' && Number.isFinite(n)) pair.input.value = String(n);
+      onChange();
+    });
+    pair.num.addEventListener('blur', () => {
+      pair.num.value = pair.input.value;
+      onChange();
+    });
+  }
+
   function curveSelect() {
     const sel = document.createElement('select');
     sel.className = 'settings-input';
@@ -508,6 +561,12 @@ export function mountBreathPage(root, { getPayload } = {}) {
   }
   const riseCurve = curveSelect();
   const fallCurve = curveSelect();
+  const risePower = powerInput('risePower');
+  const fallPower = powerInput('fallPower');
+  const riseStraight = straightInput('riseStraight');
+  const fallStraight = straightInput('fallStraight');
+  const tightnessHint = '1 = linear, 2 = default, higher = tighter knee.';
+  const straightHint = '0 = full ease curve. Higher = straighter middle, easing nearer the ends.';
 
   const clockGroup = el('fieldset', 'settings-group');
   clockGroup.append(
@@ -531,9 +590,13 @@ export function mountBreathPage(root, { getPayload } = {}) {
     field('Max', max),
     field('Rise', riseW.wrap),
     field('Rise curve', riseCurve),
+    field('Rise tightness', risePower.wrap, tightnessHint),
+    field('Rise straight mid', riseStraight.wrap, straightHint),
     field('Peak hold', peakW.wrap),
     field('Fall', fallW.wrap),
     field('Fall curve', fallCurve),
+    field('Fall tightness', fallPower.wrap, tightnessHint),
+    field('Fall straight mid', fallStraight.wrap, straightHint),
     field('Trough hold', troughW.wrap),
   );
 
@@ -561,6 +624,10 @@ export function mountBreathPage(root, { getPayload } = {}) {
       troughHold: Number(troughW.input.value),
       riseCurve: riseCurve.value,
       fallCurve: fallCurve.value,
+      risePower: Number(risePower.input.value),
+      fallPower: Number(fallPower.input.value),
+      riseStraight: Number(riseStraight.input.value),
+      fallStraight: Number(fallStraight.input.value),
     });
   }
 
@@ -576,13 +643,32 @@ export function mountBreathPage(root, { getPayload } = {}) {
     phaseSlider.max = String(span);
     min.value = String(s.min);
     max.value = String(s.max);
-    riseW.input.value = riseW.num.value = String(s.rise);
-    peakW.input.value = peakW.num.value = String(s.peakHold);
-    fallW.input.value = fallW.num.value = String(s.fall);
-    troughW.input.value = troughW.num.value = String(s.troughHold);
+    syncPairNum(riseW, s.rise);
+    syncPairNum(peakW, s.peakHold);
+    syncPairNum(fallW, s.fall);
+    syncPairNum(troughW, s.troughHold);
     riseCurve.value = s.riseCurve;
     fallCurve.value = s.fallCurve;
+    syncPairNum(risePower, s.risePower);
+    syncPairNum(fallPower, s.fallPower);
+    syncPairNum(riseStraight, s.riseStraight);
+    syncPairNum(fallStraight, s.fallStraight);
+    syncCurveExtrasEnabled();
     settings = s;
+  }
+
+  function setPairEnabled(pair, on) {
+    pair.input.disabled = pair.num.disabled = !on;
+    pair.wrap.classList.toggle('is-disabled', !on);
+  }
+
+  function syncCurveExtrasEnabled() {
+    const riseOn = riseCurve.value !== 'linear';
+    const fallOn = fallCurve.value !== 'linear';
+    setPairEnabled(risePower, riseOn);
+    setPairEnabled(fallPower, fallOn);
+    setPairEnabled(riseStraight, riseOn);
+    setPairEnabled(fallStraight, fallOn);
   }
 
   function paintWarn() {
@@ -653,10 +739,15 @@ export function mountBreathPage(root, { getPayload } = {}) {
     const changed = !settingsEqual(settings, next);
     settings = next;
     phaseSlider.value = String(next.phaseOffsetBeats);
-    riseW.num.value = String(next.rise);
-    peakW.num.value = String(next.peakHold);
-    fallW.num.value = String(next.fall);
-    troughW.num.value = String(next.troughHold);
+    syncPairNum(riseW, next.rise);
+    syncPairNum(peakW, next.peakHold);
+    syncPairNum(fallW, next.fall);
+    syncPairNum(troughW, next.troughHold);
+    syncPairNum(risePower, next.risePower);
+    syncPairNum(fallPower, next.fallPower);
+    syncPairNum(riseStraight, next.riseStraight);
+    syncPairNum(fallStraight, next.fallStraight);
+    syncCurveExtrasEnabled();
     drawWave(canvas, settings, lastPhase);
     paintWarn();
     if (changed) scheduleSave();
@@ -723,15 +814,8 @@ export function mountBreathPage(root, { getPayload } = {}) {
   max.addEventListener('input', onFormChange);
   riseCurve.addEventListener('change', onFormChange);
   fallCurve.addEventListener('change', onFormChange);
-  for (const pair of [riseW, peakW, fallW, troughW]) {
-    pair.input.addEventListener('input', () => {
-      pair.num.value = pair.input.value;
-      onFormChange();
-    });
-    pair.num.addEventListener('input', () => {
-      pair.input.value = pair.num.value;
-      onFormChange();
-    });
+  for (const pair of [riseW, peakW, fallW, troughW, risePower, fallPower, riseStraight, fallStraight]) {
+    bindPair(pair, onFormChange);
   }
   presets.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-bars]');

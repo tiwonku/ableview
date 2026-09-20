@@ -2,6 +2,8 @@
 // Song beat is Ableton quarter notes (same unit as NowPlaying.beat).
 
 export const BREATH_CURVES = Object.freeze(['linear', 'easeIn', 'easeOut', 'easeInOut']);
+export const BREATH_POWER_MIN = 1;
+export const BREATH_POWER_MAX = 8;
 
 export const DEFAULT_BREATH = Object.freeze({
   enabled: false,
@@ -16,6 +18,10 @@ export const DEFAULT_BREATH = Object.freeze({
   troughHold: 0.1,
   riseCurve: 'easeOut',
   fallCurve: 'easeIn',
+  risePower: 2,
+  fallPower: 2,
+  riseStraight: 0,
+  fallStraight: 0,
 });
 
 export const INITIAL_BREATH_TRANSPORT = Object.freeze({
@@ -45,18 +51,73 @@ function clamp01(value) {
   return Math.min(1, Math.max(0, n));
 }
 
-export function ease(t, curve) {
-  const x = clamp01(t);
+export function clampBreathPower(value, fallback = DEFAULT_BREATH.risePower) {
+  const n = finiteOr(value, fallback);
+  return Math.min(BREATH_POWER_MAX, Math.max(BREATH_POWER_MIN, n));
+}
+
+function easeFull(x, curve, power) {
   switch (curve) {
     case 'easeIn':
-      return x * x;
+      return x ** power;
     case 'easeOut':
-      return 1 - (1 - x) * (1 - x);
+      return 1 - (1 - x) ** power;
     case 'easeInOut':
-      return x < 0.5 ? 2 * x * x : 1 - ((-2 * x + 2) ** 2) / 2;
+      return x < 0.5 ? (2 ** (power - 1)) * (x ** power) : 1 - ((-2 * x + 2) ** power) / 2;
     default:
       return x;
   }
+}
+
+function cubeBez(s, p1, p2) {
+  const inv = 1 - s;
+  return 3 * inv * inv * s * p1 + 3 * inv * s * s * p2 + s * s * s;
+}
+
+function cubeBezDeriv(s, p1, p2) {
+  const inv = 1 - s;
+  return 3 * inv * inv * p1 + 6 * inv * s * (p2 - p1) + 3 * s * s * (1 - p2);
+}
+
+/** Unit cubic-bezier (0,0)→(1,1). Handles are (x1,y1) and (x2,y2). */
+function cubicBezierEase(t, x1, y1, x2, y2) {
+  const x = clamp01(t);
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  let s = x;
+  for (let i = 0; i < 8; i++) {
+    const dx = cubeBezDeriv(s, x1, x2);
+    if (Math.abs(dx) < 1e-6) break;
+    s -= (cubeBez(s, x1, x2) - x) / dx;
+    if (s < 0) s = 0;
+    else if (s > 1) s = 1;
+  }
+  return clamp01(cubeBez(s, y1, y2));
+}
+
+/**
+ * straight > 0 replaces the power curve with one cubic bezier:
+ * handles sit closer to the ends as straight increases (straighter middle),
+ * tightness tips the handles off the diagonal (sharper ease, still one curve).
+ */
+export function ease(t, curve, power = DEFAULT_BREATH.risePower, straight = 0) {
+  const x = clamp01(t);
+  const p = clampBreathPower(power);
+  const mid = clamp01(straight);
+  if (curve === 'linear' || curve == null) return x;
+  if (mid <= 0) return easeFull(x, curve, p);
+  if (mid >= 1) return x;
+
+  const c = Math.max(1e-4, (1 - mid) / 2);
+  const k = (p - BREATH_POWER_MIN) / (BREATH_POWER_MAX - BREATH_POWER_MIN);
+  const lift = 1 - k;
+  if (curve === 'easeIn') {
+    return cubicBezierEase(x, c, c * lift, 1, 1);
+  }
+  if (curve === 'easeOut') {
+    return cubicBezierEase(x, 0, 0, 1 - c, 1 - c * lift);
+  }
+  return cubicBezierEase(x, c, c * lift, 1 - c, 1 - c * lift);
 }
 
 export function quartersPerBar(numerator = 4, denominator = 4) {
@@ -97,6 +158,10 @@ export function normalizeBreathSettings(raw = {}) {
   }
   const riseCurve = BREATH_CURVES.includes(src.riseCurve) ? src.riseCurve : DEFAULT_BREATH.riseCurve;
   const fallCurve = BREATH_CURVES.includes(src.fallCurve) ? src.fallCurve : DEFAULT_BREATH.fallCurve;
+  const risePower = clampBreathPower(src.risePower, DEFAULT_BREATH.risePower);
+  const fallPower = clampBreathPower(src.fallPower, DEFAULT_BREATH.fallPower);
+  const riseStraight = clamp01(src.riseStraight ?? DEFAULT_BREATH.riseStraight);
+  const fallStraight = clamp01(src.fallStraight ?? DEFAULT_BREATH.fallStraight);
   const rateHz = Math.min(60, Math.max(1, Math.round(finiteOr(src.rateHz, DEFAULT_BREATH.rateHz))));
   const cycleBeats = finiteOr(src.cycleBeats, DEFAULT_BREATH.cycleBeats);
   return {
@@ -112,6 +177,10 @@ export function normalizeBreathSettings(raw = {}) {
     troughHold,
     riseCurve,
     fallCurve,
+    risePower,
+    fallPower,
+    riseStraight,
+    fallStraight,
   };
 }
 
@@ -147,7 +216,7 @@ export function envelopeAt(phase, settings) {
   if (p < edges[0] && riseW > 0) {
     segment = 'rise';
     inhale = 1;
-    value01 = ease(p / riseW, s.riseCurve);
+    value01 = ease(p / riseW, s.riseCurve, s.risePower, s.riseStraight);
   } else if (p < edges[1] && peakW > 0) {
     segment = 'peakHold';
     hold = 1;
@@ -156,7 +225,7 @@ export function envelopeAt(phase, settings) {
     segment = 'fall';
     exhale = 1;
     const local = (p - edges[1]) / fallW;
-    value01 = 1 - ease(local, s.fallCurve);
+    value01 = 1 - ease(local, s.fallCurve, s.fallPower, s.fallStraight);
   } else {
     segment = 'troughHold';
     hold = troughW > 0 || (riseW === 0 && peakW === 0 && fallW === 0) ? 1 : 0;

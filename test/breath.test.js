@@ -41,11 +41,52 @@ function shape(overrides = {}) {
 
 test('ease curves stay in 0–1', () => {
   for (const curve of ['linear', 'easeIn', 'easeOut', 'easeInOut']) {
-    assert.equal(ease(0, curve), 0);
-    assert.equal(ease(1, curve), 1);
-    assert.ok(ease(0.5, curve) >= 0 && ease(0.5, curve) <= 1);
+    for (const power of [1, 2, 4, 8]) {
+      assert.equal(ease(0, curve, power), 0);
+      assert.equal(ease(1, curve, power), 1);
+      assert.ok(ease(0.5, curve, power) >= 0 && ease(0.5, curve, power) <= 1);
+    }
   }
   assert.equal(ease(0.5, 'linear'), 0.5);
+});
+
+test('ease power 2 matches quadratic and higher power tightens the knee', () => {
+  assert.equal(ease(0.5, 'easeIn', 2), 0.25);
+  assert.equal(ease(0.5, 'easeOut', 2), 0.75);
+  assert.equal(ease(0.25, 'easeInOut', 2), 0.125);
+  assert.equal(ease(0.5, 'easeIn', 1), 0.5);
+  assert.equal(ease(0.5, 'easeIn', 4), 0.0625);
+  assert.ok(ease(0.5, 'easeIn', 4) < ease(0.5, 'easeIn', 2));
+  assert.ok(ease(0.5, 'easeOut', 4) > ease(0.5, 'easeOut', 2));
+  assert.equal(ease(0.5, 'linear', 8), 0.5);
+});
+
+test('normalizeBreathSettings defaults and clamps curve power', () => {
+  assert.equal(normalizeBreathSettings({}).risePower, 2);
+  assert.equal(normalizeBreathSettings({}).fallPower, 2);
+  assert.equal(normalizeBreathSettings({ risePower: 0 }).risePower, 1);
+  assert.equal(normalizeBreathSettings({ fallPower: 99 }).fallPower, 8);
+  assert.equal(normalizeBreathSettings({}).riseStraight, 0);
+  assert.equal(normalizeBreathSettings({ fallStraight: 4 }).fallStraight, 1);
+});
+
+test('straight mid is a smooth bezier toward a linear ramp', () => {
+  assert.equal(ease(0, 'easeInOut', 2, 0.5), 0);
+  assert.equal(ease(1, 'easeInOut', 2, 0.5), 1);
+  assert.ok(Math.abs(ease(0.5, 'easeInOut', 2, 0.5) - 0.5) < 1e-5);
+  const full = ease(0.25, 'easeInOut', 2, 0);
+  const bent = ease(0.25, 'easeInOut', 2, 0.5);
+  assert.ok(Math.abs(bent - 0.25) < Math.abs(full - 0.25));
+  assert.equal(ease(0.4, 'easeInOut', 2, 0), ease(0.4, 'easeInOut', 2));
+  assert.equal(ease(0.2, 'easeInOut', 2, 1), 0.2);
+  assert.ok(ease(0.12, 'easeInOut', 8, 0.5) > 0.03);
+});
+
+test('rise and fall power change envelope shape', () => {
+  const loose = shape({ riseCurve: 'easeIn', risePower: 1, fallCurve: 'easeIn', fallPower: 1 });
+  const tight = shape({ riseCurve: 'easeIn', risePower: 4, fallCurve: 'easeIn', fallPower: 4 });
+  assert.ok(breathAt(0.5, tight).value < breathAt(0.5, loose).value);
+  assert.ok(breathAt(2.5, tight).value > breathAt(2.5, loose).value);
 });
 
 test('inhale exhale and hold stay latched for the whole segment', () => {
@@ -330,6 +371,12 @@ test('validateConfig rejects invalid breath knobs', () => {
   assert.throws(() => validateConfig(cfg), /rateHz/);
   cfg.oscOut.breath = { ...DEFAULTS.oscOut.breath, riseCurve: 'sine' };
   assert.throws(() => validateConfig(cfg), /riseCurve/);
+  cfg.oscOut.breath = { ...DEFAULTS.oscOut.breath, risePower: 12 };
+  assert.throws(() => validateConfig(cfg), /risePower/);
+  cfg.oscOut.breath = { ...DEFAULTS.oscOut.breath, fallPower: 0 };
+  assert.throws(() => validateConfig(cfg), /fallPower/);
+  cfg.oscOut.breath = { ...DEFAULTS.oscOut.breath, riseStraight: 1.5 };
+  assert.throws(() => validateConfig(cfg), /riseStraight/);
 });
 
 test('createOscOutput sends breath on the shared destinations when enabled', async () => {
@@ -426,4 +473,11 @@ test('breath page wires Start inhale now to the shared offset helper', () => {
   assert.match(src, /phaseOffsetForInhaleAt/);
   assert.match(src, /Start inhale now/);
   assert.match(src, /inhaleNow\.disabled = songBeat == null/);
+  assert.match(src, /Rise tightness/);
+  assert.match(src, /Fall tightness/);
+  assert.match(src, /risePower/);
+  assert.match(src, /fallPower/);
+  assert.match(src, /Rise straight mid/);
+  assert.match(src, /Fall straight mid/);
+  assert.match(src, /activeElement !== pair\.num/);
 });

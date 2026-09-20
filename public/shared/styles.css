@@ -4760,6 +4760,10 @@ body.layout-setlist .setlist-main {
   align-items: center;
 }
 
+.breath-weight-row.is-disabled {
+  opacity: 0.45;
+}
+
 .breath-addresses {
   margin-top: 0;
 }

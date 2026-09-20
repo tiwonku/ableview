@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import dotenv from 'dotenv';
-import { BREATH_CURVES, DEFAULT_BREATH } from '../../public/shared/breath-math.js';
+import { BREATH_CURVES, BREATH_POWER_MAX, BREATH_POWER_MIN, DEFAULT_BREATH } from '../../public/shared/breath-math.js';
 import { DEFAULT_LIVE_COLOR_SLOTS, DEFAULT_STATIC_COLOR_SLOTS } from '../core/live-colors.js';
 
 export const DEFAULTS = Object.freeze({
@@ -363,6 +363,18 @@ export function validateConfig(config) {
       }
       if (breath.fallCurve != null && !BREATH_CURVES.includes(breath.fallCurve)) {
         errors.push(`oscOut.breath.fallCurve must be one of: ${BREATH_CURVES.join(', ')}`);
+      }
+      for (const key of ['risePower', 'fallPower']) {
+        if (breath[key] == null) continue;
+        if (!Number.isFinite(breath[key]) || breath[key] < BREATH_POWER_MIN || breath[key] > BREATH_POWER_MAX) {
+          errors.push(`oscOut.breath.${key} must be a number ${BREATH_POWER_MIN}–${BREATH_POWER_MAX}`);
+        }
+      }
+      for (const key of ['riseStraight', 'fallStraight']) {
+        if (breath[key] == null) continue;
+        if (!Number.isFinite(breath[key]) || breath[key] < 0 || breath[key] > 1) {
+          errors.push(`oscOut.breath.${key} must be a number 0–1`);
+        }
       }
     }
   }
