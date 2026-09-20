@@ -39,6 +39,7 @@ test('pickEditableSettings returns ingest, sim, sheets, match, timecode, sacn, m
   assert.equal(settings.timecode.enabled, false);
   assert.equal(settings.sacn.enabled, false);
   assert.equal(settings.sacn.universe, 191);
+  assert.equal(settings.sacn.staticUniverse, 191);
   assert.equal(settings.sacn.slots.main.startChannel, 500);
   assert.equal(settings.sacn.staticSlots.main.startChannel, 491);
   assert.equal(settings.moments.autoStartOnMoment, true);
@@ -202,6 +203,7 @@ test('GET and PATCH /api/config/settings', async () => {
       sacn: {
         enabled: true,
         universe: 191,
+        staticUniverse: 192,
         interfaceAddress: '10.100.10.4',
         slots: { main: { startChannel: 500 } },
         staticSlots: { accent: { startChannel: 480 } },
@@ -212,6 +214,7 @@ test('GET and PATCH /api/config/settings', async () => {
   const sacnBody = await sacnRes.json();
   assert.equal(sacnBody.settings.sacn.enabled, true);
   assert.equal(sacnBody.settings.sacn.universe, 191);
+  assert.equal(sacnBody.settings.sacn.staticUniverse, 192);
   assert.equal(sacnBody.settings.sacn.interfaceAddress, '10.100.10.4');
   assert.equal(sacnBody.settings.sacn.slots.main.startChannel, 500);
   assert.equal(sacnBody.settings.sacn.slots.secondary.startChannel, 503);

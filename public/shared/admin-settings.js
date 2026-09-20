@@ -32,6 +32,7 @@ const SACN_DEFAULTS = Object.freeze({
   interfaceAddress: '0.0.0.0',
   multicast: true,
   universe: 191,
+  staticUniverse: 191,
   staleMs: 1000,
   ignorePreview: true,
   slots: {
@@ -234,9 +235,10 @@ function rgbChip(label, color, { channel } = {}) {
   return wrap;
 }
 
-function sacnPreviewRow(title, colors, slots, phase) {
-  const row = el('div', 'sacn-preview-row');
-  row.appendChild(el('span', 'sacn-preview-label', title));
+function sacnPreviewRow(title, colors, slots, phase, { universe, live } = {}) {
+  const uni = Number.isInteger(universe) ? ` · U${universe}` : '';
+  const row = el('div', `sacn-preview-row${live === false ? ' sacn-preview-row--stale' : ''}`);
+  row.appendChild(el('span', 'sacn-preview-label', `${title}${uni}`));
   const chips = el('div', 'sacn-chips');
   chips.appendChild(rgbChip('Main', colors?.main, { channel: slots?.main?.startChannel }));
   chips.appendChild(rgbChip('Sec', colors?.secondary, { channel: slots?.secondary?.startChannel }));
@@ -271,15 +273,20 @@ function renderSacnStatusBox(sacnStatus, settings) {
   }
 
   const live = sacnStatus.live === true;
+  const fxLive = sacnStatus.fxLive === true || (sacnStatus.fxLive == null && live);
+  const lookLive = sacnStatus.staticLive === true || (sacnStatus.staticLive == null && live);
   const signalLine = el('p', `ableton-session-line${live ? '' : ' warn'}`);
   const seen = formatIngestSeen(sacnStatus.lastSeenAt);
-  const uni = sacnStatus.universe ?? settings.sacn?.universe ?? 191;
+  const fxUni = sacnStatus.universe ?? settings.sacn?.universe ?? 191;
+  const lookUni = sacnStatus.staticUniverse ?? settings.sacn?.staticUniverse ?? fxUni;
   const from = sacnStatus.sourceAddress ? ` from ${sacnStatus.sourceAddress}` : '';
   if (live) {
     const name = sacnStatus.sourceName ? ` · ${sacnStatus.sourceName}` : '';
-    signalLine.textContent = `Live universe ${uni}${from}${name}${seen ? ` (last packet ${seen})` : ''}`;
+    const uniText = fxUni === lookUni ? `universe ${fxUni}` : `FX U${fxUni} · look U${lookUni}`;
+    signalLine.textContent = `Live ${uniText}${from}${name}${seen ? ` (last packet ${seen})` : ''}`;
   } else {
-    signalLine.textContent = `No signal on universe ${uni} — pick the lighting NIC and confirm GrandMA is sending`;
+    const uniText = fxUni === lookUni ? `universe ${fxUni}` : `FX U${fxUni} / look U${lookUni}`;
+    signalLine.textContent = `No signal on ${uniText} — pick the lighting NIC and confirm GrandMA is sending`;
   }
   box.appendChild(signalLine);
 
@@ -289,12 +296,15 @@ function renderSacnStatusBox(sacnStatus, settings) {
     'Live FX',
     sacnStatus.colors,
     settings.sacn?.slots,
-    live ? (moving ? 'move' : 'hold') : null,
+    fxLive ? (moving ? 'move' : 'hold') : null,
+    { universe: fxUni, live: fxLive },
   ));
   preview.appendChild(sacnPreviewRow(
     'Static',
     sacnStatus.staticColors,
     settings.sacn?.staticSlots,
+    null,
+    { universe: lookUni, live: lookLive },
   ));
   box.appendChild(preview);
 
@@ -690,6 +700,7 @@ function sacnFromForm(fd, current) {
     port: Number(fd.get('sacnPort')),
     interfaceAddress: fd.get('sacnInterfaceAddress')?.trim() || '0.0.0.0',
     universe: Number(fd.get('sacnUniverse')),
+    staticUniverse: Number(fd.get('sacnStaticUniverse')),
     staleMs: Number(fd.get('sacnStaleMs')),
     multicast: true,
     ignorePreview: true,
@@ -757,11 +768,11 @@ function renderSacnGroup(settings, sacnStatus, nics) {
     'UDP port',
     numberInput('sacnPort', settings.sacn?.port ?? 5568, { min: 1, max: 65535 }),
   ));
+  group.appendChild(el('p', 'settings-subhead', 'Live FX'));
   group.appendChild(fieldRow(
     'Universe',
     numberInput('sacnUniverse', settings.sacn?.universe ?? 191, { min: 1, max: 63999 }),
   ));
-  group.appendChild(el('p', 'settings-subhead', 'Live FX start channels'));
   group.appendChild(fieldRow(
     'Main',
     numberInput('sacnMainChannel', settings.sacn?.slots?.main?.startChannel ?? 500, { min: 1, max: 510 }),
@@ -774,7 +785,11 @@ function renderSacnGroup(settings, sacnStatus, nics) {
     'Accent',
     numberInput('sacnAccentChannel', settings.sacn?.slots?.accent?.startChannel ?? 506, { min: 1, max: 510 }),
   ));
-  group.appendChild(el('p', 'settings-subhead', 'Static look start channels'));
+  group.appendChild(el('p', 'settings-subhead', 'Static look'));
+  group.appendChild(fieldRow(
+    'Universe',
+    numberInput('sacnStaticUniverse', settings.sacn?.staticUniverse ?? settings.sacn?.universe ?? 191, { min: 1, max: 63999 }),
+  ));
   group.appendChild(fieldRow(
     'Main',
     numberInput('sacnStaticMainChannel', settings.sacn?.staticSlots?.main?.startChannel ?? 491, { min: 1, max: 510 }),
@@ -801,7 +816,7 @@ function renderSacnGroup(settings, sacnStatus, nics) {
   ));
 
   const hint = el('p', 'settings-sim-hint');
-  hint.textContent = 'Pick the same NIC sACNView uses. Live FX defaults to Jake’s map (universe 191, channels 500–508). Static look defaults to 491–499 — change those if he parks the fixtures elsewhere (start channel must be 1–510). Operator cards paint FX; Flash and the session log use the static look, plus a MOVE span while FX is chasing. Preview packets are ignored.';
+  hint.textContent = 'Pick the same NIC sACNView uses. Live FX defaults to Jake’s map (universe 191, channels 500–508). Static look can use a second universe — same NIC, one UDP port. Start channels are 1–510 on that universe. Operator cards paint FX; Flash and the session log use the static look, plus a MOVE span while FX is chasing. Preview packets are ignored.';
   group.appendChild(hint);
   return group;
 }
@@ -1268,6 +1283,9 @@ export function mountSettingsPanel(rootSelector) {
       live: status.live === true,
       lastSeenAt: status.lastSeenAt ?? sacnStatus?.lastSeenAt ?? null,
       universe: status.universe ?? sacnStatus?.universe ?? null,
+      staticUniverse: status.staticUniverse ?? sacnStatus?.staticUniverse ?? null,
+      fxLive: status.fxLive === true,
+      staticLive: status.staticLive === true,
       sourceName: status.sourceName ?? sacnStatus?.sourceName ?? null,
       sourceAddress: status.sourceAddress ?? sacnStatus?.sourceAddress ?? null,
       colors: status.colors ?? null,

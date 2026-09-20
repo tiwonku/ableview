@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import dgram from 'node:dgram';
 import { createBus, EVENTS } from '../src/core/bus.js';
-import { makeLiveColorsStatus, maxChannelDelta } from '../src/core/live-colors.js';
+import { makeLiveColorsStatus, maxChannelDelta, resolveSacnUniverses } from '../src/core/live-colors.js';
 import {
   buildE131DataPacket,
   extractSlotColors,
@@ -301,6 +301,93 @@ test('createSacnListener reads FX and static buses from independent channels', a
     assert.deepEqual(status.colors.main, { r: 255, g: 0, b: 0 });
     assert.deepEqual(status.staticColors.main, { r: 8, g: 16, b: 32 });
     assert.deepEqual(status.staticColors.accent, { r: 9, g: 9, b: 9 });
+    assert.equal(status.moving, true);
+  } finally {
+    socket.close();
+    listener.stop();
+  }
+});
+
+test('resolveSacnUniverses defaults the look bus onto the FX universe', () => {
+  assert.deepEqual(resolveSacnUniverses({}), { universe: 191, staticUniverse: 191 });
+  assert.deepEqual(resolveSacnUniverses({ universe: 191 }), { universe: 191, staticUniverse: 191 });
+  assert.deepEqual(
+    resolveSacnUniverses({ universe: 191, staticUniverse: 192 }),
+    { universe: 191, staticUniverse: 192 },
+  );
+});
+
+test('createSacnListener keeps FX and look buses isolated across universes', async () => {
+  const bus = createBus();
+  const listenPort = await reserveUdpPort();
+  const config = {
+    ...DEFAULTS,
+    sacn: {
+      ...DEFAULTS.sacn,
+      enabled: true,
+      port: listenPort,
+      bindAddress: '127.0.0.1',
+      multicast: false,
+      universe: 191,
+      staticUniverse: 192,
+      staleMs: 500,
+    },
+  };
+  const listener = createSacnListener({
+    getConfig: () => config,
+    bus,
+    log: silentLog,
+  });
+  const socket = dgram.createSocket('udp4');
+  const send = (packet) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timed out waiting for LIVE_COLORS')), 2000);
+    bus.once(EVENTS.LIVE_COLORS, () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    socket.send(packet, listenPort, '127.0.0.1', (err) => { if (err) reject(err); });
+  });
+  try {
+    await listener.start();
+    await new Promise((resolve, reject) => {
+      socket.once('error', reject);
+      socket.bind(() => resolve());
+    });
+    await send(buildE131DataPacket({
+      universe: 191,
+      dmx: dmxWithSlots({
+        main: [255, 0, 0],
+        secondary: [0, 255, 0],
+        accent: [0, 0, 255],
+        lookMain: [1, 1, 1],
+        lookSecondary: [1, 1, 1],
+        lookAccent: [1, 1, 1],
+      }),
+    }));
+    let status = listener.getStatus();
+    assert.deepEqual(status.colors.main, { r: 255, g: 0, b: 0 });
+    assert.equal(status.staticColors.main, null);
+    assert.equal(status.fxLive, true);
+    assert.equal(status.staticLive, false);
+
+    await send(buildE131DataPacket({
+      universe: 192,
+      dmx: dmxWithSlots({
+        main: [9, 9, 9],
+        secondary: [9, 9, 9],
+        accent: [9, 9, 9],
+        lookMain: [8, 16, 32],
+        lookSecondary: [1, 2, 3],
+        lookAccent: [4, 5, 6],
+      }),
+    }));
+    status = listener.getStatus();
+    assert.deepEqual(status.colors.main, { r: 255, g: 0, b: 0 });
+    assert.deepEqual(status.staticColors.main, { r: 8, g: 16, b: 32 });
+    assert.equal(status.universe, 191);
+    assert.equal(status.staticUniverse, 192);
+    assert.equal(status.fxLive, true);
+    assert.equal(status.staticLive, true);
     assert.equal(status.moving, true);
   } finally {
     socket.close();

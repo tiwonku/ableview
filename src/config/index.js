@@ -64,6 +64,7 @@ export const DEFAULTS = Object.freeze({
     interfaceAddress: '0.0.0.0',
     multicast: true,
     universe: 191,
+    staticUniverse: 191,
     staleMs: 1000,
     ignorePreview: true,
     slots: {
@@ -214,12 +215,14 @@ export function validateConfig(config) {
   if (sacn.interfaceAddress != null && typeof sacn.interfaceAddress !== 'string') {
     errors.push('sacn.interfaceAddress must be a string');
   }
-  if (sacn.universe != null) {
-    const u = sacn.universe;
-    if (!(Number.isInteger(u) && u >= 1 && u <= 63999)) {
-      errors.push('sacn.universe must be an integer 1–63999');
+  function validateUniverse(value, path) {
+    if (value == null) return;
+    if (!(Number.isInteger(value) && value >= 1 && value <= 63999)) {
+      errors.push(`${path} must be an integer 1–63999`);
     }
   }
+  validateUniverse(sacn.universe, 'sacn.universe');
+  validateUniverse(sacn.staticUniverse, 'sacn.staticUniverse');
   if (sacn.multicast != null && typeof sacn.multicast !== 'boolean') {
     errors.push('sacn.multicast must be a boolean');
   }

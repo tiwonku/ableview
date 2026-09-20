@@ -1862,9 +1862,13 @@ select.settings-input option {
 }
 
 .sacn-preview-label {
-  min-width: 4.4rem;
+  min-width: 6.4rem;
   font-weight: 650;
   letter-spacing: 0.02em;
+}
+
+.sacn-preview-row--stale {
+  opacity: 0.55;
 }
 
 .sacn-preview .sacn-chip-swatch {

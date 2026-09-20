@@ -37,11 +37,12 @@ test('settings panel maps FX and static look channels independently', () => {
     fileURLToPath(new URL('../public/shared/admin-settings.js', import.meta.url)),
     'utf8',
   );
+  assert.match(src, /sacnStaticUniverse/);
   assert.match(src, /sacnStaticMainChannel/);
   assert.match(src, /sacnStaticSecondaryChannel/);
   assert.match(src, /sacnStaticAccentChannel/);
-  assert.match(src, /Live FX start channels/);
-  assert.match(src, /Static look start channels/);
+  assert.match(src, /Live FX/);
+  assert.match(src, /Static look/);
   assert.match(src, /sacn-preview-row/);
 });
 

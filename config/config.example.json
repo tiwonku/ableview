@@ -73,6 +73,7 @@
     "interfaceAddress": "0.0.0.0",
     "multicast": true,
     "universe": 191,
+    "staticUniverse": 191,
     "staleMs": 1000,
     "ignorePreview": true,
     "slots": {

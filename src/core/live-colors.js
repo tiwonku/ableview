@@ -72,28 +72,40 @@ export function makeRgb(r, g, b) {
   return { r, g, b };
 }
 
+export function resolveSacnUniverses(sacn = {}) {
+  const universe = Number.isInteger(sacn.universe) ? sacn.universe : 191;
+  const staticUniverse = Number.isInteger(sacn.staticUniverse) ? sacn.staticUniverse : universe;
+  return { universe, staticUniverse };
+}
+
 export function makeLiveColorsStatus({
   enabled,
   live = false,
   lastSeenAt = null,
   universe = null,
+  staticUniverse = null,
   sourceName = null,
   sourceAddress = null,
   preview = false,
   colors = null,
   staticColors = null,
   moving = false,
+  fxLive = false,
+  staticLive = false,
 } = {}) {
   return {
     enabled: enabled === true,
     live: live === true,
     lastSeenAt,
     universe,
+    staticUniverse,
     sourceName,
     sourceAddress,
     preview: preview === true,
     colors: cloneSlotColors(colors),
     staticColors: cloneSlotColors(staticColors),
     moving: moving === true,
+    fxLive: fxLive === true,
+    staticLive: staticLive === true,
   };
 }

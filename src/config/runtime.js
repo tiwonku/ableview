@@ -57,6 +57,7 @@ function serializeSacn(sacn) {
     interfaceAddress: src.interfaceAddress ?? '0.0.0.0',
     multicast: src.multicast !== false,
     universe: src.universe ?? 191,
+    staticUniverse: src.staticUniverse ?? src.universe ?? 191,
     staleMs: src.staleMs ?? 1000,
     ignorePreview: src.ignorePreview !== false,
     slots: serializeSlotGroup(src.slots, DEFAULT_LIVE_COLOR_SLOTS),
