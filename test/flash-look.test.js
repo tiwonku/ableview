@@ -111,6 +111,24 @@ test('isLiveColorMoving uses the sACN change delta', () => {
   assert.equal(isLiveColorMoving(null, next), false);
 });
 
+test('isLiveColorMoving ignores a parked FX/look profile offset', () => {
+  const parked = {
+    live: true,
+    moving: false,
+    colors: {
+      main: { r: 0, g: 255, b: 0 },
+      secondary: { r: 255, g: 0, b: 0 },
+      accent: { r: 255, g: 204, b: 0 },
+    },
+    staticColors: {
+      main: { r: 0, g: 255, b: 0 },
+      secondary: { r: 255, g: 0, b: 0 },
+      accent: { r: 255, g: 168, b: 0 },
+    },
+  };
+  assert.equal(isLiveColorMoving(parked, parked), false);
+});
+
 test('buildFlashLookSlots snapshots sheet vs GrandMA and flags rainbow', () => {
   const slots = buildFlashLookSlots({
     fields: FIELDS,

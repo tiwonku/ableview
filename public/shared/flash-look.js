@@ -62,9 +62,6 @@ export function flashLookDisabledReason(status, columns, columnMap = DEFAULT_LIV
 export function isLiveColorMoving(prev, next, { threshold = FLASH_LOOK_MOTION_DELTA } = {}) {
   if (next?.live !== true) return false;
   if (next.moving === true) return true;
-  if (hasSlotColors(next.staticColors) && next.colors) {
-    return maxSlotDelta(next.colors, next.staticColors) >= threshold;
-  }
   if (!prev?.colors || !next?.colors) return false;
   return maxSlotDelta(prev.colors, next.colors) >= threshold;
 }

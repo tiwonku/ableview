@@ -2,7 +2,9 @@ import dgram from 'node:dgram';
 import { EVENTS } from '../core/bus.js';
 import {
   cloneSlotColors,
-  isFxDivergedFromLook,
+  fxMotionWindowMs,
+  hasSlotColors,
+  isFxMotionActive,
   makeLiveColorsStatus,
   maxChannelDelta,
   resolveSacnUniverses,
@@ -20,10 +22,12 @@ function colorsChanged(a, b) {
 export function createSacnListener({ getConfig, bus, log }) {
   let socket = null;
   let staleTimer = null;
+  let motionTimer = null;
   let live = false;
   let lastSeenAt = null;
   let lastFxSeenAt = null;
   let lastStaticSeenAt = null;
+  let lastFxChangeAt = null;
   let lastColors = null;
   let lastStaticColors = null;
   let lastUniverse = null;
@@ -41,6 +45,33 @@ export function createSacnListener({ getConfig, bus, log }) {
       clearTimeout(staleTimer);
       staleTimer = null;
     }
+  }
+
+  function clearMotionTimer() {
+    if (motionTimer) {
+      clearTimeout(motionTimer);
+      motionTimer = null;
+    }
+  }
+
+  function motionWindowMs() {
+    return fxMotionWindowMs(sacnConfig().log);
+  }
+
+  function fxIsMoving(now = Date.now()) {
+    return isFxMotionActive(lastFxChangeAt, now, motionWindowMs());
+  }
+
+  function scheduleMotionEnd() {
+    clearMotionTimer();
+    if (lastFxChangeAt == null) return;
+    const wait = lastFxChangeAt + motionWindowMs() - Date.now();
+    if (wait <= 0) return;
+    motionTimer = setTimeout(() => {
+      motionTimer = null;
+      emitStatus();
+    }, Math.max(20, wait));
+    motionTimer.unref?.();
   }
 
   function busFresh(seenAt, staleMs, now) {
@@ -117,10 +148,16 @@ export function createSacnListener({ getConfig, bus, log }) {
     }
 
     const staleMs = config.staleMs ?? 1000;
+    const changeDelta = config.log?.changeDelta ?? 4;
     const wasLive = live;
+    const wasMoving = fxIsMoving(now);
     applyLiveFlags(staleMs, now);
     const rgbChanged = colorsChanged(lastColors, colors)
       || colorsChanged(lastStaticColors, staticColors);
+    if (isFx && hasSlotColors(lastColors) && maxChannelDelta(lastColors, colors) >= changeDelta) {
+      lastFxChangeAt = now;
+      scheduleMotionEnd();
+    }
 
     lastColors = cloneSlotColors(colors);
     lastStaticColors = cloneSlotColors(staticColors);
@@ -130,7 +167,7 @@ export function createSacnListener({ getConfig, bus, log }) {
     lastPreview = parsed.preview === true;
     scheduleStaleCheck(staleMs);
 
-    if (!wasLive || rgbChanged) {
+    if (!wasLive || rgbChanged || wasMoving !== fxIsMoving(now)) {
       if (!wasLive) {
         log.info(
           { universe: parsed.universe, from: rinfo?.address },
@@ -162,9 +199,7 @@ export function createSacnListener({ getConfig, bus, log }) {
       staticColors: lastStaticColors,
       fxLive,
       staticLive,
-      moving: fxLive && staticLive && isFxDivergedFromLook(lastColors, lastStaticColors, {
-        changeDelta: config.log?.changeDelta ?? 4,
-      }),
+      moving: fxLive && fxIsMoving(),
     });
   }
 
@@ -230,6 +265,7 @@ export function createSacnListener({ getConfig, bus, log }) {
 
   function stop() {
     clearStaleTimer();
+    clearMotionTimer();
     if (socket) {
       try { socket.close(); } catch { /* already closed */ }
       socket = null;
@@ -243,6 +279,8 @@ export function createSacnListener({ getConfig, bus, log }) {
     lastSeenAt = null;
     lastFxSeenAt = null;
     lastStaticSeenAt = null;
+    lastFxChangeAt = null;
+    clearMotionTimer();
     live = false;
     lastUniverse = null;
     lastStaticUniverse = null;

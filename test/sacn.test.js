@@ -2,7 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import dgram from 'node:dgram';
 import { createBus, EVENTS } from '../src/core/bus.js';
-import { makeLiveColorsStatus, maxChannelDelta, resolveSacnUniverses } from '../src/core/live-colors.js';
+import {
+  fxMotionWindowMs,
+  isFxMotionActive,
+  makeLiveColorsStatus,
+  maxChannelDelta,
+  resolveSacnUniverses,
+} from '../src/core/live-colors.js';
 import {
   buildE131DataPacket,
   extractSlotColors,
@@ -301,7 +307,7 @@ test('createSacnListener reads FX and static buses from independent channels', a
     assert.deepEqual(status.colors.main, { r: 255, g: 0, b: 0 });
     assert.deepEqual(status.staticColors.main, { r: 8, g: 16, b: 32 });
     assert.deepEqual(status.staticColors.accent, { r: 9, g: 9, b: 9 });
-    assert.equal(status.moving, true);
+    assert.equal(status.moving, false);
   } finally {
     socket.close();
     listener.stop();
@@ -388,7 +394,92 @@ test('createSacnListener keeps FX and look buses isolated across universes', asy
     assert.equal(status.staticUniverse, 192);
     assert.equal(status.fxLive, true);
     assert.equal(status.staticLive, true);
-    assert.equal(status.moving, true);
+    assert.equal(status.moving, false);
+  } finally {
+    socket.close();
+    listener.stop();
+  }
+});
+
+test('fxMotionWindowMs uses the longer of settle and motion interval', () => {
+  assert.equal(fxMotionWindowMs({}), 400);
+  assert.equal(fxMotionWindowMs({ settleMs: 200, motionIntervalMs: 400 }), 400);
+  assert.equal(fxMotionWindowMs({ settleMs: 800, motionIntervalMs: 400 }), 800);
+});
+
+test('isFxMotionActive is only true while FX RGB changed recently', () => {
+  assert.equal(isFxMotionActive(null, 1000, 400), false);
+  assert.equal(isFxMotionActive(900, 1000, 400), true);
+  assert.equal(isFxMotionActive(500, 1000, 400), false);
+});
+
+test('createSacnListener only marks moving while FX RGB is changing', async () => {
+  const bus = createBus();
+  const listenPort = await reserveUdpPort();
+  const config = {
+    ...DEFAULTS,
+    sacn: {
+      ...DEFAULTS.sacn,
+      enabled: true,
+      port: listenPort,
+      bindAddress: '127.0.0.1',
+      multicast: false,
+      universe: 191,
+      staticUniverse: 192,
+      staleMs: 500,
+      log: { changeDelta: 4, settleMs: 30, motionIntervalMs: 40 },
+    },
+  };
+  const listener = createSacnListener({
+    getConfig: () => config,
+    bus,
+    log: silentLog,
+  });
+  const socket = dgram.createSocket('udp4');
+  const send = (packet) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timed out waiting for LIVE_COLORS')), 2000);
+    bus.once(EVENTS.LIVE_COLORS, () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    socket.send(packet, listenPort, '127.0.0.1', (err) => { if (err) reject(err); });
+  });
+  try {
+    await listener.start();
+    await new Promise((resolve, reject) => {
+      socket.once('error', reject);
+      socket.bind(() => resolve());
+    });
+    await send(buildE131DataPacket({
+      universe: 192,
+      dmx: dmxWithSlots({
+        lookMain: [0, 255, 0],
+        lookSecondary: [255, 0, 0],
+        lookAccent: [255, 168, 0],
+      }),
+    }));
+    await send(buildE131DataPacket({
+      universe: 191,
+      dmx: dmxWithSlots({
+        main: [0, 255, 0],
+        secondary: [255, 0, 0],
+        accent: [255, 204, 0],
+      }),
+    }));
+    assert.equal(listener.getStatus().moving, false);
+
+    await send(buildE131DataPacket({
+      universe: 191,
+      dmx: dmxWithSlots({
+        main: [0, 200, 0],
+        secondary: [255, 0, 0],
+        accent: [255, 204, 0],
+      }),
+    }));
+    assert.equal(listener.getStatus().moving, true);
+
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(listener.getStatus().moving, false);
   } finally {
     socket.close();
     listener.stop();

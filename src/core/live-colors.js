@@ -38,6 +38,19 @@ export function isFxDivergedFromLook(colors, staticColors, { changeDelta = 4 } =
   return maxChannelDelta(colors, staticColors) >= changeDelta;
 }
 
+/** How long MOVE stays lit after the last FX RGB change. */
+export function fxMotionWindowMs(log = {}) {
+  const settleMs = Number.isFinite(log.settleMs) ? log.settleMs : 200;
+  const motionIntervalMs = Number.isFinite(log.motionIntervalMs) ? log.motionIntervalMs : 400;
+  return Math.max(settleMs, motionIntervalMs);
+}
+
+/** True while FX RGB has changed inside the motion window. A parked profile offset is not motion. */
+export function isFxMotionActive(lastFxChangeAt, now = Date.now(), windowMs = 400) {
+  if (lastFxChangeAt == null || !(windowMs > 0)) return false;
+  return now - lastFxChangeAt < windowMs;
+}
+
 export function cloneSlotColors(colors) {
   const out = emptySlotColors();
   if (!colors || typeof colors !== 'object') return out;

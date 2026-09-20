@@ -816,7 +816,7 @@ function renderSacnGroup(settings, sacnStatus, nics) {
   ));
 
   const hint = el('p', 'settings-sim-hint');
-  hint.textContent = 'Pick the same NIC sACNView uses. Live FX defaults to Jake’s map (universe 191, channels 500–508). Static look can use a second universe — same NIC, one UDP port. Start channels are 1–510 on that universe. Operator cards paint FX; Flash and the session log use the static look, plus a MOVE span while FX is chasing. Preview packets are ignored.';
+  hint.textContent = 'Pick the same NIC sACNView uses. Live FX defaults to Jake’s map (universe 191, channels 500–508). Static look can use a second universe — same NIC, one UDP port. Start channels are 1–510 on that universe. Operator cards paint FX; Flash and the session log use the static look, plus a MOVE span while FX is chasing. A parked RGB offset between fixture profiles is HOLD. Preview packets are ignored.';
   group.appendChild(hint);
   return group;
 }
