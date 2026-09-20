@@ -22,7 +22,7 @@ const exampleViews = {
     title: 'Band',
     fields: [
       { column: 'Key', display: 'token' },
-      { column: 'Relative Key', display: 'token' },
+      { column: 'Key', type: 'camelot', label: 'Harmony' },
       { source: 'tempo', label: 'Tempo', display: 'token' },
     ],
   },
@@ -97,13 +97,16 @@ test('collectOperatorViews skips system views and keeps config order', () => {
 test('dashboard zones dedupe colors and skip tempo', () => {
   assert.equal(dashboardFieldKind({ source: 'tempo' }), 'skip');
   assert.equal(dashboardFieldKind({ column: 'Key' }), 'token');
+  assert.equal(dashboardFieldKind({ column: 'Key', type: 'camelot' }), 'camelot');
   assert.equal(dashboardFieldKind({ column: 'Lasers' }), 'note');
   assert.equal(dashboardFieldKind({ column: 'RGB_1', type: 'color' }), 'color');
   assert.equal(fieldIdentity({ column: 'RGB_1' }), 'column:RGB_1');
+  assert.equal(fieldIdentity({ column: 'Key', type: 'camelot' }), 'column:Key:camelot');
   assert.equal(fieldIdentity({ source: 'tempo' }), 'source:tempo');
 
   const zones = buildDashboardZones(collectOperatorViews(exampleViews));
-  assert.deepEqual(zones.tokens.map((f) => f.column), ['Key', 'Relative Key']);
+  assert.deepEqual(zones.tokens.map((f) => f.column), ['Key']);
+  assert.deepEqual(zones.camelot.map((f) => f.label), ['Harmony']);
   assert.deepEqual(zones.images.map((f) => f.column), ['ART']);
   assert.deepEqual(zones.colors.map((f) => f.column), ['RGB_1', 'RGB_2', 'RGB_3']);
   assert.deepEqual(zones.noteGroups.map((g) => g.id), ['visuals', 'lighting']);

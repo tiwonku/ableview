@@ -8,6 +8,7 @@ import {
   fieldLabel,
   formatTempoFieldValue,
   isLiveField,
+  isCamelotField,
 } from '../public/shared/field-display.js';
 
 test('resolveFieldDisplay respects explicit display', () => {
@@ -35,7 +36,7 @@ test('resolveFieldsLayoutMode uses hero for small non-color views', () => {
     resolveFieldsLayoutMode([
       { column: 'Key' },
       { column: 'BPM' },
-      { column: 'Relative Key' },
+      { column: 'Key', type: 'camelot', label: 'Harmony' },
     ]),
     'hero',
   );
@@ -136,4 +137,24 @@ test('formatTempoFieldValue and fieldLabel helpers', () => {
 
 test('resolveFieldDisplay defaults live tempo to token', () => {
   assert.equal(resolveFieldDisplay({ source: 'tempo' }, '128'), 'token');
+});
+
+test('camelot fields stay on the hero token row', () => {
+  assert.equal(isCamelotField({ column: 'Key', type: 'camelot' }), true);
+  assert.equal(resolveFieldDisplay({ column: 'Key', type: 'camelot' }, 'Gm'), 'token');
+  const rows = groupFieldsForLayout(
+    [
+      { column: 'Key', display: 'token' },
+      { column: 'Key', type: 'camelot', label: 'Harmony' },
+      { source: 'tempo', label: 'Tempo' },
+    ],
+    { row: { Key: 'Gm' }, tempo: 105 },
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].type, 'row');
+  assert.deepEqual(rows[0].items.map((item) => item.field.type ?? item.field.source), [
+    undefined,
+    'camelot',
+    'tempo',
+  ]);
 });

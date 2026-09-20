@@ -134,8 +134,9 @@
           "display": "token"
         },
         {
-          "column": "Relative Key",
-          "display": "token"
+          "column": "Key",
+          "type": "camelot",
+          "label": "Harmony"
         },
         {
           "source": "tempo",

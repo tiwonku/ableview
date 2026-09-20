@@ -16,6 +16,10 @@ export function isSheetField(field) {
   return Boolean(field?.column) && !isLiveField(field);
 }
 
+export function isCamelotField(field) {
+  return field?.type === 'camelot';
+}
+
 /** Format Ableton tempo for operator field tokens (number only; label is separate). */
 export function formatTempoFieldValue(tempo) {
   if (tempo == null || Number.isNaN(Number(tempo))) return null;
@@ -25,7 +29,7 @@ export function formatTempoFieldValue(tempo) {
 
 /** @returns {'token' | 'text' | 'note'} */
 export function resolveFieldDisplay(field, value, { layout = 'hero' } = {}) {
-  if (field.type === 'color') return 'token';
+  if (field.type === 'color' || isCamelotField(field)) return 'token';
   if (isLiveField(field)) return field.display === 'text' || field.display === 'note'
     ? field.display
     : 'token';

@@ -12,13 +12,21 @@ import { suggestAliasStem } from './alias-stem.js';
 import { operatorCreateColumns } from './playing-clips-strip.js';
 
 export function viewFieldColumns(fields) {
-  return (fields ?? []).map((field) => field.column).filter(Boolean);
+  const seen = new Set();
+  const out = [];
+  for (const field of fields ?? []) {
+    if (!field?.column || field.type === 'camelot') continue;
+    if (seen.has(field.column)) continue;
+    seen.add(field.column);
+    out.push(field.column);
+  }
+  return out;
 }
 
 export function buildFieldLabels(fields) {
   return Object.fromEntries(
     (fields ?? [])
-      .filter((field) => field?.column)
+      .filter((field) => field?.column && field.type !== 'camelot')
       .map((field) => [field.column, field.label ?? field.column])
   );
 }
@@ -26,7 +34,7 @@ export function buildFieldLabels(fields) {
 export function buildViewEditorColumns(fields, editorColumns = {}) {
   const result = {};
   for (const field of fields ?? []) {
-    if (!field?.column) continue;
+    if (!field?.column || field.type === 'camelot') continue;
     result[field.column] = editorColumns[field.column]
       ?? (field.type === 'color' || field.type === 'image'
         ? { type: field.type }
@@ -89,7 +97,7 @@ export function buildOperatorCreateFields(viewFields, matchColumn, aliasColumn, 
   return columns
     .filter((column) => column in session.row)
     .map((column) => {
-      const fromView = (viewFields ?? []).find((f) => f.column === column);
+      const fromView = (viewFields ?? []).find((f) => f.column === column && f.type !== 'camelot');
       if (fromView) return fromView;
       return { column, label: column, display: 'text' };
     });

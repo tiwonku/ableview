@@ -60,6 +60,7 @@ export function withAdminBoardMode(path, mode, search) {
 
 export function fieldIdentity(field) {
   if (field?.source) return `source:${field.source}`;
+  if (field?.type === 'camelot' && field?.column) return `column:${field.column}:camelot`;
   if (field?.column) return `column:${field.column}`;
   return null;
 }
@@ -98,9 +99,10 @@ export function flattenOperatorFields(operatorViews) {
   return out;
 }
 
-/** @returns {'skip' | 'token' | 'color' | 'image' | 'note'} */
+/** @returns {'skip' | 'token' | 'color' | 'image' | 'note' | 'camelot'} */
 export function dashboardFieldKind(field) {
   if (!field || field.source === 'tempo') return 'skip';
+  if (field.type === 'camelot') return 'camelot';
   if (field.type === 'color') return 'color';
   if (field.type === 'image') return 'image';
   const column = String(field.column ?? '').trim();
@@ -120,6 +122,7 @@ export function buildDashboardZones(operatorViews) {
   const tokens = [];
   const images = [];
   const colors = [];
+  const camelot = [];
   const noteGroups = [];
 
   for (const view of operatorViews ?? []) {
@@ -133,6 +136,7 @@ export function buildDashboardZones(operatorViews) {
       if (kind === 'token') tokens.push(field);
       else if (kind === 'image') images.push(field);
       else if (kind === 'color') colors.push(field);
+      else if (kind === 'camelot') camelot.push(field);
       else notes.push(field);
     }
     if (notes.length) {
@@ -144,5 +148,5 @@ export function buildDashboardZones(operatorViews) {
     }
   }
 
-  return { tokens, images, colors, noteGroups };
+  return { tokens, images, colors, camelot, noteGroups };
 }

@@ -2724,6 +2724,81 @@ body.layout-operator .field--token .field-value {
   font-variant-numeric: tabular-nums;
 }
 
+body.layout-operator .field--camelot .field-value-body {
+  justify-content: center;
+  align-items: stretch;
+}
+
+.camelot-open {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.35rem, 1.2cqmin, 0.7rem);
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0.15rem 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+
+.camelot-open:hover .camelot-chip,
+.camelot-open:focus-visible .camelot-chip {
+  border-color: var(--accent);
+}
+
+.camelot-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 0.45rem;
+}
+
+.camelot-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.12em 0.4em;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.camelot-chip--relative {
+  font-size: clamp(1.15rem, 22cqmin, 5rem);
+}
+
+.camelot-neighbors {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.camelot-chip--prev,
+.camelot-chip--next {
+  font-size: clamp(0.85rem, 12cqmin, 2.4rem);
+  color: var(--text);
+  opacity: 0.92;
+}
+
+body.layout-operator .fields-strip .camelot-chip--relative {
+  font-size: clamp(0.95rem, 8cqmin, 2rem);
+}
+
+body.layout-operator .fields-strip .camelot-chip--prev,
+body.layout-operator .fields-strip .camelot-chip--next {
+  font-size: clamp(0.75rem, 5.5cqmin, 1.25rem);
+}
+
 body.layout-operator .fields-strip .field--token .field-value {
   width: 100%;
   max-width: 100%;
@@ -3134,6 +3209,76 @@ body.field-expand-open {
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.field-expand-panel--camelot {
+  width: min(36rem, 100%);
+}
+
+.field-expand-body--camelot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.85rem 1rem;
+  overflow: hidden;
+  white-space: normal;
+  font-weight: 400;
+}
+
+.camelot-wheel {
+  width: min(32rem, 88dvw, 78dvh);
+  height: auto;
+  max-height: min(78dvh, 32rem);
+}
+
+.camelot-wedge {
+  stroke: var(--bg);
+  stroke-width: 1.25;
+}
+
+.camelot-wedge--current {
+  stroke: #fff;
+  stroke-width: 2.25;
+}
+
+.camelot-wedge--relative,
+.camelot-wedge--prev,
+.camelot-wedge--next {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 1.6;
+}
+
+.camelot-wedge-label {
+  fill: rgba(240, 242, 248, 0.62);
+  font-size: 9px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.camelot-wedge-label--current,
+.camelot-wedge-label--relative,
+.camelot-wedge-label--prev,
+.camelot-wedge-label--next {
+  fill: #f0f2f8;
+}
+
+.camelot-hub {
+  fill: var(--surface);
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+
+.camelot-hub-name {
+  fill: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.camelot-hub-code {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .color-picker-overlay {
@@ -4751,6 +4896,24 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.05;
+}
+
+.admin-dashboard-tokens .field--camelot {
+  min-width: 8.5rem;
+}
+
+.admin-dashboard-tokens .camelot-open {
+  align-items: flex-start;
+  gap: 0.28rem;
+}
+
+.admin-dashboard-tokens .camelot-chip--relative {
+  font-size: clamp(1.05rem, 2.6dvh, 1.65rem);
+}
+
+.admin-dashboard-tokens .camelot-chip--prev,
+.admin-dashboard-tokens .camelot-chip--next {
+  font-size: clamp(0.72rem, 1.6dvh, 0.95rem);
 }
 
 .admin-dashboard-look .colors-row {

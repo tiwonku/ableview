@@ -56,6 +56,17 @@ test('viewFieldColumns skips live source fields without a column', () => {
   assert.deepEqual(viewFieldColumns(fields), ['Lasers', 'RGB_1']);
 });
 
+test('viewFieldColumns skips camelot so Key stays a single editor column', () => {
+  const fields = [
+    { column: 'Key', display: 'token' },
+    { column: 'Key', type: 'camelot', label: 'Harmony' },
+    { source: 'tempo', label: 'Tempo' },
+  ];
+  assert.deepEqual(viewFieldColumns(fields), ['Key']);
+  assert.deepEqual(buildFieldLabels(fields), { Key: 'Key' });
+  assert.deepEqual(buildViewEditorColumns(fields), { Key: { type: 'text' } });
+});
+
 test('ws-client imports viewFieldColumns for operator Edit', () => {
   const src = readFileSync(
     fileURLToPath(new URL('../public/shared/ws-client.js', import.meta.url)),

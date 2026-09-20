@@ -11,7 +11,9 @@ import {
   resolveFieldDisplay,
   groupFieldsForLayout,
   resolveFieldsLayoutMode,
+  isCamelotField,
 } from './field-display.js';
+import { renderCamelotField } from './camelot-render.js';
 import {
   captureEditSession,
   renderRowEditorPanel,
@@ -625,6 +627,8 @@ function renderFieldsGrid(fields, payload, { onPickColor } = {}) {
         grid.appendChild(renderColorField(field, payload, { onPickColor }));
       } else if (field.type === 'image') {
         grid.appendChild(renderImageField(field, payload));
+      } else if (isCamelotField(field)) {
+        grid.appendChild(renderCamelotField(field, payload));
       } else {
         grid.appendChild(renderTextField(field, payload, null, layoutMode));
       }
@@ -641,7 +645,11 @@ function renderFieldsGrid(fields, payload, { onPickColor } = {}) {
         const rowEl = document.createElement('div');
         rowEl.className = 'fields-row';
         for (const item of row.items) {
-          rowEl.appendChild(renderTextField(item.field, payload, item.display));
+          if (isCamelotField(item.field)) {
+            rowEl.appendChild(renderCamelotField(item.field, payload));
+          } else {
+            rowEl.appendChild(renderTextField(item.field, payload, item.display));
+          }
         }
         grid.appendChild(rowEl);
       }
@@ -1210,13 +1218,14 @@ function renderAdminClipRow(root, {
 }
 
 function renderDashboardLook(parent, zones, payload) {
-  if (!zones.images.length && !zones.tokens.length && !zones.colors.length) return;
+  const camelot = zones.camelot ?? [];
+  if (!zones.images.length && !zones.tokens.length && !zones.colors.length && !camelot.length) return;
 
   const look = document.createElement('section');
   look.className = 'admin-dashboard-look';
   look.setAttribute('aria-label', 'Look');
 
-  if (zones.images.length || zones.tokens.length) {
+  if (zones.images.length || zones.tokens.length || camelot.length) {
     const identity = document.createElement('div');
     identity.className = 'admin-dashboard-identity';
     if (zones.images.length) {
@@ -1227,11 +1236,14 @@ function renderDashboardLook(parent, zones, payload) {
       }
       identity.appendChild(art);
     }
-    if (zones.tokens.length) {
+    if (zones.tokens.length || camelot.length) {
       const tokens = document.createElement('div');
       tokens.className = 'admin-dashboard-tokens';
       for (const field of zones.tokens) {
         tokens.appendChild(renderTextField(field, payload, 'token', 'hero'));
+      }
+      for (const field of camelot) {
+        tokens.appendChild(renderCamelotField(field, payload));
       }
       identity.appendChild(tokens);
     }
