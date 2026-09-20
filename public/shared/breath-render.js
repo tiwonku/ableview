@@ -7,6 +7,7 @@ import {
   breathAt,
   interpolateSongBeat,
   normalizeBreathSettings,
+  phaseOffsetForInhaleAt,
   quartersPerBar,
   sampleBreathWave,
 } from './breath-math.js';
@@ -448,7 +449,7 @@ export function mountBreathPage(root, { getPayload } = {}) {
 
   const phase = document.createElement('input');
   phase.type = 'number';
-  phase.step = '0.25';
+  phase.step = 'any';
   phase.className = 'settings-input';
 
   const phaseSlider = document.createElement('input');
@@ -457,6 +458,10 @@ export function mountBreathPage(root, { getPayload } = {}) {
   phaseSlider.max = '16';
   phaseSlider.step = '0.25';
   phaseSlider.className = 'breath-slider';
+
+  const inhaleNow = el('button', 'breath-preset breath-inhale-now', 'Start inhale now');
+  inhaleNow.type = 'button';
+  inhaleNow.disabled = true;
 
   const min = document.createElement('input');
   const max = document.createElement('input');
@@ -511,6 +516,11 @@ export function mountBreathPage(root, { getPayload } = {}) {
     field('Bar presets', presets),
     field('Phase offset (beats)', phase),
     field('Nudge', phaseSlider),
+    field(
+      'Align',
+      inhaleNow,
+      'Tap when inhale should start. Sets phase so rise begins at the current song position.',
+    ),
     field('Send rate', rate),
   );
 
@@ -688,6 +698,7 @@ export function mountBreathPage(root, { getPayload } = {}) {
     const frozen = transport.isPlaying !== true && songBeat != null;
     meterEls.frozen.textContent = songBeat == null ? 'waiting' : transport.isPlaying ? 'playing' : 'frozen';
     meters.querySelectorAll('.stat')[5]?.classList.toggle('warn', frozen);
+    inhaleNow.disabled = songBeat == null;
     drawWave(canvas, settings, songBeat == null ? null : state.phase);
   }
 
@@ -727,6 +738,17 @@ export function mountBreathPage(root, { getPayload } = {}) {
     if (!btn) return;
     const bars = Number(btn.dataset.bars);
     cycle.value = String(barsToBeats(bars, transport.signatureNumerator, transport.signatureDenominator));
+    onFormChange();
+  });
+  inhaleNow.addEventListener('click', () => {
+    const songBeat = interpolateSongBeat({ ...transport, now: Date.now() });
+    const offset = phaseOffsetForInhaleAt(songBeat, Number(cycle.value) || settings.cycleBeats);
+    if (offset == null) return;
+    phase.value = String(offset);
+    const span = Math.max(8, Math.abs(Number(cycle.value) || settings.cycleBeats), Math.abs(offset));
+    phaseSlider.min = String(-span);
+    phaseSlider.max = String(span);
+    phaseSlider.value = String(offset);
     onFormChange();
   });
 

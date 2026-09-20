@@ -71,6 +71,17 @@ export function barsToBeats(bars, numerator = 4, denominator = 4) {
   return Number(bars) * quartersPerBar(numerator, denominator);
 }
 
+/** Offset that puts inhale (phase 0) at songBeat, wrapped into [0, cycleBeats). */
+export function phaseOffsetForInhaleAt(songBeat, cycleBeats) {
+  if (songBeat == null || songBeat === '') return null;
+  const beat = Number(songBeat);
+  const cycle = Number(cycleBeats);
+  if (!Number.isFinite(beat) || !(cycle > 0)) return null;
+  let offset = beat % cycle;
+  if (offset < 0) offset += cycle;
+  return Number(offset.toFixed(4));
+}
+
 export function normalizeBreathSettings(raw = {}) {
   const src = raw && typeof raw === 'object' ? raw : {};
   const rise = Math.max(0, finiteOr(src.rise, DEFAULT_BREATH.rise));

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -7,6 +9,7 @@ import {
   ease,
   interpolateSongBeat,
   normalizeBreathSettings,
+  phaseOffsetForInhaleAt,
   quartersPerBar,
 } from '../public/shared/breath-math.js';
 import { DEFAULTS, validateConfig } from '../src/config/index.js';
@@ -98,6 +101,26 @@ test('phase offset shifts the envelope against song beat', () => {
   const shifted = breathAt(0, shape({ phaseOffsetBeats: 1, rise: 1, peakHold: 0, fall: 0, troughHold: 0, cycleBeats: 4 }));
   assert.equal(aligned.phase, 0);
   assert.equal(shifted.phase, 0.75);
+});
+
+test('phaseOffsetForInhaleAt wraps song beat into one cycle', () => {
+  assert.equal(phaseOffsetForInhaleAt(12, 8), 4);
+  assert.equal(phaseOffsetForInhaleAt(4, 8), 4);
+  assert.equal(phaseOffsetForInhaleAt(-1, 8), 7);
+  assert.equal(phaseOffsetForInhaleAt(null, 8), null);
+  assert.equal(phaseOffsetForInhaleAt(3, 0), null);
+  const songBeat = 12.25;
+  const offset = phaseOffsetForInhaleAt(songBeat, 8);
+  const aligned = breathAt(songBeat, shape({
+    cycleBeats: 8,
+    phaseOffsetBeats: offset,
+    rise: 1,
+    peakHold: 0,
+    fall: 0,
+    troughHold: 0,
+  }));
+  assert.equal(aligned.phase, 0);
+  assert.equal(aligned.inhale, 1);
 });
 
 test('min/max scale the 0–1 envelope', () => {
@@ -393,4 +416,14 @@ test('createOscOutput does not send breath when breath is disabled', async () =>
   }));
   assert.ok(sent.every((p) => p.address.startsWith('/ableview/clock/')));
   out.stop();
+});
+
+test('breath page wires Start inhale now to the shared offset helper', () => {
+  const src = readFileSync(
+    fileURLToPath(new URL('../public/shared/breath-render.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(src, /phaseOffsetForInhaleAt/);
+  assert.match(src, /Start inhale now/);
+  assert.match(src, /inhaleNow\.disabled = songBeat == null/);
 });
