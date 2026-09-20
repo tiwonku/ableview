@@ -111,6 +111,8 @@ test('buildHealthReport includes sACN live colors when provided', () => {
       universe: 191,
       sourceAddress: '10.100.10.3',
       colors: { main: { r: 255, g: 0, b: 0 }, secondary: null, accent: null },
+      staticColors: { main: { r: 10, g: 20, b: 30 }, secondary: null, accent: null },
+      moving: true,
     }),
     lastCuePayload: makeCuePayload({ clipName: 'Song A' }),
   });
@@ -118,6 +120,8 @@ test('buildHealthReport includes sACN live colors when provided', () => {
   assert.equal(report.sacn.enabled, true);
   assert.equal(report.sacn.universe, 191);
   assert.equal(report.sacn.colors.main.r, 255);
+  assert.equal(report.sacn.staticColors.main.r, 10);
+  assert.equal(report.sacn.moving, true);
 });
 
 test('buildHealthReport flags osc_out_blocked when another instance holds OSC', () => {

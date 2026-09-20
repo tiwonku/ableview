@@ -125,7 +125,7 @@ export function connectView({
   let currentViewId = viewId;
   let showingSettings = settingsActive === true;
   let settingsGen = 0;
-  let unmountSettings = null;
+  let settingsOverlay = null;
   let breathCtl = null;
   let dashBreathCtl = null;
   let socketGen = 0;
@@ -301,6 +301,7 @@ export function connectView({
       }
       if (msg.liveColorColumns) liveColorColumns = msg.liveColorColumns;
       if (lastStatus) lastStatus = { ...lastStatus, liveColors: lastLiveColors };
+      if (showingSettings) settingsOverlay?.applyLiveColors?.(lastLiveColors);
       if (viewConfig?.system && currentViewId === 'admin' && !showingSettings && !editSession && !aliasSession && !pinSession) {
         updateAdminChrome({ refreshClipHead: false });
       }
@@ -1434,15 +1435,15 @@ export function connectView({
   function leaveSettings() {
     settingsGen += 1;
     showingSettings = false;
-    unmountSettings?.();
-    unmountSettings = null;
+    settingsOverlay?.unmount?.();
+    settingsOverlay = null;
     document.body.classList.remove('layout-settings');
     root?.classList.remove('settings-main');
     root?.removeAttribute('aria-label');
   }
 
   async function enterSettings(href, historyMode) {
-    if (showingSettings && unmountSettings) return;
+    if (showingSettings && settingsOverlay) return;
     showingSettings = true;
     breathCtl?.destroy();
     breathCtl = null;
@@ -1459,8 +1460,9 @@ export function connectView({
     const gen = ++settingsGen;
     const { attachSettingsOverlay } = await import('./settings-overlay.js');
     if (gen !== settingsGen || !showingSettings) return;
-    unmountSettings?.();
-    unmountSettings = attachSettingsOverlay(root);
+    settingsOverlay?.unmount?.();
+    settingsOverlay = attachSettingsOverlay(root);
+    if (lastLiveColors) settingsOverlay?.applyLiveColors?.(lastLiveColors);
   }
 
   function shouldInterceptNav(nextId) {

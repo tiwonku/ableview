@@ -1,10 +1,12 @@
-import { cloneSlotColors, maxChannelDelta } from '../core/live-colors.js';
+import {
+  cloneSlotColors,
+  hasSlotColors,
+  maxChannelDelta,
+} from '../core/live-colors.js';
 
 const LOG_DEFAULTS = Object.freeze({
   changeDelta: 4,
   settleMs: 200,
-  motionIntervalMs: 400,
-  minIntervalMs: 100,
 });
 
 function readLogConfig(getLogConfig) {
@@ -12,15 +14,13 @@ function readLogConfig(getLogConfig) {
   return {
     changeDelta: raw?.changeDelta ?? LOG_DEFAULTS.changeDelta,
     settleMs: raw?.settleMs ?? LOG_DEFAULTS.settleMs,
-    motionIntervalMs: raw?.motionIntervalMs ?? LOG_DEFAULTS.motionIntervalMs,
-    minIntervalMs: raw?.minIntervalMs ?? LOG_DEFAULTS.minIntervalMs,
   };
 }
 
 /**
- * Change-gated live_color records.
- * UI paints every packet separately; this only writes settled looks and
- * sparse motion samples while color is still moving (chases / fades).
+ * Hybrid live_color records.
+ * Logs the static look bus (settled holds) plus move/hold spans while FX
+ * is changing. Falls back to settled FX-only holds when static is absent.
  */
 export function createLiveColorGate({
   getLogConfig,
@@ -29,118 +29,175 @@ export function createLiveColorGate({
   setTimeoutFn = setTimeout,
   clearTimeoutFn = clearTimeout,
 } = {}) {
-  let lastPacketColors = null;
-  let lastLoggedColors = null;
-  let lastLoggedAt = 0;
-  let lastLoggedReason = null;
-  let lastMoveAt = 0;
-  let latestColors = null;
+  let lastPacketLook = null;
+  let lastPacketFx = null;
+  let lastLoggedLook = null;
+  let lastLoggedPhase = null;
+  let lastLookMoveAt = 0;
+  let lastFxMoveAt = 0;
+  let latestLook = null;
+  let latestFx = null;
   let latestMeta = null;
-  let settleTimer = null;
-  let motionTimer = null;
+  let hasLookBus = false;
+  let moving = false;
+  let lookSettleTimer = null;
+  let motionEndTimer = null;
 
-  function clearSettle() {
-    if (settleTimer) {
-      clearTimeoutFn(settleTimer);
-      settleTimer = null;
+  function clearLookSettle() {
+    if (lookSettleTimer) {
+      clearTimeoutFn(lookSettleTimer);
+      lookSettleTimer = null;
     }
   }
 
-  function clearMotion() {
-    if (motionTimer) {
-      clearTimeoutFn(motionTimer);
-      motionTimer = null;
+  function clearMotionEnd() {
+    if (motionEndTimer) {
+      clearTimeoutFn(motionEndTimer);
+      motionEndTimer = null;
     }
   }
 
-  function emit(reason) {
-    if (!latestColors) return false;
-    const { minIntervalMs, changeDelta } = readLogConfig(getLogConfig);
-    const t = now();
-    const sameAsLast = lastLoggedColors && maxChannelDelta(lastLoggedColors, latestColors) < 1;
-    const closeToLast = lastLoggedColors && maxChannelDelta(lastLoggedColors, latestColors) < changeDelta;
-
-    if (reason === 'motion') {
-      if (t - lastLoggedAt < minIntervalMs) return false;
-      if (sameAsLast) return false;
-    } else if (reason === 'settled') {
-      if (lastLoggedReason === 'settled' && closeToLast) return false;
-    } else {
-      return false;
+  function emitHold({ colors } = {}) {
+    const payload = {
+      phase: 'hold',
+      universe: latestMeta?.universe ?? null,
+    };
+    if (colors) {
+      payload.colors = cloneSlotColors(colors);
+      lastLoggedLook = cloneSlotColors(colors);
     }
+    lastLoggedPhase = 'hold';
+    onRecord?.(payload);
+    return true;
+  }
 
-    lastLoggedColors = cloneSlotColors(latestColors);
-    lastLoggedAt = t;
-    lastLoggedReason = reason;
+  function emitMove() {
+    if (lastLoggedPhase === 'move') return false;
+    lastLoggedPhase = 'move';
+    moving = true;
     onRecord?.({
-      reason,
-      colors: cloneSlotColors(latestColors),
+      phase: 'move',
       universe: latestMeta?.universe ?? null,
     });
     return true;
   }
 
-  function startMotion() {
-    if (motionTimer) return;
-    const tick = () => {
-      motionTimer = null;
-      const { motionIntervalMs, settleMs, changeDelta } = readLogConfig(getLogConfig);
-      if (now() - lastMoveAt >= settleMs) return;
-      if (lastLoggedColors && maxChannelDelta(lastLoggedColors, latestColors) < changeDelta) return;
-      emit('motion');
-      motionTimer = setTimeoutFn(tick, motionIntervalMs);
-      motionTimer.unref?.();
-    };
-    const { motionIntervalMs } = readLogConfig(getLogConfig);
-    motionTimer = setTimeoutFn(tick, motionIntervalMs);
-    motionTimer.unref?.();
+  function lookChangedEnough(next) {
+    const { changeDelta } = readLogConfig(getLogConfig);
+    if (!lastLoggedLook) return true;
+    return maxChannelDelta(lastLoggedLook, next) >= changeDelta;
   }
 
-  function scheduleSettle() {
-    clearSettle();
+  function emitSettledLook() {
+    if (!latestLook || !hasSlotColors(latestLook)) return false;
+    if (!lookChangedEnough(latestLook)) return false;
+    if (lastLoggedPhase === 'hold' && lastLoggedLook
+      && maxChannelDelta(lastLoggedLook, latestLook) < 1) {
+      return false;
+    }
+    return emitHold({ colors: latestLook });
+  }
+
+  function fxIsBusy() {
     const { settleMs } = readLogConfig(getLogConfig);
-    settleTimer = setTimeoutFn(() => {
-      settleTimer = null;
-      const { settleMs: wait } = readLogConfig(getLogConfig);
-      if (now() - lastMoveAt < wait) {
-        scheduleSettle();
+    return lastFxMoveAt > 0 && now() - lastFxMoveAt < settleMs;
+  }
+
+  function lookIsStable() {
+    const { settleMs } = readLogConfig(getLogConfig);
+    return lastLookMoveAt > 0 && now() - lastLookMoveAt >= settleMs;
+  }
+
+  function startMove() {
+    if (!moving) emitMove();
+    scheduleMotionEnd();
+  }
+
+  function scheduleMotionEnd() {
+    if (!moving || motionEndTimer) return;
+    const { settleMs } = readLogConfig(getLogConfig);
+    motionEndTimer = setTimeoutFn(() => {
+      motionEndTimer = null;
+      if (fxIsBusy()) {
+        scheduleMotionEnd();
         return;
       }
-      clearMotion();
-      emit('settled');
+      moving = false;
+      if (lastLoggedPhase === 'move') emitHold();
     }, settleMs);
-    settleTimer.unref?.();
+    motionEndTimer.unref?.();
+  }
+
+  function evaluateMotion() {
+    if (!hasLookBus) return;
+    if (lookIsStable() && fxIsBusy()) {
+      startMove();
+      return;
+    }
+    if (moving && !fxIsBusy()) scheduleMotionEnd();
+  }
+
+  function scheduleLookSettle() {
+    clearLookSettle();
+    const { settleMs } = readLogConfig(getLogConfig);
+    lookSettleTimer = setTimeoutFn(() => {
+      lookSettleTimer = null;
+      const { settleMs: wait } = readLogConfig(getLogConfig);
+      if (now() - lastLookMoveAt < wait) {
+        scheduleLookSettle();
+        return;
+      }
+      emitSettledLook();
+      evaluateMotion();
+    }, settleMs);
+    lookSettleTimer.unref?.();
   }
 
   function handleStatus(status) {
-    if (!status || status.enabled !== true || status.live !== true || !status.colors) return;
+    if (!status || status.enabled !== true || status.live !== true) return;
 
-    const { changeDelta } = readLogConfig(getLogConfig);
-    latestColors = cloneSlotColors(status.colors);
+    const lookSource = hasSlotColors(status.staticColors) ? status.staticColors : status.colors;
+    if (!hasSlotColors(lookSource)) return;
+
+    hasLookBus = hasSlotColors(status.staticColors);
+    latestLook = cloneSlotColors(lookSource);
+    latestFx = cloneSlotColors(status.colors);
     latestMeta = { universe: status.universe ?? null };
 
-    const packetDelta = maxChannelDelta(lastPacketColors, latestColors);
-    const loggedDelta = maxChannelDelta(lastLoggedColors, latestColors);
-    lastPacketColors = cloneSlotColors(latestColors);
+    const lookDelta = maxChannelDelta(lastPacketLook, latestLook);
+    const fxDelta = maxChannelDelta(lastPacketFx, latestFx);
+    lastPacketLook = cloneSlotColors(latestLook);
+    lastPacketFx = cloneSlotColors(latestFx);
 
-    if (packetDelta < 1) return;
-    if (lastLoggedColors && loggedDelta < changeDelta) return;
+    if (lookDelta >= 1) {
+      lastLookMoveAt = now();
+      scheduleLookSettle();
+    }
+    if (hasLookBus && fxDelta >= 1) {
+      lastFxMoveAt = now();
+      if (moving) {
+        clearMotionEnd();
+        scheduleMotionEnd();
+      }
+    }
 
-    lastMoveAt = now();
-    scheduleSettle();
-    startMotion();
+    evaluateMotion();
   }
 
   function reset() {
-    clearSettle();
-    clearMotion();
-    lastPacketColors = null;
-    lastLoggedColors = null;
-    lastLoggedAt = 0;
-    lastLoggedReason = null;
-    lastMoveAt = 0;
-    latestColors = null;
+    clearLookSettle();
+    clearMotionEnd();
+    lastPacketLook = null;
+    lastPacketFx = null;
+    lastLoggedLook = null;
+    lastLoggedPhase = null;
+    lastLookMoveAt = 0;
+    lastFxMoveAt = 0;
+    latestLook = null;
+    latestFx = null;
     latestMeta = null;
+    hasLookBus = false;
+    moving = false;
   }
 
   return {

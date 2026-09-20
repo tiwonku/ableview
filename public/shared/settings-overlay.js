@@ -14,12 +14,19 @@ function resolveEl(target) {
 /** Mount settings into the current document. Returns unmount. */
 export function attachSettingsOverlay(appTarget) {
   const app = resolveEl(appTarget);
-  if (!app) return () => {};
+  if (!app) {
+    return { unmount() {}, applyLiveColors() {} };
+  }
 
   app.replaceChildren();
-  const unmountSettings = mountSettingsPanel(app);
+  const panel = mountSettingsPanel(app);
 
-  return () => {
-    unmountSettings?.();
+  return {
+    unmount: () => {
+      panel?.unmount?.();
+    },
+    applyLiveColors: (status) => {
+      panel?.applyLiveColors?.(status);
+    },
   };
 }

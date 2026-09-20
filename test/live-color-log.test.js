@@ -19,31 +19,35 @@ function wait(ms) {
 }
 
 function liveStatus(colors, overrides = {}) {
+  const { staticColors, ...rest } = overrides;
   return makeLiveColorsStatus({
     enabled: true,
     live: true,
     universe: 191,
     colors,
-    ...overrides,
+    staticColors: staticColors ?? colors,
+    ...rest,
   });
 }
 
-test('live color gate emits one settled record after a snap', async () => {
+const LOOK = {
+  main: { r: 255, g: 110, b: 0 },
+  secondary: { r: 255, g: 110, b: 0 },
+  accent: { r: 255, g: 161, b: 0 },
+};
+
+test('live color gate emits one hold after a static snap', async () => {
   const records = [];
   const gate = createLiveColorGate({
-    getLogConfig: () => ({ changeDelta: 4, settleMs: 25, motionIntervalMs: 200, minIntervalMs: 0 }),
+    getLogConfig: () => ({ changeDelta: 4, settleMs: 25 }),
     onRecord: (r) => records.push(r),
   });
   try {
-    gate.handleStatus(liveStatus({
-      main: { r: 255, g: 0, b: 0 },
-      secondary: { r: 0, g: 0, b: 0 },
-      accent: { r: 0, g: 0, b: 0 },
-    }));
+    gate.handleStatus(liveStatus(LOOK));
     await wait(50);
     assert.equal(records.length, 1);
-    assert.equal(records[0].reason, 'settled');
-    assert.deepEqual(records[0].colors.main, { r: 255, g: 0, b: 0 });
+    assert.equal(records[0].phase, 'hold');
+    assert.deepEqual(records[0].colors.main, LOOK.main);
   } finally {
     gate.stop();
   }
@@ -52,34 +56,31 @@ test('live color gate emits one settled record after a snap', async () => {
 test('live color gate ignores keepalives of the same look', async () => {
   const records = [];
   const gate = createLiveColorGate({
-    getLogConfig: () => ({ changeDelta: 4, settleMs: 20, motionIntervalMs: 200, minIntervalMs: 0 }),
+    getLogConfig: () => ({ changeDelta: 4, settleMs: 20 }),
     onRecord: (r) => records.push(r),
   });
-  const look = {
-    main: { r: 10, g: 20, b: 30 },
-    secondary: { r: 1, g: 2, b: 3 },
-    accent: { r: 4, g: 5, b: 6 },
-  };
   try {
-    gate.handleStatus(liveStatus(look));
+    gate.handleStatus(liveStatus(LOOK));
     await wait(40);
-    gate.handleStatus(liveStatus(look));
-    gate.handleStatus(liveStatus(look));
+    gate.handleStatus(liveStatus(LOOK));
+    gate.handleStatus(liveStatus(LOOK));
     await wait(40);
     assert.equal(records.length, 1);
-    assert.equal(records[0].reason, 'settled');
+    assert.equal(records[0].phase, 'hold');
   } finally {
     gate.stop();
   }
 });
 
-test('live color gate samples motion during a chase then settles', async () => {
+test('live color gate marks move while FX chases a held look', async () => {
   const records = [];
   const gate = createLiveColorGate({
-    getLogConfig: () => ({ changeDelta: 4, settleMs: 35, motionIntervalMs: 25, minIntervalMs: 0 }),
+    getLogConfig: () => ({ changeDelta: 4, settleMs: 30 }),
     onRecord: (r) => records.push(r),
   });
   try {
+    gate.handleStatus(liveStatus(LOOK, { staticColors: LOOK }));
+    await wait(50);
     let r = 0;
     const timer = setInterval(() => {
       r = Math.min(255, r + 20);
@@ -87,19 +88,93 @@ test('live color gate samples motion during a chase then settles', async () => {
         main: { r, g: 0, b: 0 },
         secondary: { r: 0, g: r, b: 0 },
         accent: { r: 0, g: 0, b: r },
-      }));
+      }, { staticColors: LOOK }));
     }, 8);
-    await wait(90);
-    clearInterval(timer);
     await wait(80);
-    assert.ok(records.some((row) => row.reason === 'motion'), 'expected motion samples during chase');
-    assert.equal(records.at(-1).reason, 'settled');
+    clearInterval(timer);
+    await wait(70);
+    assert.ok(records.some((row) => row.phase === 'hold' && row.colors), 'expected a static hold');
+    assert.ok(records.some((row) => row.phase === 'move'), 'expected a move span during chase');
+    assert.equal(records.at(-1).phase, 'hold');
+    assert.equal(records.filter((row) => row.phase === 'move').length, 1);
   } finally {
     gate.stop();
   }
 });
 
-test('session log writes live_color events with clip context', async () => {
+test('live color gate logs a new hold when the static look changes mid-chase', async () => {
+  const records = [];
+  const gate = createLiveColorGate({
+    getLogConfig: () => ({ changeDelta: 4, settleMs: 25 }),
+    onRecord: (r) => records.push(r),
+  });
+  const nextLook = {
+    main: { r: 0, g: 255, b: 255 },
+    secondary: { r: 0, g: 255, b: 255 },
+    accent: { r: 0, g: 255, b: 255 },
+  };
+  try {
+    gate.handleStatus(liveStatus(LOOK, { staticColors: LOOK }));
+    await wait(40);
+    let r = 10;
+    const timer = setInterval(() => {
+      r = Math.min(255, r + 15);
+      gate.handleStatus(liveStatus({
+        main: { r, g: 20, b: 40 },
+        secondary: { r: 20, g: r, b: 40 },
+        accent: { r: 20, g: 40, b: r },
+      }, { staticColors: LOOK }));
+    }, 8);
+    await wait(50);
+    clearInterval(timer);
+    gate.handleStatus(liveStatus({
+      main: { r: 80, g: 20, b: 40 },
+      secondary: { r: 20, g: 80, b: 40 },
+      accent: { r: 20, g: 40, b: 80 },
+    }, { staticColors: nextLook }));
+    await wait(50);
+    const holds = records.filter((row) => row.phase === 'hold' && row.colors);
+    assert.ok(holds.some((row) => row.colors.main.r === 255));
+    assert.ok(holds.some((row) => row.colors.main.r === 0 && row.colors.main.g === 255));
+  } finally {
+    gate.stop();
+  }
+});
+
+test('without a static bus, the gate only writes settled FX holds', async () => {
+  const records = [];
+  const gate = createLiveColorGate({
+    getLogConfig: () => ({ changeDelta: 4, settleMs: 20 }),
+    onRecord: (r) => records.push(r),
+  });
+  try {
+    gate.handleStatus(makeLiveColorsStatus({
+      enabled: true,
+      live: true,
+      universe: 191,
+      colors: LOOK,
+    }));
+    await wait(40);
+    let r = 0;
+    const timer = setInterval(() => {
+      r = Math.min(255, r + 30);
+      gate.handleStatus(makeLiveColorsStatus({
+        enabled: true,
+        live: true,
+        colors: { main: { r, g: 0, b: 0 }, secondary: LOOK.secondary, accent: LOOK.accent },
+      }));
+    }, 8);
+    await wait(50);
+    clearInterval(timer);
+    await wait(40);
+    assert.ok(records.every((row) => row.phase === 'hold'));
+    assert.equal(records.filter((row) => row.phase === 'move').length, 0);
+  } finally {
+    gate.stop();
+  }
+});
+
+test('session log writes live_color hold events with clip context', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'ableview-live-color-'));
   const config = {
     ...DEFAULTS,
@@ -111,7 +186,7 @@ test('session log writes live_color events with clip context', async () => {
     },
     sacn: {
       ...DEFAULTS.sacn,
-      log: { changeDelta: 4, settleMs: 20, motionIntervalMs: 200, minIntervalMs: 0 },
+      log: { changeDelta: 4, settleMs: 20 },
     },
     sim: { ...DEFAULTS.sim, enabled: false },
   };
@@ -134,6 +209,12 @@ test('session log writes live_color events with clip context', async () => {
     main: { r: 8, g: 16, b: 32 },
     secondary: { r: 0, g: 0, b: 0 },
     accent: { r: 255, g: 255, b: 255 },
+  }, {
+    staticColors: {
+      main: { r: 8, g: 16, b: 32 },
+      secondary: { r: 0, g: 0, b: 0 },
+      accent: { r: 255, g: 255, b: 255 },
+    },
   }));
   await wait(45);
 
@@ -142,7 +223,7 @@ test('session log writes live_color events with clip context', async () => {
   const lines = readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
   const colorLines = lines.filter((l) => l.event === 'live_color');
   assert.equal(colorLines.length, 1);
-  assert.equal(colorLines[0].reason, 'settled');
+  assert.equal(colorLines[0].phase, 'hold');
   assert.equal(colorLines[0].clipName, 'Song B - Drop');
   assert.equal(colorLines[0].rowId, '12');
   assert.equal(colorLines[0].universe, 191);

@@ -53,6 +53,8 @@ export async function createViewServer({
       sourceName: status.sourceName ?? null,
       sourceAddress: status.sourceAddress ?? null,
       colors: status.colors ?? null,
+      staticColors: status.staticColors ?? null,
+      moving: status.moving === true,
     };
   }
 

@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { validateConfig } from './index.js';
-import { DEFAULT_LIVE_COLOR_COLUMNS, DEFAULT_LIVE_COLOR_SLOTS } from '../core/live-colors.js';
+import { DEFAULT_LIVE_COLOR_COLUMNS, DEFAULT_LIVE_COLOR_SLOTS, DEFAULT_STATIC_COLOR_SLOTS } from '../core/live-colors.js';
 import { DEFAULT_BREATH, normalizeBreathSettings } from '../../public/shared/breath-math.js';
 
 function serializeBreath(breath) {
@@ -32,16 +32,20 @@ function serializeOscOut(oscOut) {
   };
 }
 
-function serializeSacn(sacn) {
-  const src = sacn ?? {};
+function serializeSlotGroup(srcSlots, defaults) {
   const slots = {};
   for (const id of ['main', 'secondary', 'accent']) {
-    const slot = src.slots?.[id] ?? DEFAULT_LIVE_COLOR_SLOTS[id];
+    const slot = srcSlots?.[id] ?? defaults[id];
     slots[id] = {
-      startChannel: slot?.startChannel ?? DEFAULT_LIVE_COLOR_SLOTS[id].startChannel,
-      label: slot?.label ?? DEFAULT_LIVE_COLOR_SLOTS[id].label,
+      startChannel: slot?.startChannel ?? defaults[id].startChannel,
+      label: slot?.label ?? defaults[id].label,
     };
   }
+  return slots;
+}
+
+function serializeSacn(sacn) {
+  const src = sacn ?? {};
   return {
     enabled: src.enabled === true,
     port: src.port ?? 5568,
@@ -51,7 +55,8 @@ function serializeSacn(sacn) {
     universe: src.universe ?? 191,
     staleMs: src.staleMs ?? 1000,
     ignorePreview: src.ignorePreview !== false,
-    slots,
+    slots: serializeSlotGroup(src.slots, DEFAULT_LIVE_COLOR_SLOTS),
+    staticSlots: serializeSlotGroup(src.staticSlots, DEFAULT_STATIC_COLOR_SLOTS),
     viewColumns: { ...DEFAULT_LIVE_COLOR_COLUMNS, ...(src.viewColumns ?? {}) },
     log: {
       changeDelta: src.log?.changeDelta ?? 4,

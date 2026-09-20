@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import dotenv from 'dotenv';
 import { BREATH_CURVES, DEFAULT_BREATH } from '../../public/shared/breath-math.js';
+import { DEFAULT_LIVE_COLOR_SLOTS, DEFAULT_STATIC_COLOR_SLOTS } from '../core/live-colors.js';
 
 export const DEFAULTS = Object.freeze({
   ingest: {
@@ -66,9 +67,14 @@ export const DEFAULTS = Object.freeze({
     staleMs: 1000,
     ignorePreview: true,
     slots: {
-      main: { startChannel: 500, label: 'Color Main' },
-      secondary: { startChannel: 503, label: 'Color secondary' },
-      accent: { startChannel: 506, label: 'Color accent' },
+      main: { ...DEFAULT_LIVE_COLOR_SLOTS.main },
+      secondary: { ...DEFAULT_LIVE_COLOR_SLOTS.secondary },
+      accent: { ...DEFAULT_LIVE_COLOR_SLOTS.accent },
+    },
+    staticSlots: {
+      main: { ...DEFAULT_STATIC_COLOR_SLOTS.main },
+      secondary: { ...DEFAULT_STATIC_COLOR_SLOTS.secondary },
+      accent: { ...DEFAULT_STATIC_COLOR_SLOTS.accent },
     },
     viewColumns: {
       RGB_1: 'main',
@@ -221,23 +227,26 @@ export function validateConfig(config) {
     errors.push('sacn.ignorePreview must be a boolean');
   }
   const slotIds = ['main', 'secondary', 'accent'];
-  if (sacn.slots != null) {
-    if (!sacn.slots || typeof sacn.slots !== 'object' || Array.isArray(sacn.slots)) {
-      errors.push('sacn.slots must be an object');
-    } else {
-      for (const id of slotIds) {
-        const slot = sacn.slots[id];
-        if (slot == null) continue;
-        const ch = slot.startChannel;
-        if (!(Number.isInteger(ch) && ch >= 1 && ch <= 510)) {
-          errors.push(`sacn.slots.${id}.startChannel must be an integer 1–510`);
-        }
-        if (slot.label != null && typeof slot.label !== 'string') {
-          errors.push(`sacn.slots.${id}.label must be a string`);
-        }
+  function validateSlotGroup(group, path) {
+    if (group == null) return;
+    if (!group || typeof group !== 'object' || Array.isArray(group)) {
+      errors.push(`${path} must be an object`);
+      return;
+    }
+    for (const id of slotIds) {
+      const slot = group[id];
+      if (slot == null) continue;
+      const ch = slot.startChannel;
+      if (!(Number.isInteger(ch) && ch >= 1 && ch <= 510)) {
+        errors.push(`${path}.${id}.startChannel must be an integer 1–510`);
+      }
+      if (slot.label != null && typeof slot.label !== 'string') {
+        errors.push(`${path}.${id}.label must be a string`);
       }
     }
   }
+  validateSlotGroup(sacn.slots, 'sacn.slots');
+  validateSlotGroup(sacn.staticSlots, 'sacn.staticSlots');
   if (sacn.viewColumns != null) {
     if (!sacn.viewColumns || typeof sacn.viewColumns !== 'object' || Array.isArray(sacn.viewColumns)) {
       errors.push('sacn.viewColumns must be an object');

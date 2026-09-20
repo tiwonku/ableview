@@ -40,6 +40,7 @@ test('pickEditableSettings returns ingest, sim, sheets, match, timecode, sacn, m
   assert.equal(settings.sacn.enabled, false);
   assert.equal(settings.sacn.universe, 191);
   assert.equal(settings.sacn.slots.main.startChannel, 500);
+  assert.equal(settings.sacn.staticSlots.main.startChannel, 491);
   assert.equal(settings.moments.autoStartOnMoment, true);
   assert.equal(settings.oscOut.enabled, false);
   assert.deepEqual(settings.oscOut.destinations, []);
@@ -203,6 +204,7 @@ test('GET and PATCH /api/config/settings', async () => {
         universe: 191,
         interfaceAddress: '10.100.10.4',
         slots: { main: { startChannel: 500 } },
+        staticSlots: { accent: { startChannel: 480 } },
       },
     }),
   });
@@ -213,6 +215,8 @@ test('GET and PATCH /api/config/settings', async () => {
   assert.equal(sacnBody.settings.sacn.interfaceAddress, '10.100.10.4');
   assert.equal(sacnBody.settings.sacn.slots.main.startChannel, 500);
   assert.equal(sacnBody.settings.sacn.slots.secondary.startChannel, 503);
+  assert.equal(sacnBody.settings.sacn.staticSlots.main.startChannel, 491);
+  assert.equal(sacnBody.settings.sacn.staticSlots.accent.startChannel, 480);
   assert.deepEqual(sacnBody.reloaded, ['sacn']);
 
   const nicsRes = await fetch(`http://127.0.0.1:${server.port}/api/net/interfaces`);

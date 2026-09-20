@@ -43,6 +43,23 @@ test('flashableColorColumns keeps mapped color fields in view order', () => {
   assert.deepEqual(flashableColorColumns([{ column: 'Key' }]), []);
 });
 
+test('liveColorsToEditorChanges prefers the static look over FX', () => {
+  const mixed = {
+    ...LIVE,
+    colors: {
+      main: { r: 1, g: 2, b: 3 },
+      secondary: { r: 4, g: 5, b: 6 },
+      accent: { r: 7, g: 8, b: 9 },
+    },
+    staticColors: LIVE.colors,
+  };
+  assert.deepEqual(liveColorsToEditorChanges(mixed), {
+    RGB_1: '#FF0050',
+    RGB_2: '#E89CFF',
+    RGB_3: '#0078D8',
+  });
+});
+
 test('liveColorsToEditorChanges writes hex for live slots only', () => {
   assert.deepEqual(liveColorsToEditorChanges(LIVE), {
     RGB_1: '#FF0050',
@@ -122,7 +139,7 @@ test('flashLookWarnings cover motion, rainbow, and missing slots', () => {
   });
   const warnings = flashLookWarnings(slots, { moving: true });
   assert.equal(warnings.length, 3);
-  assert.match(warnings[0], /moving/);
+  assert.match(warnings[0], /static look/);
   assert.match(warnings[1], /RAINBOW/);
   assert.match(warnings[2], /Color 3/);
 });

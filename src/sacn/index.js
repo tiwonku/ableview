@@ -2,6 +2,7 @@ import dgram from 'node:dgram';
 import { EVENTS } from '../core/bus.js';
 import {
   cloneSlotColors,
+  isFxDivergedFromLook,
   makeLiveColorsStatus,
   maxChannelDelta,
 } from '../core/live-colors.js';
@@ -21,6 +22,7 @@ export function createSacnListener({ getConfig, bus, log }) {
   let live = false;
   let lastSeenAt = null;
   let lastColors = null;
+  let lastStaticColors = null;
   let lastUniverse = null;
   let lastSourceName = null;
   let lastSourceAddress = null;
@@ -74,10 +76,13 @@ export function createSacnListener({ getConfig, bus, log }) {
     if (config.ignorePreview !== false && parsed.preview) return;
 
     const colors = extractSlotColors(parsed.dmx, config.slots);
+    const staticColors = extractSlotColors(parsed.dmx, config.staticSlots);
     const becameLive = markLive(config.staleMs ?? 1000);
-    const rgbChanged = colorsChanged(lastColors, colors);
+    const rgbChanged = colorsChanged(lastColors, colors)
+      || colorsChanged(lastStaticColors, staticColors);
 
     lastColors = cloneSlotColors(colors);
+    lastStaticColors = cloneSlotColors(staticColors);
     lastUniverse = parsed.universe;
     lastSourceName = parsed.sourceName || lastSourceName;
     lastSourceAddress = rinfo?.address ?? lastSourceAddress;
@@ -103,6 +108,10 @@ export function createSacnListener({ getConfig, bus, log }) {
       sourceAddress: lastSourceAddress,
       preview: lastPreview,
       colors: lastColors,
+      staticColors: lastStaticColors,
+      moving: live && isFxDivergedFromLook(lastColors, lastStaticColors, {
+        changeDelta: config.log?.changeDelta ?? 4,
+      }),
     });
   }
 
@@ -165,6 +174,7 @@ export function createSacnListener({ getConfig, bus, log }) {
 
   function resetState() {
     lastColors = null;
+    lastStaticColors = null;
     lastSeenAt = null;
     live = false;
     lastUniverse = null;

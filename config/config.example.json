@@ -80,6 +80,11 @@
       "secondary": { "startChannel": 503, "label": "Color secondary" },
       "accent": { "startChannel": 506, "label": "Color accent" }
     },
+    "staticSlots": {
+      "main": { "startChannel": 491, "label": "Look Main" },
+      "secondary": { "startChannel": 494, "label": "Look secondary" },
+      "accent": { "startChannel": 497, "label": "Look accent" }
+    },
     "viewColumns": {
       "RGB_1": "main",
       "RGB_2": "secondary",
@@ -122,7 +127,11 @@
       "fall": 0.4,
       "troughHold": 0.1,
       "riseCurve": "easeOut",
-      "fallCurve": "easeIn"
+      "fallCurve": "easeIn",
+      "risePower": 2,
+      "fallPower": 2,
+      "riseStraight": 0,
+      "fallStraight": 0
     }
   },
   "views": {

@@ -16,9 +16,9 @@ test('settings overlay no longer mounts the session log', () => {
 });
 
 test('attachSettingsOverlay is a no-op without an app root', () => {
-  const unmount = attachSettingsOverlay(null);
-  assert.equal(typeof unmount, 'function');
-  unmount();
+  const overlay = attachSettingsOverlay(null);
+  assert.equal(typeof overlay.unmount, 'function');
+  overlay.unmount();
 });
 
 test('settings panel includes operator LAN share links', () => {
@@ -30,6 +30,19 @@ test('settings panel includes operator LAN share links', () => {
   assert.match(src, /shareFromNetResponse/);
   assert.match(src, /copyTextToClipboard/);
   assert.match(src, /\/api\/net\/interfaces/);
+});
+
+test('settings panel maps FX and static look channels independently', () => {
+  const src = readFileSync(
+    fileURLToPath(new URL('../public/shared/admin-settings.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(src, /sacnStaticMainChannel/);
+  assert.match(src, /sacnStaticSecondaryChannel/);
+  assert.match(src, /sacnStaticAccentChannel/);
+  assert.match(src, /Live FX start channels/);
+  assert.match(src, /Static look start channels/);
+  assert.match(src, /sacn-preview-row/);
 });
 
 test('settings panel can toggle arrangement matching', () => {

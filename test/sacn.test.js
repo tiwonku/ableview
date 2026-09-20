@@ -23,7 +23,7 @@ const JAKE_SLOTS = {
   accent: { startChannel: 506, label: 'Color accent' },
 };
 
-function dmxWithSlots({ main, secondary, accent }) {
+function dmxWithSlots({ main, secondary, accent, lookMain, lookSecondary, lookAccent }) {
   const dmx = Buffer.alloc(512);
   const write = (start, rgb) => {
     if (!rgb) return;
@@ -34,6 +34,9 @@ function dmxWithSlots({ main, secondary, accent }) {
   write(500, main);
   write(503, secondary);
   write(506, accent);
+  write(491, lookMain);
+  write(494, lookSecondary);
+  write(497, lookAccent);
   return dmx;
 }
 
@@ -154,6 +157,7 @@ test('createSacnListener emits LIVE_COLORS for unicast data on the configured un
     assert.deepEqual(status.colors.main, { r: 255, g: 128, b: 0 });
     assert.deepEqual(status.colors.secondary, { r: 0, g: 40, b: 255 });
     assert.deepEqual(status.colors.accent, { r: 12, g: 12, b: 12 });
+    assert.deepEqual(status.staticColors.main, { r: 0, g: 0, b: 0 });
   } finally {
     socket.close();
     listener.stop();
@@ -241,6 +245,63 @@ test('createSacnListener marks signal stale after staleMs', async () => {
     await new Promise((resolve) => setTimeout(resolve, 80));
     assert.equal(listener.getStatus().live, false);
     assert.ok(listener.getStatus().colors.main);
+  } finally {
+    socket.close();
+    listener.stop();
+  }
+});
+
+test('createSacnListener reads FX and static buses from independent channels', async () => {
+  const bus = createBus();
+  const listenPort = await reserveUdpPort();
+  const config = {
+    ...DEFAULTS,
+    sacn: {
+      ...DEFAULTS.sacn,
+      enabled: true,
+      port: listenPort,
+      bindAddress: '127.0.0.1',
+      multicast: false,
+      universe: 191,
+      staleMs: 500,
+    },
+  };
+  const listener = createSacnListener({
+    getConfig: () => config,
+    bus,
+    log: silentLog,
+  });
+  const socket = dgram.createSocket('udp4');
+  try {
+    await listener.start();
+    await new Promise((resolve, reject) => {
+      socket.once('error', reject);
+      socket.bind(() => resolve());
+    });
+    const packet = buildE131DataPacket({
+      universe: 191,
+      dmx: dmxWithSlots({
+        main: [255, 0, 0],
+        secondary: [0, 255, 0],
+        accent: [0, 0, 255],
+        lookMain: [8, 16, 32],
+        lookSecondary: [1, 2, 3],
+        lookAccent: [9, 9, 9],
+      }),
+    });
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('timed out waiting for LIVE_COLORS')), 2000);
+      bus.once(EVENTS.LIVE_COLORS, () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      socket.send(packet, listenPort, '127.0.0.1', (err) => { if (err) reject(err); });
+    });
+    const status = listener.getStatus();
+    assert.deepEqual(status.colors.main, { r: 255, g: 0, b: 0 });
+    assert.deepEqual(status.staticColors.main, { r: 8, g: 16, b: 32 });
+    assert.deepEqual(status.staticColors.accent, { r: 9, g: 9, b: 9 });
+    assert.equal(status.moving, true);
   } finally {
     socket.close();
     listener.stop();

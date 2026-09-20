@@ -381,6 +381,7 @@ test('init and liveColors broadcast include GrandMA sACN colors', async () => {
     assert.equal(init.liveColors?.enabled, true);
     assert.equal(init.liveColors?.universe, 191);
     assert.deepEqual(init.liveColors?.colors?.main, { r: 1, g: 2, b: 3 });
+    assert.equal(init.liveColors?.moving, false);
     assert.equal(init.liveColorColumns.RGB_1, 'main');
 
     liveStatus = {

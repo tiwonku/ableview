@@ -286,21 +286,22 @@ export function createSessionLogger({
     lastMatchKey = mk;
   }
 
-  function appendLiveColorRecord({ reason, colors, universe }) {
+  function appendLiveColorRecord({ phase, colors, universe }) {
     if (!enabled) return;
     const envelope = timestampEnvelope();
     const simulated = typeof getSimulated === 'function' ? getSimulated() === true : false;
-    appendRecord({
+    const record = {
       ...envelope,
       event: 'live_color',
-      reason,
+      phase,
       universe,
-      colors,
       clipName: lastCueForColor?.clipName ?? null,
       rowId: lastCueForColor?.rowId ?? null,
       simulated,
       sessionName,
-    });
+    };
+    if (colors) record.colors = colors;
+    appendRecord(record);
   }
 
   function handleLiveColors(status) {

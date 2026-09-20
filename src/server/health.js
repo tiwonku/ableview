@@ -67,6 +67,8 @@ export function buildHealthReport({
           sourceName: liveColors.sourceName ?? null,
           sourceAddress: liveColors.sourceAddress ?? null,
           colors: liveColors.colors ?? null,
+          staticColors: liveColors.staticColors ?? null,
+          moving: liveColors.moving === true,
         }
       : null,
     sheets: {

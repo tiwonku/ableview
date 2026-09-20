@@ -3,6 +3,8 @@
 import { parseRgbCell } from './color-parse.js';
 import {
   DEFAULT_LIVE_COLOR_COLUMNS,
+  hasSlotColors,
+  lookColorsFromStatus,
   rgbToLiveDisplay,
   slotForColumn,
 } from './live-color-overlay.js';
@@ -27,10 +29,12 @@ export function liveColorsToEditorChanges(status, columnMap = DEFAULT_LIVE_COLOR
   const keys = columns?.length ? columns : Object.keys(columnMap ?? {});
   const changes = {};
   if (status?.live !== true) return changes;
+  const look = lookColorsFromStatus(status);
+  if (!look) return changes;
   for (const column of keys) {
     const slot = slotForColumn(column, columnMap);
     if (!slot) continue;
-    const color = rgbToLiveDisplay(status.colors?.[slot]);
+    const color = rgbToLiveDisplay(look[slot]);
     if (!color?.hex) continue;
     changes[column] = color.hex;
   }
@@ -50,14 +54,18 @@ export function flashLookDisabledReason(status, columns, columnMap = DEFAULT_LIV
   if (status?.preview === true) return 'GrandMA is in preview — Flash is disabled';
   if (status?.live !== true) return 'No GrandMA signal';
   if (!Object.keys(liveColorsToEditorChanges(status, columnMap, { columns })).length) {
-    return 'No GrandMA color data';
+    return 'No GrandMA look data';
   }
   return 'Write GrandMA colors to this cue';
 }
 
 export function isLiveColorMoving(prev, next, { threshold = FLASH_LOOK_MOTION_DELTA } = {}) {
+  if (next?.live !== true) return false;
+  if (next.moving === true) return true;
+  if (hasSlotColors(next.staticColors) && next.colors) {
+    return maxSlotDelta(next.colors, next.staticColors) >= threshold;
+  }
   if (!prev?.colors || !next?.colors) return false;
-  if (next.live !== true) return false;
   return maxSlotDelta(prev.colors, next.colors) >= threshold;
 }
 
@@ -73,7 +81,7 @@ export function buildFlashLookSlots({
   return cols.map((column) => {
     const slot = slotForColumn(column, columnMap);
     const sheet = parseRgbCell(row?.[column]);
-    const live = rgbToLiveDisplay(liveColors?.colors?.[slot]);
+    const live = rgbToLiveDisplay(lookColorsFromStatus(liveColors)?.[slot]);
     return {
       column,
       label: fieldLabel(fieldByColumn.get(column) ?? { column }),
@@ -98,7 +106,7 @@ export function flashLookChangesForColumns(slots, columns) {
 
 export function flashLookWarnings(slots, { moving = false } = {}) {
   const warnings = [];
-  if (moving) warnings.push('Look is still moving (chase / fade). Flash anyway or wait.');
+  if (moving) warnings.push('GrandMA FX is active — Flash writes the static look.');
   const rainbow = (slots ?? []).filter((s) => s.rainbow && s.canWrite).map((s) => s.label);
   if (rainbow.length) {
     warnings.push(`${joinLabels(rainbow)} is RAINBOW — Flash will replace it.`);

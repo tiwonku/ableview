@@ -15,8 +15,27 @@ export const DEFAULT_LIVE_COLOR_SLOTS = Object.freeze({
   accent: { startChannel: 506, label: 'Color accent' },
 });
 
+export const DEFAULT_STATIC_COLOR_SLOTS = Object.freeze({
+  main: { startChannel: 491, label: 'Look Main' },
+  secondary: { startChannel: 494, label: 'Look secondary' },
+  accent: { startChannel: 497, label: 'Look accent' },
+});
+
 export function emptySlotColors() {
   return { main: null, secondary: null, accent: null };
+}
+
+export function hasSlotColors(colors) {
+  return LIVE_COLOR_SLOTS.some((id) => {
+    const c = colors?.[id];
+    return c && Number.isInteger(c.r) && Number.isInteger(c.g) && Number.isInteger(c.b);
+  });
+}
+
+/** True when the FX bus differs from the static look by at least changeDelta. */
+export function isFxDivergedFromLook(colors, staticColors, { changeDelta = 4 } = {}) {
+  if (!hasSlotColors(colors) || !hasSlotColors(staticColors)) return false;
+  return maxChannelDelta(colors, staticColors) >= changeDelta;
 }
 
 export function cloneSlotColors(colors) {
@@ -62,6 +81,8 @@ export function makeLiveColorsStatus({
   sourceAddress = null,
   preview = false,
   colors = null,
+  staticColors = null,
+  moving = false,
 } = {}) {
   return {
     enabled: enabled === true,
@@ -72,5 +93,7 @@ export function makeLiveColorsStatus({
     sourceAddress,
     preview: preview === true,
     colors: cloneSlotColors(colors),
+    staticColors: cloneSlotColors(staticColors),
+    moving: moving === true,
   };
 }

@@ -1847,6 +1847,56 @@ select.settings-input option {
   );
 }
 
+.sacn-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+}
+
+.sacn-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+}
+
+.sacn-preview-label {
+  min-width: 4.4rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.sacn-preview .sacn-chip-swatch {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.sacn-phase {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.12rem 0.4rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.sacn-phase--hold {
+  color: #8ee0b0;
+}
+
+.sacn-phase--move {
+  color: #ffd27a;
+}
+
+.settings-subhead {
+  margin: 0.85rem 0 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  color: var(--muted, rgba(255, 255, 255, 0.7));
+}
+
 .settings-sync-row {
   margin-top: 0.25rem;
 }

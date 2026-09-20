@@ -39,6 +39,11 @@ const SACN_DEFAULTS = Object.freeze({
     secondary: { startChannel: 503, label: 'Color secondary' },
     accent: { startChannel: 506, label: 'Color accent' },
   },
+  staticSlots: {
+    main: { startChannel: 491, label: 'Look Main' },
+    secondary: { startChannel: 494, label: 'Look secondary' },
+    accent: { startChannel: 497, label: 'Look accent' },
+  },
   log: {
     changeDelta: 4,
     settleMs: 200,
@@ -75,16 +80,21 @@ function normalizeSettings(raw) {
   };
 }
 
+function mergeSlotGroup(defaults, raw) {
+  const slots = { ...defaults, ...(raw ?? {}) };
+  return {
+    main: { ...defaults.main, ...slots.main },
+    secondary: { ...defaults.secondary, ...slots.secondary },
+    accent: { ...defaults.accent, ...slots.accent },
+  };
+}
+
 function normalizeSacn(raw) {
-  const slots = { ...SACN_DEFAULTS.slots, ...(raw?.slots ?? {}) };
   return {
     ...SACN_DEFAULTS,
     ...raw,
-    slots: {
-      main: { ...SACN_DEFAULTS.slots.main, ...slots.main },
-      secondary: { ...SACN_DEFAULTS.slots.secondary, ...slots.secondary },
-      accent: { ...SACN_DEFAULTS.slots.accent, ...slots.accent },
-    },
+    slots: mergeSlotGroup(SACN_DEFAULTS.slots, raw?.slots),
+    staticSlots: mergeSlotGroup(SACN_DEFAULTS.staticSlots, raw?.staticSlots),
     log: { ...SACN_DEFAULTS.log, ...(raw?.log ?? {}) },
   };
 }
@@ -208,19 +218,35 @@ function renderTimecodeStatusBox(timecodeStatus, settings) {
   return box;
 }
 
-function rgbChip(label, color) {
+function rgbChip(label, color, { channel } = {}) {
   const wrap = el('span', 'sacn-chip');
   const swatch = el('span', 'sacn-chip-swatch');
+  const ch = Number.isInteger(channel) ? ` ${channel}` : '';
   if (color && Number.isInteger(color.r)) {
     swatch.style.background = `rgb(${color.r}, ${color.g}, ${color.b})`;
     wrap.appendChild(swatch);
-    wrap.appendChild(document.createTextNode(`${label} ${color.r},${color.g},${color.b}`));
+    wrap.appendChild(document.createTextNode(`${label}${ch} ${color.r},${color.g},${color.b}`));
   } else {
     swatch.classList.add('sacn-chip-swatch--empty');
     wrap.appendChild(swatch);
-    wrap.appendChild(document.createTextNode(`${label} —`));
+    wrap.appendChild(document.createTextNode(`${label}${ch} —`));
   }
   return wrap;
+}
+
+function sacnPreviewRow(title, colors, slots, phase) {
+  const row = el('div', 'sacn-preview-row');
+  row.appendChild(el('span', 'sacn-preview-label', title));
+  const chips = el('div', 'sacn-chips');
+  chips.appendChild(rgbChip('Main', colors?.main, { channel: slots?.main?.startChannel }));
+  chips.appendChild(rgbChip('Sec', colors?.secondary, { channel: slots?.secondary?.startChannel }));
+  chips.appendChild(rgbChip('Accent', colors?.accent, { channel: slots?.accent?.startChannel }));
+  row.appendChild(chips);
+  if (phase) {
+    const badge = el('span', `sacn-phase sacn-phase--${phase}`, phase === 'move' ? 'MOVE' : 'HOLD');
+    row.appendChild(badge);
+  }
+  return row;
 }
 
 function renderSacnStatusBox(sacnStatus, settings) {
@@ -257,12 +283,20 @@ function renderSacnStatusBox(sacnStatus, settings) {
   }
   box.appendChild(signalLine);
 
-  const chips = el('p', 'ableton-session-line sacn-chips');
-  const colors = sacnStatus.colors ?? {};
-  chips.appendChild(rgbChip('Main', colors.main));
-  chips.appendChild(rgbChip('Sec', colors.secondary));
-  chips.appendChild(rgbChip('Accent', colors.accent));
-  box.appendChild(chips);
+  const preview = el('div', 'sacn-preview');
+  const moving = live && sacnStatus.moving === true;
+  preview.appendChild(sacnPreviewRow(
+    'Live FX',
+    sacnStatus.colors,
+    settings.sacn?.slots,
+    live ? (moving ? 'move' : 'hold') : null,
+  ));
+  preview.appendChild(sacnPreviewRow(
+    'Static',
+    sacnStatus.staticColors,
+    settings.sacn?.staticSlots,
+  ));
+  box.appendChild(preview);
 
   if (live) box.classList.add('ableton-session--ok');
   else box.classList.add('ableton-session--warn');
@@ -631,8 +665,26 @@ function settingsFromForm(form, current) {
   };
 }
 
+function slotGroupFromForm(fd, current, names) {
+  return {
+    main: {
+      ...current.main,
+      startChannel: Number(fd.get(names.main)),
+    },
+    secondary: {
+      ...current.secondary,
+      startChannel: Number(fd.get(names.secondary)),
+    },
+    accent: {
+      ...current.accent,
+      startChannel: Number(fd.get(names.accent)),
+    },
+  };
+}
+
 function sacnFromForm(fd, current) {
   const slots = current.sacn?.slots ?? SACN_DEFAULTS.slots;
+  const staticSlots = current.sacn?.staticSlots ?? SACN_DEFAULTS.staticSlots;
   return {
     enabled: fd.get('sacnEnabled') === 'on',
     port: Number(fd.get('sacnPort')),
@@ -641,24 +693,20 @@ function sacnFromForm(fd, current) {
     staleMs: Number(fd.get('sacnStaleMs')),
     multicast: true,
     ignorePreview: true,
-    slots: {
-      main: {
-        ...slots.main,
-        startChannel: Number(fd.get('sacnMainChannel')),
-      },
-      secondary: {
-        ...slots.secondary,
-        startChannel: Number(fd.get('sacnSecondaryChannel')),
-      },
-      accent: {
-        ...slots.accent,
-        startChannel: Number(fd.get('sacnAccentChannel')),
-      },
-    },
+    slots: slotGroupFromForm(fd, slots, {
+      main: 'sacnMainChannel',
+      secondary: 'sacnSecondaryChannel',
+      accent: 'sacnAccentChannel',
+    }),
+    staticSlots: slotGroupFromForm(fd, staticSlots, {
+      main: 'sacnStaticMainChannel',
+      secondary: 'sacnStaticSecondaryChannel',
+      accent: 'sacnStaticAccentChannel',
+    }),
     log: {
       changeDelta: Number(fd.get('sacnChangeDelta')),
       settleMs: Number(fd.get('sacnSettleMs')),
-      motionIntervalMs: Number(fd.get('sacnMotionIntervalMs')),
+      motionIntervalMs: current.sacn?.log?.motionIntervalMs ?? SACN_DEFAULTS.log.motionIntervalMs,
       minIntervalMs: current.sacn?.log?.minIntervalMs ?? SACN_DEFAULTS.log.minIntervalMs,
     },
   };
@@ -713,17 +761,31 @@ function renderSacnGroup(settings, sacnStatus, nics) {
     'Universe',
     numberInput('sacnUniverse', settings.sacn?.universe ?? 191, { min: 1, max: 63999 }),
   ));
+  group.appendChild(el('p', 'settings-subhead', 'Live FX start channels'));
   group.appendChild(fieldRow(
-    'Main RGB start channel',
+    'Main',
     numberInput('sacnMainChannel', settings.sacn?.slots?.main?.startChannel ?? 500, { min: 1, max: 510 }),
   ));
   group.appendChild(fieldRow(
-    'Secondary RGB start channel',
+    'Secondary',
     numberInput('sacnSecondaryChannel', settings.sacn?.slots?.secondary?.startChannel ?? 503, { min: 1, max: 510 }),
   ));
   group.appendChild(fieldRow(
-    'Accent RGB start channel',
+    'Accent',
     numberInput('sacnAccentChannel', settings.sacn?.slots?.accent?.startChannel ?? 506, { min: 1, max: 510 }),
+  ));
+  group.appendChild(el('p', 'settings-subhead', 'Static look start channels'));
+  group.appendChild(fieldRow(
+    'Main',
+    numberInput('sacnStaticMainChannel', settings.sacn?.staticSlots?.main?.startChannel ?? 491, { min: 1, max: 510 }),
+  ));
+  group.appendChild(fieldRow(
+    'Secondary',
+    numberInput('sacnStaticSecondaryChannel', settings.sacn?.staticSlots?.secondary?.startChannel ?? 494, { min: 1, max: 510 }),
+  ));
+  group.appendChild(fieldRow(
+    'Accent',
+    numberInput('sacnStaticAccentChannel', settings.sacn?.staticSlots?.accent?.startChannel ?? 497, { min: 1, max: 510 }),
   ));
   group.appendChild(fieldRow(
     'Stale after (ms)',
@@ -737,13 +799,9 @@ function renderSacnGroup(settings, sacnStatus, nics) {
     'Log settle (ms)',
     numberInput('sacnSettleMs', settings.sacn?.log?.settleMs ?? 200, { min: 0, step: 50 }),
   ));
-  group.appendChild(fieldRow(
-    'Chase sample interval (ms)',
-    numberInput('sacnMotionIntervalMs', settings.sacn?.log?.motionIntervalMs ?? 400, { min: 50, step: 50 }),
-  ));
 
   const hint = el('p', 'settings-sim-hint');
-  hint.textContent = 'Pick the same NIC sACNView uses. Defaults are Jake’s map: universe 191, channels 500–508 (8-bit RGB). Operator swatches follow packets in realtime; the session log only writes settled looks plus sparse samples during chases. Preview packets are ignored.';
+  hint.textContent = 'Pick the same NIC sACNView uses. Live FX defaults to Jake’s map (universe 191, channels 500–508). Static look defaults to 491–499 — change those if he parks the fixtures elsewhere (start channel must be 1–510). Operator cards paint FX; Flash and the session log use the static look, plus a MOVE span while FX is chasing. Preview packets are ignored.';
   group.appendChild(hint);
   return group;
 }
@@ -1202,10 +1260,29 @@ export function mountSettingsPanel(rootSelector) {
   }, 3000);
   pollTimer.unref?.();
 
-  return () => {
+  function applyLiveColors(status) {
+    if (stopped || !status) return;
+    sacnStatus = {
+      ...(sacnStatus ?? {}),
+      enabled: status.enabled === true,
+      live: status.live === true,
+      lastSeenAt: status.lastSeenAt ?? sacnStatus?.lastSeenAt ?? null,
+      universe: status.universe ?? sacnStatus?.universe ?? null,
+      sourceName: status.sourceName ?? sacnStatus?.sourceName ?? null,
+      sourceAddress: status.sourceAddress ?? sacnStatus?.sourceAddress ?? null,
+      colors: status.colors ?? null,
+      staticColors: status.staticColors ?? null,
+      moving: status.moving === true,
+    };
+    refreshSacnSessionBox();
+  }
+
+  function unmount() {
     stopped = true;
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = null;
     root.replaceChildren();
-  };
+  }
+
+  return { unmount, applyLiveColors };
 }

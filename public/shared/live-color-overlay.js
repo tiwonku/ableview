@@ -28,6 +28,20 @@ export function slotForColumn(column, map = DEFAULT_LIVE_COLOR_COLUMNS) {
   return map?.[column] ?? DEFAULT_LIVE_COLOR_COLUMNS[column] ?? null;
 }
 
+export function hasSlotColors(colors) {
+  return ['main', 'secondary', 'accent'].some((id) => {
+    const c = colors?.[id];
+    return c && Number.isInteger(c.r) && Number.isInteger(c.g) && Number.isInteger(c.b);
+  });
+}
+
+/** Static look bus when present; otherwise the FX triple (pre-patch fallback). */
+export function lookColorsFromStatus(status) {
+  if (hasSlotColors(status?.staticColors)) return status.staticColors;
+  if (hasSlotColors(status?.colors)) return status.colors;
+  return null;
+}
+
 export function renderLiveColorHost(column) {
   const live = document.createElement('div');
   live.className = 'color-live';
