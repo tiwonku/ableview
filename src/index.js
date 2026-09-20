@@ -118,6 +118,7 @@ async function main() {
       getIngestStatus: () => ingest.getIngestStatus(),
       getTimecodeStatus: () => timecode.getStatus(),
       getLiveColorsStatus: () => sacn.getStatus(),
+      getOscOutStatus: () => oscOut.getStatus(),
     }),
     sessionLog,
   });

@@ -53,17 +53,23 @@ import {
   openFlashLook,
   syncFlashLookButton,
 } from './flash-look-overlay.js';
-import { mountBreathPage } from './breath-render.js';
+import { mountBreathPage, mountBreathPreview } from './breath-render.js';
 
 const RECONNECT_MS = 1500;
 const ALIAS_SEARCH_DEBOUNCE_MS = 180;
 
 function tracksKey(tracks) {
-  return JSON.stringify(tracks ?? []);
+  return JSON.stringify((tracks ?? []).map((t) => [
+    t.trackIndex,
+    t.clipName ?? null,
+    t.slotIndex ?? null,
+    t.trackName ?? null,
+  ]));
 }
 
 function sceneKey(scene) {
-  return JSON.stringify(scene ?? null);
+  if (!scene) return '';
+  return `${scene.index ?? ''}\0${scene.name ?? ''}\0${scene.pending ? 1 : 0}\0${scene.launchType ?? ''}`;
 }
 
 function cueContentChanged(prev, next) {
@@ -77,6 +83,18 @@ function cueContentChanged(prev, next) {
     || prev.pendingLaunch !== next.pendingLaunch
     || tracksKey(prev.tracks) !== tracksKey(next.tracks)
     || sceneKey(prev.scene) !== sceneKey(next.scene);
+}
+
+function dashboardCueChanged(prev, next) {
+  if (!prev) return true;
+  return prev.clipName !== next.clipName
+    || prev.match?.rowId !== next.match?.rowId
+    || prev.match?.matched !== next.match?.matched
+    || prev.match?.viaOverride !== next.match?.viaOverride
+    || prev.pendingLaunch !== next.pendingLaunch
+    || tracksKey(prev.tracks) !== tracksKey(next.tracks)
+    || sceneKey(prev.scene) !== sceneKey(next.scene)
+    || prev.stale !== next.stale;
 }
 
 function setlistCueChanged(prev, next) {
@@ -103,6 +121,7 @@ export function connectView({
   let settingsGen = 0;
   let unmountSettings = null;
   let breathCtl = null;
+  let dashBreathCtl = null;
   let socketGen = 0;
   let ws = null;
   let reconnectTimer = null;
@@ -323,6 +342,16 @@ export function connectView({
       if (currentViewId === 'breath' && !showingSettings && !statusOnly && breathCtl) {
         breathCtl.updateTransport(lastPayload);
         setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
+        return;
+      }
+      if (
+        currentViewId === 'admin'
+        && boardMode === 'dashboard'
+        && !showingSettings
+        && !statusOnly
+        && !dashboardCueChanged(prevPayload, lastPayload)
+      ) {
+        dashBreathCtl?.updateTransport(lastPayload);
         return;
       }
       render();
@@ -1095,6 +1124,7 @@ export function connectView({
       return;
     }
     if (viewConfig.system) {
+      dashBreathCtl?.park?.();
       renderAdmin(root, {
         ...ctx,
         editSession,
@@ -1146,6 +1176,33 @@ export function connectView({
       });
     }
     paintLiveColors();
+    syncDashBreath();
+  }
+
+  function stopDashBreath() {
+    dashBreathCtl?.destroy();
+    dashBreathCtl = null;
+  }
+
+  function syncDashBreath() {
+    const active = currentViewId === 'admin'
+      && boardMode === 'dashboard'
+      && !showingSettings
+      && !statusOnly
+      && !editSession
+      && !aliasSession
+      && !pinSession;
+    const host = active ? root?.querySelector('#admin-dash-breath') : null;
+    if (!host) {
+      stopDashBreath();
+      return;
+    }
+    if (dashBreathCtl) {
+      dashBreathCtl.attach(host);
+      dashBreathCtl.updateTransport(lastPayload);
+      return;
+    }
+    dashBreathCtl = mountBreathPreview(host, { getPayload: () => lastPayload });
   }
 
   function paintLiveColors() {
@@ -1285,6 +1342,7 @@ export function connectView({
     showingSettings = true;
     breathCtl?.destroy();
     breathCtl = null;
+    stopDashBreath();
     closeColorPicker();
     closeFlashLook();
     editSession = null;
@@ -1318,6 +1376,7 @@ export function connectView({
       breathCtl?.destroy();
       breathCtl = null;
     }
+    if (nextId !== 'admin') stopDashBreath();
     if (nextId === currentViewId) {
       syncChrome();
       render();
@@ -1387,6 +1446,7 @@ export function connectView({
       leaveSettings();
       breathCtl?.destroy();
       breathCtl = null;
+      stopDashBreath();
       window.removeEventListener('popstate', onPopState);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       ws?.close();

@@ -7,6 +7,7 @@ export function buildHealthReport({
   getIngestStatus,
   getTimecodeStatus,
   getLiveColorsStatus,
+  getOscOutStatus,
   lastCuePayload = null,
 }) {
   const sheets = getSheetSnapshot();
@@ -31,6 +32,9 @@ export function buildHealthReport({
   ) {
     checks.push('cue_track_missing');
   }
+
+  const oscOut = getOscOutStatus?.() ?? null;
+  if (oscOut?.blocked === true) checks.push('osc_out_blocked');
 
   const timecode = getTimecodeStatus?.() ?? null;
   const liveColors = getLiveColorsStatus?.() ?? null;
@@ -77,6 +81,16 @@ export function buildHealthReport({
       ? {
           clipName: lastCuePayload.clipName,
           matched: lastCuePayload.match?.matched ?? false,
+        }
+      : null,
+    oscOut: oscOut
+      ? {
+          enabled: oscOut.enabled === true,
+          sending: oscOut.sending === true,
+          blocked: oscOut.blocked === true,
+          pid: oscOut.pid ?? null,
+          httpPort: oscOut.httpPort ?? null,
+          owner: oscOut.owner ?? null,
         }
       : null,
     checks,

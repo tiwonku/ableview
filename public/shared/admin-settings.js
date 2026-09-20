@@ -501,7 +501,20 @@ function renderSharePanel(share, shareViewId, onViewChange) {
   return group;
 }
 
-function renderOscOutGroup(settings) {
+function oscOutStatusLine(oscOutStatus) {
+  if (!oscOutStatus) return '';
+  if (oscOutStatus.blocked) {
+    const owner = oscOutStatus.owner;
+    if (owner?.httpPort) {
+      return `This process is not sending OSC. Port ${owner.httpPort} (pid ${owner.pid}) holds the lock. Run npm run stop-extras and use :8080.`;
+    }
+    return 'This process is not sending OSC. Another AbleView holds the lock. Run npm run stop-extras.';
+  }
+  if (oscOutStatus.sending) return `Sending from this process (pid ${oscOutStatus.pid}, port ${oscOutStatus.httpPort}).`;
+  return '';
+}
+
+function renderOscOutGroup(settings, oscOutStatus) {
   const group = el('fieldset', 'settings-group');
   group.appendChild(el('legend', null, 'OSC clock out'));
 
@@ -542,8 +555,15 @@ function renderOscOutGroup(settings) {
   addRow.appendChild(addBtn);
   group.appendChild(addRow);
 
+  const sendLine = oscOutStatusLine(oscOutStatus);
+  if (sendLine) {
+    const sendStatus = el('p', oscOutStatus?.blocked ? 'settings-status err' : 'settings-field-hint');
+    sendStatus.textContent = sendLine;
+    group.appendChild(sendStatus);
+  }
+
   const hint = el('p', 'settings-sim-hint');
-  hint.textContent = 'Each destination is a unicast UDP target (host + port). A 224–239.x multicast group is also allowed. Same messages go to every destination. This never sends toward Ableton.';
+  hint.textContent = 'Each destination is a unicast UDP target (host + port). A 224–239.x multicast group is also allowed. Same messages go to every destination. This never sends toward Ableton. Leftover agent sims: npm run procs / npm run stop-extras.';
   group.appendChild(hint);
 
   const map = el('p', 'settings-field-hint oscout-addresses');
@@ -728,7 +748,7 @@ function renderSacnGroup(settings, sacnStatus, nics) {
   return group;
 }
 
-function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, nics, share, shareViewId, onShareViewChange }) {
+function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, oscOutStatus, nics, share, shareViewId, onShareViewChange }) {
   root.innerHTML = '';
 
   const heading = el('h2', 'section-title', 'Settings');
@@ -946,7 +966,7 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   bottomRow.appendChild(matchGroup);
 
   const clockRow = el('div', 'settings-row settings-row-single');
-  clockRow.appendChild(renderOscOutGroup(settings));
+  clockRow.appendChild(renderOscOutGroup(settings, oscOutStatus));
 
   grid.appendChild(topRow);
   grid.appendChild(bottomRow);
@@ -991,6 +1011,7 @@ export function mountSettingsPanel(rootSelector) {
   let ingestStatus = null;
   let timecodeStatus = null;
   let sacnStatus = null;
+  let oscOutStatus = null;
   let nics = [{ name: 'All interfaces', address: '0.0.0.0' }];
   let share = { port: 8080, views: [], origins: [] };
   let shareViewId = 'band';
@@ -1008,6 +1029,7 @@ export function mountSettingsPanel(rootSelector) {
       ingestStatus,
       timecodeStatus,
       sacnStatus,
+      oscOutStatus,
       nics,
       share,
       shareViewId,
@@ -1050,6 +1072,7 @@ export function mountSettingsPanel(rootSelector) {
     if (data?.ingest) ingestStatus = data.ingest;
     if (data?.timecode) timecodeStatus = data.timecode;
     if (data?.sacn) sacnStatus = data.sacn;
+    if (data?.oscOut) oscOutStatus = data.oscOut;
   }
 
   async function loadNics() {
@@ -1074,6 +1097,7 @@ export function mountSettingsPanel(rootSelector) {
     serverSupportsTimecode = data.settings?.timecode !== undefined;
     serverSupportsSacn = data.settings?.sacn !== undefined;
     settings = normalizeSettings(data.settings);
+    if (data.oscOutStatus) oscOutStatus = data.oscOutStatus;
     await Promise.all([loadSheetStatus(), loadHealthStatus(), loadNics()]);
     if (!serverSupportsTimecode) {
       status = {

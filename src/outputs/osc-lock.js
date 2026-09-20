@@ -3,6 +3,20 @@ import path from 'node:path';
 
 export const DEFAULT_OSC_OUT_LOCK = path.join(process.cwd(), 'data', 'osc-out.lock');
 
+/** Show-box HTTP port. A process on this port may take OSC from a leftover sim. */
+export const PREFERRED_OSC_HTTP_PORT = 8080;
+
+export function isPreferredOscHttpPort(httpPort) {
+  return Number(httpPort) === PREFERRED_OSC_HTTP_PORT;
+}
+
+export function shouldStealOscOutLock(existing, httpPort) {
+  if (!existing) return false;
+  if (!isPreferredOscHttpPort(httpPort)) return false;
+  if (isPreferredOscHttpPort(existing.httpPort)) return false;
+  return true;
+}
+
 export function pidAlive(pid) {
   const n = Number(pid);
   if (!Number.isInteger(n) || n <= 0) return false;
@@ -49,11 +63,20 @@ export function acquireOscOutLock(lockPath, {
   }
 
   const existing = readOscOutLock(lockPath);
-  if (!existing || !pidAlive(existing.pid) || existing.pid === pid) {
+  const replaceable = !existing
+    || !pidAlive(existing.pid)
+    || existing.pid === pid
+    || shouldStealOscOutLock(existing, httpPort);
+  if (replaceable) {
     try { unlinkSync(lockPath); } catch { /* stale or ours */ }
     try {
       writeLock(lockPath, info);
-      return { ok: true, info, replaced: existing };
+      return {
+        ok: true,
+        info,
+        replaced: existing,
+        stole: existing && existing.pid !== pid && pidAlive(existing.pid),
+      };
     } catch (err) {
       if (err?.code !== 'EEXIST') throw err;
       return { ok: false, existing: readOscOutLock(lockPath) };

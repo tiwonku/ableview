@@ -1,8 +1,11 @@
 /** REST handlers for admin-editable settings (M7). */
 
-export function registerConfigRoutes(app, { configRuntime, log }) {
+export function registerConfigRoutes(app, { configRuntime, log, getOscOutStatus }) {
   app.get('/api/config/settings', async (_req, reply) => {
-    return reply.send({ settings: configRuntime.getSettings() });
+    return reply.send({
+      settings: configRuntime.getSettings(),
+      oscOutStatus: getOscOutStatus?.() ?? null,
+    });
   });
 
   app.patch('/api/config/settings', async (req, reply) => {

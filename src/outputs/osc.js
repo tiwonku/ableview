@@ -5,8 +5,11 @@ import { createBreathRuntime } from './breath.js';
 import {
   DEFAULT_OSC_OUT_LOCK,
   acquireOscOutLock,
+  readOscOutLock,
   releaseOscOutLock,
 } from './osc-lock.js';
+
+export const OSC_OUT_RECLAIM_MS = 2000;
 
 // Clock rebroadcast (spec §11 tap point). A separate UDP port from Ableton
 // ingest — never send /live/** and never target ingest.abletonHost:oscSendPort.
@@ -184,6 +187,8 @@ export function createOscOutput({
   now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
   setIntervalFn = null,
   clearIntervalFn = clearInterval,
+  reclaimMs = OSC_OUT_RECLAIM_MS,
+  lockPid = process.pid,
 }) {
   let udp = null;
   let lastEvent = null;
@@ -191,6 +196,7 @@ export function createOscOutput({
   let lastDestKey = null;
   let lockHeld = false;
   let sendBlocked = false;
+  let reclaimTimer = null;
   const pulseTimers = { beat: null, bar: null };
 
   function resolvedLockPath() {
@@ -204,15 +210,21 @@ export function createOscOutput({
     const file = resolvedLockPath();
     if (!file) return true;
     const result = acquireOscOutLock(file, {
-      pid: process.pid,
+      pid: lockPid,
       httpPort: getConfig().server?.httpPort ?? null,
     });
     if (!result.ok) {
       log.error(
         { ownerPid: result.existing?.pid, ownerHttpPort: result.existing?.httpPort, lockPath: file },
-        'osc output skipped — another AbleView is already sending (stop the extra process)',
+        'osc output skipped — another AbleView is already sending (npm run stop-extras)',
       );
       return false;
+    }
+    if (result.stole) {
+      log.warn(
+        { previousPid: result.replaced?.pid, previousHttpPort: result.replaced?.httpPort },
+        'osc output took the lock from a leftover AbleView (prefer :8080)',
+      );
     }
     lockHeld = true;
     return true;
@@ -220,7 +232,7 @@ export function createOscOutput({
 
   function dropLock() {
     if (!lockHeld) return;
-    releaseOscOutLock(resolvedLockPath(), process.pid);
+    releaseOscOutLock(resolvedLockPath(), lockPid);
     lockHeld = false;
   }
 
@@ -233,8 +245,45 @@ export function createOscOutput({
     return Number.isFinite(n) && n >= 0 ? n : OSC_OUT_PULSE_RESET_MS;
   }
 
+  function ownsLock() {
+    const file = resolvedLockPath();
+    if (!file) return true;
+    const existing = readOscOutLock(file);
+    return existing?.pid === lockPid;
+  }
+
+  function loseLock(reason) {
+    lockHeld = false;
+    sendBlocked = true;
+    lastDestKey = null;
+    breath.syncTimer(false);
+    log.error({ owner: resolvedLockPath() ? readOscOutLock(resolvedLockPath()) : null }, reason);
+    scheduleReclaim();
+  }
+
+  function clearReclaimTimer() {
+    if (!reclaimTimer) return;
+    clearTimeout(reclaimTimer);
+    reclaimTimer = null;
+  }
+
+  function scheduleReclaim() {
+    if (sendPacket || reclaimTimer || !sendBlocked || !enabled()) return;
+    reclaimTimer = setTimeout(() => {
+      reclaimTimer = null;
+      start().catch((err) => {
+        log.error({ err: err.message }, 'osc clock output reclaim failed');
+      });
+    }, reclaimMs);
+    reclaimTimer.unref?.();
+  }
+
   function dispatch(packets, { bundle = false } = {}) {
     if (sendBlocked || !packets.length) return;
+    if (lockHeld && !ownsLock()) {
+      loseLock('osc output released — another AbleView took the lock');
+      return;
+    }
     const { destinations, skippedAbleton } = resolveDestinations(
       getConfig().oscOut,
       getConfig().ingest,
@@ -360,6 +409,7 @@ export function createOscOutput({
     if (!enabled()) {
       sendBlocked = false;
       dropLock();
+      clearReclaimTimer();
       breath.syncTimer(false);
       log.info('osc clock output disabled');
       return;
@@ -368,9 +418,11 @@ export function createOscOutput({
       sendBlocked = true;
       lastDestKey = null;
       breath.syncTimer(false);
+      scheduleReclaim();
       return;
     }
     sendBlocked = false;
+    clearReclaimTimer();
     if (!sendPacket) {
       await openUdp();
     }
@@ -383,8 +435,21 @@ export function createOscOutput({
     breath.syncTimer(breathWanted());
   }
 
+  function getStatus() {
+    const file = resolvedLockPath();
+    return {
+      enabled: enabled(),
+      sending: enabled() && !sendBlocked && Boolean(sendPacket || udp),
+      blocked: sendBlocked,
+      pid: lockPid,
+      httpPort: getConfig().server?.httpPort ?? null,
+      owner: file ? readOscOutLock(file) : null,
+    };
+  }
+
   function stop() {
     bus.off(EVENTS.NOW_PLAYING, onNowPlaying);
+    clearReclaimTimer();
     breath.stop();
     clearPulseTimers({ reset: true });
     closeUdp();
@@ -392,5 +457,5 @@ export function createOscOutput({
     lastDestKey = null;
   }
 
-  return { start, stop };
+  return { start, stop, getStatus };
 }

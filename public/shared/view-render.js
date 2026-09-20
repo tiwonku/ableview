@@ -1275,6 +1275,13 @@ function renderDashboardNotes(parent, zones, payload) {
     heading.className = 'admin-dashboard-note-title';
     heading.textContent = group.title;
     col.appendChild(heading);
+    if (group.id === 'visuals') {
+      const breathHost = document.createElement('div');
+      breathHost.id = 'admin-dash-breath';
+      breathHost.className = 'admin-dashboard-breath';
+      breathHost.setAttribute('aria-label', 'Breath');
+      col.appendChild(breathHost);
+    }
     for (const field of group.fields) {
       const display = resolveFieldDisplay(field, getFieldValue(field, payload), { layout: 'hero' });
       col.appendChild(renderTextField(field, payload, display === 'token' ? 'text' : display));

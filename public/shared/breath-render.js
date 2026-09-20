@@ -1,6 +1,7 @@
 import {
   BREATH_CURVES,
   DEFAULT_BREATH,
+  INITIAL_BREATH_TRANSPORT,
   applyBreathTransport,
   barsToBeats,
   breathAt,
@@ -43,7 +44,10 @@ async function fetchSettings() {
   const res = await fetch('/api/config/settings');
   if (!res.ok) throw new Error(`settings ${res.status}`);
   const body = await res.json();
-  return body.settings ?? {};
+  return {
+    settings: body.settings ?? {},
+    oscOutStatus: body.oscOutStatus ?? null,
+  };
 }
 
 async function patchBreath(breath) {
@@ -57,22 +61,37 @@ async function patchBreath(breath) {
   return body;
 }
 
-function drawWave(canvas, settings, playheadPhase) {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+const waveLayerCache = new WeakMap();
+
+function wavePad(cssH, compact) {
+  const showLabels = !compact || cssH >= 88;
+  if (compact) return { l: 4, r: 4, t: 6, b: showLabels ? 14 : 6, showLabels };
+  return { l: 8, r: 8, t: 12, b: 18, showLabels: true };
+}
+
+function waveSettingsKey(settings) {
+  const s = normalizeBreathSettings(settings);
+  return [
+    s.min, s.max, s.rise, s.peakHold, s.fall, s.troughHold, s.riseCurve, s.fallCurve,
+  ].join('|');
+}
+
+function syncCanvasLayout(canvas) {
+  const cssW = canvas.clientWidth;
+  const cssH = canvas.clientHeight;
+  if (!(cssW >= 2) || !(cssH >= 2)) return null;
   const dpr = window.devicePixelRatio || 1;
-  const cssW = canvas.clientWidth || 640;
-  const cssH = canvas.clientHeight || 220;
   const w = Math.max(1, Math.round(cssW * dpr));
   const h = Math.max(1, Math.round(cssH * dpr));
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
   }
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, cssW, cssH);
+  return { cssW, cssH, dpr, w, h };
+}
 
-  const pad = { l: 8, r: 8, t: 12, b: 18 };
+function paintStaticWave(ctx, settings, cssW, cssH, compact) {
+  const pad = wavePad(cssH, compact);
   const innerW = cssW - pad.l - pad.r;
   const innerH = cssH - pad.t - pad.b;
   const s = normalizeBreathSettings(settings);
@@ -134,26 +153,190 @@ function drawWave(canvas, settings, playheadPhase) {
   ctx.lineTo(pad.l + innerW, yAt(s.max));
   ctx.stroke();
 
-  if (playheadPhase != null && Number.isFinite(playheadPhase)) {
-    const x = pad.l + clampPhase(playheadPhase) * innerW;
-    ctx.strokeStyle = '#f0f2f8';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(x, pad.t);
-    ctx.lineTo(x, pad.t + innerH);
-    ctx.stroke();
+  if (pad.showLabels) {
+    ctx.fillStyle = '#8b92a8';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillText('inhale', pad.l + 4, cssH - 4);
+    ctx.fillText('exhale', pad.l + innerW * 0.52, cssH - 4);
   }
+}
 
-  ctx.fillStyle = '#8b92a8';
-  ctx.font = '11px system-ui, sans-serif';
-  ctx.fillText('inhale', pad.l + 4, cssH - 4);
-  ctx.fillText('exhale', pad.l + innerW * 0.52, cssH - 4);
+function paintPlayhead(ctx, cssW, cssH, playheadPhase, compact, dpr) {
+  if (playheadPhase == null || !Number.isFinite(playheadPhase)) return;
+  const pad = wavePad(cssH, compact);
+  const innerW = cssW - pad.l - pad.r;
+  const innerH = cssH - pad.t - pad.b;
+  const x = Math.round((pad.l + clampPhase(playheadPhase) * innerW) * dpr) / dpr;
+  ctx.strokeStyle = '#f0f2f8';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, pad.t);
+  ctx.lineTo(x, pad.t + innerH);
+  ctx.stroke();
+}
+
+function ensureWaveLayer(canvas, settings, cssW, cssH, dpr, compact) {
+  let entry = waveLayerCache.get(canvas);
+  if (!entry) {
+    entry = { layer: document.createElement('canvas'), key: '' };
+    waveLayerCache.set(canvas, entry);
+  }
+  const key = `${Math.round(cssW * dpr)}x${Math.round(cssH * dpr)}|${compact ? 1 : 0}|${waveSettingsKey(settings)}`;
+  if (entry.key === key) return entry.layer;
+  const w = Math.max(1, Math.round(cssW * dpr));
+  const h = Math.max(1, Math.round(cssH * dpr));
+  entry.layer.width = w;
+  entry.layer.height = h;
+  const layerCtx = entry.layer.getContext('2d');
+  if (!layerCtx) return null;
+  layerCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  layerCtx.clearRect(0, 0, cssW, cssH);
+  paintStaticWave(layerCtx, settings, cssW, cssH, compact);
+  entry.key = key;
+  return entry.layer;
+}
+
+export function drawBreathWave(canvas, settings, playheadPhase, { compact = false } = {}) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const layout = syncCanvasLayout(canvas);
+  if (!layout) return;
+  const { cssW, cssH, dpr, w, h } = layout;
+  const layer = ensureWaveLayer(canvas, settings, cssW, cssH, dpr, compact);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (layer) ctx.drawImage(layer, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  paintPlayhead(ctx, cssW, cssH, playheadPhase, compact, dpr);
+}
+
+function drawWave(canvas, settings, playheadPhase) {
+  drawBreathWave(canvas, settings, playheadPhase);
 }
 
 function clampPhase(phase) {
   const n = Number(phase);
   if (!Number.isFinite(n)) return 0;
   return ((n % 1) + 1) % 1;
+}
+
+/**
+ * Read-only Live-locked wave + playhead. Used on Admin dashboard Visuals.
+ */
+export function mountBreathPreview(host, { getPayload } = {}) {
+  if (!host) throw new Error('Missing breath preview host');
+
+  const wrap = el('div', 'breath-wave-wrap admin-dashboard-breath-wrap');
+  const canvas = el('canvas', 'breath-wave admin-dashboard-breath-wave');
+  canvas.setAttribute('aria-hidden', 'true');
+  wrap.appendChild(canvas);
+
+  let attachedHost = host;
+  let parkNode = null;
+  let parked = false;
+  let settings = { ...DEFAULT_BREATH };
+  let transport = { ...INITIAL_BREATH_TRANSPORT };
+  let destroyed = false;
+  let raf = 0;
+  let lastBox = '';
+
+  function applyPayload(payload) {
+    if (!payload) return;
+    transport = applyBreathTransport(transport, {
+      tempo: payload.tempo,
+      beat: payload.beat,
+      songTime: payload.songTime,
+      isPlaying: payload.isPlaying,
+      signatureNumerator: payload.signatureNumerator,
+      signatureDenominator: payload.signatureDenominator,
+    }, Date.now());
+  }
+
+  function paint() {
+    if (parked) return;
+    const now = Date.now();
+    const songBeat = interpolateSongBeat({ ...transport, now });
+    const state = breathAt(songBeat, settings);
+    drawBreathWave(canvas, settings, songBeat == null ? null : state.phase, { compact: true });
+  }
+
+  function loop() {
+    if (destroyed) return;
+    paint();
+    raf = requestAnimationFrame(loop);
+  }
+
+  function attach(nextHost) {
+    if (destroyed || !nextHost) return;
+    parked = false;
+    attachedHost = nextHost;
+    if (wrap.parentNode !== nextHost) {
+      nextHost.replaceChildren();
+      nextHost.appendChild(wrap);
+    }
+    paint();
+  }
+
+  function park() {
+    if (destroyed) return;
+    parked = true;
+    if (!parkNode) {
+      parkNode = document.createElement('div');
+      parkNode.hidden = true;
+      parkNode.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(parkNode);
+    }
+    if (wrap.parentNode !== parkNode) parkNode.appendChild(wrap);
+    attachedHost = parkNode;
+  }
+
+  attach(host);
+  applyPayload(getPayload?.());
+  paint();
+  raf = requestAnimationFrame(loop);
+
+  fetchSettings()
+    .then((all) => {
+      if (destroyed) return;
+      settings = normalizeBreathSettings(all.settings?.oscOut?.breath ?? DEFAULT_BREATH);
+      paint();
+    })
+    .catch(() => {
+      // Keep defaults so the preview still runs offline.
+    });
+
+  const ro = typeof ResizeObserver === 'function'
+    ? new ResizeObserver((entries) => {
+      if (destroyed || parked) return;
+      const box = entries[0]?.contentRect;
+      if (!box) return;
+      const next = `${Math.round(box.width)}x${Math.round(box.height)}`;
+      if (next === lastBox) return;
+      lastBox = next;
+      paint();
+    })
+    : null;
+  ro?.observe(wrap);
+
+  return {
+    get host() {
+      return attachedHost;
+    },
+    attach,
+    park,
+    updateTransport(payload) {
+      applyPayload(payload);
+    },
+    destroy() {
+      destroyed = true;
+      if (raf) cancelAnimationFrame(raf);
+      ro?.disconnect();
+      wrap.remove();
+      parkNode?.remove();
+      parkNode = null;
+      attachedHost = null;
+    },
+  };
 }
 
 export function mountBreathPage(root, { getPayload } = {}) {
@@ -176,6 +359,7 @@ export function mountBreathPage(root, { getPayload } = {}) {
     lastIntBeat: null,
     lastSongTime: null,
   };
+  let oscOutStatus = null;
   let saveTimer = null;
   let saveGen = 0;
   let saveState = 'idle';
@@ -392,6 +576,14 @@ export function mountBreathPage(root, { getPayload } = {}) {
   }
 
   function paintWarn() {
+    if (oscOutStatus?.blocked) {
+      const owner = oscOutStatus.owner;
+      warn.hidden = false;
+      warn.textContent = owner?.httpPort
+        ? `This process is not sending OSC. Port ${owner.httpPort} (pid ${owner.pid}) holds the lock. Run npm run stop-extras and use :8080.`
+        : 'This process is not sending OSC. Another AbleView holds the lock. Run npm run stop-extras and use :8080.';
+      return;
+    }
     if (!oscOutEnabled) {
       warn.hidden = false;
       warn.textContent = 'OSC clock out is off. Enable it and add destinations in Settings. Preview still runs here.';
@@ -548,9 +740,12 @@ export function mountBreathPage(root, { getPayload } = {}) {
   fetchSettings()
     .then((all) => {
       if (destroyed) return;
-      oscOutEnabled = all.oscOut?.enabled === true;
-      destCount = Array.isArray(all.oscOut?.destinations) ? all.oscOut.destinations.length : 0;
-      writeForm(all.oscOut?.breath ?? DEFAULT_BREATH);
+      oscOutEnabled = all.settings?.oscOut?.enabled === true;
+      destCount = Array.isArray(all.settings?.oscOut?.destinations)
+        ? all.settings.oscOut.destinations.length
+        : 0;
+      oscOutStatus = all.oscOutStatus ?? null;
+      writeForm(all.settings?.oscOut?.breath ?? DEFAULT_BREATH);
       paintWarn();
     })
     .catch((err) => {

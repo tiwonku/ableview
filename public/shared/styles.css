@@ -4971,6 +4971,34 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
   color: var(--muted);
 }
 
+.admin-dashboard-note-col:has(.admin-dashboard-breath) {
+  overflow: hidden;
+}
+
+.admin-dashboard-breath {
+  flex: 0 0 auto;
+  height: 7.5rem;
+  display: flex;
+  flex-direction: column;
+  contain: layout paint;
+}
+
+.admin-dashboard-breath-wrap {
+  flex: none;
+  height: 7.5rem;
+  margin: 0;
+  padding: 0.2rem 0;
+  background: transparent;
+  border: none;
+  overflow: hidden;
+}
+
+.admin-dashboard-breath-wave {
+  display: block;
+  width: 100%;
+  height: 7.5rem;
+}
+
 .admin-dashboard-note-col .field {
   flex: 0 0 auto;
   min-height: 0;

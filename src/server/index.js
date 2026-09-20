@@ -182,6 +182,7 @@ export async function createViewServer({
       getIngestStatus: ctx.getIngestStatus,
       getTimecodeStatus: ctx.getTimecodeStatus,
       getLiveColorsStatus: ctx.getLiveColorsStatus,
+      getOscOutStatus: ctx.getOscOutStatus,
       lastCuePayload: lastPayload,
     });
     const code = report.status === 'ok' ? 200 : 503;
@@ -189,7 +190,11 @@ export async function createViewServer({
   });
 
   if (configRuntime) {
-    registerConfigRoutes(app, { configRuntime, log });
+    registerConfigRoutes(app, {
+      configRuntime,
+      log,
+      getOscOutStatus: () => getHealthContext?.()?.getOscOutStatus?.() ?? null,
+    });
   }
 
   function listeningHttpPort() {

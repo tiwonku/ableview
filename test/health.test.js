@@ -120,6 +120,29 @@ test('buildHealthReport includes sACN live colors when provided', () => {
   assert.equal(report.sacn.colors.main.r, 255);
 });
 
+test('buildHealthReport flags osc_out_blocked when another instance holds OSC', () => {
+  const report = buildHealthReport({
+    simulated: false,
+    getSheetSnapshot: () => sheetSnapshot(),
+    getConnectedViewCount: () => 0,
+    getIngestStatus: () => ({ live: true, lastSeenAt: Date.now() }),
+    getOscOutStatus: () => ({
+      enabled: true,
+      sending: false,
+      blocked: true,
+      pid: 1,
+      httpPort: 8080,
+      owner: { pid: 2, httpPort: 8094 },
+    }),
+    lastCuePayload: makeCuePayload({ clipName: 'Song A' }),
+  });
+
+  assert.ok(report.checks.includes('osc_out_blocked'));
+  assert.equal(report.oscOut.blocked, true);
+  assert.equal(report.oscOut.owner.httpPort, 8094);
+  assert.equal(report.status, 'degraded');
+});
+
 test('GET /health returns JSON and 503 when degraded', async () => {
   const bus = createBus();
   const server = await createViewServer({

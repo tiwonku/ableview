@@ -147,12 +147,37 @@ test('admin dashboard is wired in render, client, and session tracks', () => {
   assert.match(renderSrc, /Dashboard/);
   assert.match(renderSrc, /buildDashboardZones/);
   assert.match(renderSrc, /renderSessionTracks/);
+  assert.match(renderSrc, /admin-dash-breath/);
   assert.match(clientSrc, /boardMode/);
   assert.match(clientSrc, /setBoardMode/);
   assert.match(clientSrc, /operatorViews/);
   assert.match(clientSrc, /layout-admin-dashboard/);
   assert.match(clientSrc, /adminDashboardFlash/);
+  assert.match(clientSrc, /mountBreathPreview/);
+  assert.match(clientSrc, /function dashboardCueChanged/);
+  assert.match(clientSrc, /syncDashBreath/);
+  assert.match(clientSrc, /dashBreathCtl\?\.park/);
+  assert.match(clientSrc, /dashBreathCtl\.attach/);
+  assert.match(clientSrc, /t\.trackIndex/);
   assert.match(sessionSrc, /session-tracks\.js/);
   assert.match(css, /body\.layout-admin-dashboard/);
   assert.match(css, /\.admin-dashboard-notes/);
+  assert.match(css, /\.admin-dashboard-breath/);
+  assert.match(css, /\.admin-dashboard-breath-wave \{[\s\S]*?height: 7\.5rem;/);
+  const dashFn = clientSrc.match(/function dashboardCueChanged\([\s\S]*?\n\}/);
+  assert.ok(dashFn, 'dashboardCueChanged should exist');
+  assert.doesNotMatch(dashFn[0], /isPlaying/);
+});
+
+test('breath preview helper is exported for the dashboard', () => {
+  const src = readFileSync(
+    fileURLToPath(new URL('../public/shared/breath-render.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(src, /export function mountBreathPreview/);
+  assert.match(src, /export function drawBreathWave/);
+  assert.match(src, /compact: true/);
+  assert.match(src, /function park\(/);
+  assert.match(src, /function attach\(/);
+  assert.match(src, /waveLayerCache/);
 });
