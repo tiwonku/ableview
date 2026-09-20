@@ -155,10 +155,18 @@ test('admin dashboard is wired in render, client, and session tracks', () => {
   assert.match(clientSrc, /adminDashboardFlash/);
   assert.match(clientSrc, /mountBreathPreview/);
   assert.match(clientSrc, /function dashboardCueChanged/);
+  assert.match(clientSrc, /function updateAdminChrome/);
+  assert.match(clientSrc, /noMatchHero: currentViewId === 'admin' && boardMode === 'dashboard'/);
+  assert.match(clientSrc, /updateAdminChrome\(\{ refreshClipHead: false \}\)/);
   assert.match(clientSrc, /syncDashBreath/);
   assert.match(clientSrc, /dashBreathCtl\?\.park/);
   assert.match(clientSrc, /dashBreathCtl\.attach/);
   assert.match(clientSrc, /t\.trackIndex/);
+  const statusFn = clientSrc.match(/if \(msg\.type === 'status'[\s\S]*?\n    \}/);
+  assert.ok(statusFn, 'status handler should exist');
+  assert.match(statusFn[0], /updateAdminChrome\(\{ refreshClipHead: false \}\)/);
+  assert.match(renderSrc, /refreshClipHead = true/);
+  assert.match(renderSrc, /noMatchHero = false/);
   assert.match(sessionSrc, /session-tracks\.js/);
   assert.match(css, /body\.layout-admin-dashboard/);
   assert.match(css, /\.admin-dashboard-notes/);

@@ -205,6 +205,23 @@ export function connectView({
     };
   }
 
+  function adminChromeOpts() {
+    return {
+      payload: lastPayload,
+      connected,
+      lastUpdate,
+      status: lastStatus,
+      matchColumn,
+      editSession,
+      noMatchHero: currentViewId === 'admin' && boardMode === 'dashboard',
+    };
+  }
+
+  function updateAdminChrome({ refreshClipHead = true } = {}) {
+    if (!root || showingSettings || statusOnly) return;
+    updateAdminLiveChrome(root, { ...adminChromeOpts(), refreshClipHead });
+  }
+
   function updateLiveChromeDuringEdit() {
     if ((!editSession && !aliasSession && !pinSession) || !root) return;
     const chrome = {
@@ -218,7 +235,7 @@ export function connectView({
       return;
     }
     if (viewConfig.system) {
-      updateAdminLiveChrome(root, { ...chrome, status: lastStatus, matchColumn });
+      updateAdminChrome();
     } else {
       updateViewLiveChrome(root, { ...chrome, matchColumn });
     }
@@ -273,14 +290,7 @@ export function connectView({
       if (msg.liveColorColumns) liveColorColumns = msg.liveColorColumns;
       if (lastStatus) lastStatus = { ...lastStatus, liveColors: lastLiveColors };
       if (viewConfig?.system && currentViewId === 'admin' && !showingSettings && !editSession && !aliasSession && !pinSession) {
-        updateAdminLiveChrome(root, {
-          payload: lastPayload,
-          connected,
-          lastUpdate,
-          status: lastStatus,
-          matchColumn,
-          editSession,
-        });
+        updateAdminChrome({ refreshClipHead: false });
       }
       paintLiveColors();
       return;
@@ -316,6 +326,10 @@ export function connectView({
       }
       if (currentViewId === 'setlist' && !showingSettings && !statusOnly) {
         updateSetlistLiveChrome(root, setlistChromeCtx());
+        return;
+      }
+      if (currentViewId === 'admin' && !showingSettings && !statusOnly) {
+        updateAdminChrome({ refreshClipHead: false });
         return;
       }
       render();

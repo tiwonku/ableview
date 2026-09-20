@@ -4800,11 +4800,11 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
   overflow: hidden;
 }
 
-.admin-dashboard-board:has(.admin-editor),
-.admin-dashboard-board:has(.alias-panel),
-.admin-dashboard-board:has(.pin-panel),
-.admin-dashboard-board:has(.no-match-panel),
-.admin-dashboard-board:has(.no-match) {
+.admin-dashboard-board:has(> .admin-editor),
+.admin-dashboard-board:has(> .alias-panel),
+.admin-dashboard-board:has(> .pin-panel),
+.admin-dashboard-board:has(> .no-match-panel),
+.admin-dashboard-board:has(> .no-match) {
   grid-template-rows: minmax(0, 1fr) minmax(9.5rem, 34%);
 }
 

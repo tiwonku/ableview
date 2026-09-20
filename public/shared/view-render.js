@@ -1555,10 +1555,23 @@ export function renderAdmin(root, {
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-export function updateAdminLiveChrome(root, { payload, status, connected, lastUpdate, editSession, matchColumn = null }) {
+export function updateAdminLiveChrome(root, {
+  payload,
+  status,
+  connected,
+  lastUpdate,
+  editSession,
+  matchColumn = null,
+  noMatchHero = false,
+  refreshClipHead = true,
+} = {}) {
   const clipHead = root.querySelector('#admin-clip-head');
   const busy = Boolean(editSession);
-  if (clipHead) renderAdminClipHead(clipHead, payload, matchColumn, { busy });
+  // Dashboard paints No Match / Last matched in the hero. Chrome ticks (sACN,
+  // timecode status) must use the same noMatchHero flag or the title vanishes.
+  if (refreshClipHead && clipHead) {
+    renderAdminClipHead(clipHead, payload, matchColumn, { busy, noMatchHero });
+  }
 
   const stats = root.querySelector('#admin-stats');
   if (stats) renderAdminStats(stats, payload, status);
