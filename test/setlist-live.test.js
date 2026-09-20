@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   liveBoardModel,
   setHealthChips,
+  setNavModel,
   formatSetConfidence,
   formatSyncedAge,
 } from '../public/shared/setlist-render.js';
@@ -112,4 +113,39 @@ test('setHealthChips skips Ableton and cue-track in sim', () => {
   assert.equal(chips.some((c) => c.id === 'cue-track'), false);
   assert.equal(chips.find((c) => c.id === 'views')?.label, '2 other views');
   assert.equal(chips.find((c) => c.id === 'sheet')?.action, 'sync');
+});
+
+test('setNavModel marks current, pinned, and pin-able rows', () => {
+  const model = setNavModel(
+    {
+      match: { matched: true, rowId: '12', viaOverride: true },
+    },
+    {
+      name: 'festival',
+      library: [{ name: 'festival', itemCount: 2 }],
+      items: [
+        { rowId: '12', title: 'Hot Rox', status: 'confirmed' },
+        { rowId: '7', title: 'Breeze', status: 'likely' },
+        { rowId: '3', title: 'Ghost', missing: true },
+      ],
+    },
+  );
+  assert.equal(model.name, 'festival');
+  assert.equal(model.items[0].current, true);
+  assert.equal(model.items[0].pinned, true);
+  assert.equal(model.items[0].canPin, false);
+  assert.equal(model.items[1].current, false);
+  assert.equal(model.items[1].canPin, true);
+  assert.equal(model.items[2].canPin, false);
+  assert.equal(model.items[2].missing, true);
+});
+
+test('setNavModel has no current row when unmatched', () => {
+  const model = setNavModel(
+    { match: { matched: false } },
+    { name: 'club', items: [{ rowId: '1', title: 'Intro' }] },
+  );
+  assert.equal(model.items[0].current, false);
+  assert.equal(model.items[0].pinned, false);
+  assert.equal(model.items[0].canPin, true);
 });

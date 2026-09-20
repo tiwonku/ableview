@@ -39,6 +39,7 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
     'utf8',
   );
   assert.match(sessionLogSrc, /mountSetNoteRow/);
+  assert.match(sessionLogSrc, /getWho = \(\) => 'setlist'/);
   assert.match(clientSrc, /currentViewId === 'setlist'/);
   assert.match(clientSrc, /renderSetlist/);
   assert.match(clientSrc, /syncSessionLogPanel/);

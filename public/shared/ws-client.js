@@ -11,8 +11,10 @@ import {
 import { renderSession } from './session-render.js';
 import {
   renderSetlist,
+  renderSetNav,
   captureSetlistFocus,
   updateSetlistLiveChrome,
+  resetSetNavScroll,
 } from './setlist-render.js';
 import {
   collectEditorChanges,
@@ -34,10 +36,14 @@ import { mountViewNav, viewIdFromPath } from './view-nav.js';
 import { isKioskMode, kioskLinkAction, mountKioskControls } from './kiosk-controls.js';
 import {
   flattenOperatorFields,
+  isWideAdminViewport,
   parseAdminBoardMode,
   readStoredAdminBoardMode,
+  readStoredAdminSetDrawer,
   resolveAdminBoardMode,
+  resolveAdminSetDrawer,
   writeStoredAdminBoardMode,
+  writeStoredAdminSetDrawer,
 } from './admin-dashboard.js';
 import { applyLiveColorOverlay, DEFAULT_LIVE_COLOR_COLUMNS } from './live-color-overlay.js';
 import {
@@ -160,12 +166,18 @@ export function connectView({
   let setlistSyncing = false;
   let sessionLogGen = 0;
   let unmountSessionLog = null;
+  let sessionLogMountEl = null;
   let operatorViews = [];
   let boardMode = resolveAdminBoardMode({
     search: typeof location !== 'undefined' ? location.search : '',
     stored: readStoredAdminBoardMode(),
     kiosk: isKioskMode(),
   });
+  let setDrawerOpen = resolveAdminSetDrawer({
+    stored: readStoredAdminSetDrawer(),
+    kiosk: isKioskMode(),
+    wide: isWideAdminViewport(typeof window !== 'undefined' ? window : null),
+  }) === 'open';
 
   function applySimState(simulated) {
     serverSimulated = simulated === true;
@@ -314,7 +326,22 @@ export function connectView({
         render();
         return;
       }
-      if (currentViewId === 'setlist' && !showingSettings && !statusOnly) render();
+      if (currentViewId === 'setlist' && !showingSettings && !statusOnly) {
+        render();
+        return;
+      }
+      if (
+        currentViewId === 'admin'
+        && boardMode === 'dashboard'
+        && !showingSettings
+        && !statusOnly
+        && !editSession
+        && !aliasSession
+        && !pinSession
+      ) {
+        const nav = root?.querySelector('#admin-set-nav');
+        if (nav) renderSetNav(nav, setNavCtx());
+      }
       return;
     }
 
@@ -389,6 +416,29 @@ export function connectView({
     }
     syncChrome();
     render();
+  }
+
+  function setSetDrawer(open) {
+    const next = open === true;
+    if (next === setDrawerOpen) return;
+    setDrawerOpen = next;
+    writeStoredAdminSetDrawer(setDrawerOpen ? 'open' : 'closed');
+    if (!setDrawerOpen) resetSetNavScroll();
+    render();
+  }
+
+  function setNavCtx() {
+    return {
+      payload: lastPayload,
+      setlist: lastSetlist,
+      onSwitch: (name) => mutateSetlist('/api/setlist', { method: 'PATCH', body: { name } }),
+      onPin: postPin,
+      onClearPin: clearPin,
+      onOpenSet: (href) => {
+        if (onNavigate('setlist', href) !== false) location.assign(href);
+      },
+      busy: saveState === 'saving' || Boolean(editSession || aliasSession || pinSession),
+    };
   }
 
   function flashLookFields() {
@@ -1028,6 +1078,8 @@ export function connectView({
       setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
       return;
     }
+    parkSessionLogMount();
+    try {
     const aliasFocus = (aliasSession || pinSession) ? captureAliasPanelFocus() : null;
     const setlistFocus = currentViewId === 'setlist' ? captureSetlistFocus() : null;
     const autoFocusSearch = aliasAutoFocusSearch;
@@ -1162,6 +1214,8 @@ export function connectView({
         onBoardModeChange: currentViewId === 'admin' ? setBoardMode : undefined,
         operatorViews,
         ...(adminDashboardFlash() ? flashLookProps() : {}),
+        setDrawerOpen,
+        onSetDrawerChange: currentViewId === 'admin' ? setSetDrawer : undefined,
       });
     } else {
       renderView(root, {
@@ -1191,6 +1245,20 @@ export function connectView({
     }
     paintLiveColors();
     syncDashBreath();
+    if (
+      currentViewId === 'admin'
+      && boardMode === 'dashboard'
+      && setDrawerOpen
+      && !editSession
+      && !aliasSession
+      && !pinSession
+    ) {
+      const nav = root?.querySelector('#admin-set-nav');
+      if (nav) renderSetNav(nav, setNavCtx());
+    }
+    } finally {
+      syncSessionLogPanel();
+    }
   }
 
   function stopDashBreath() {
@@ -1305,32 +1373,54 @@ export function connectView({
     syncSessionLogPanel();
   }
 
+  function parkSessionLogMount() {
+    sessionLogMountEl?.remove();
+  }
+
+  function sessionLogKeepMounted() {
+    return !statusOnly && !showingSettings && (
+      currentViewId === 'setlist'
+      || (currentViewId === 'admin' && boardMode === 'dashboard')
+    );
+  }
+
   async function syncSessionLogPanel() {
-    const onSet = !statusOnly && !showingSettings && currentViewId === 'setlist';
-    if (!onSet) {
+    const pageHost = document.getElementById('session-log');
+    if (pageHost) {
+      pageHost.hidden = currentViewId !== 'setlist' || showingSettings || statusOnly;
+    }
+
+    if (!sessionLogKeepMounted()) {
       sessionLogGen += 1;
       unmountSessionLog?.();
       unmountSessionLog = null;
-      const host = document.getElementById('session-log');
-      if (host) {
-        host.replaceChildren();
-        host.hidden = true;
-      }
+      sessionLogMountEl = null;
       return;
     }
-    if (unmountSessionLog) {
-      const host = document.getElementById('session-log');
-      if (host) host.hidden = false;
-      return;
-    }
+
     const gen = ++sessionLogGen;
     const { ensureSessionLogHost, mountSessionLogPanel } = await import('./admin-session-log.js');
-    if (gen !== sessionLogGen || showingSettings || currentViewId !== 'setlist') return;
-    const { host } = ensureSessionLogHost(root);
-    if (!host) return;
-    host.hidden = false;
-    unmountSessionLog?.();
-    unmountSessionLog = mountSessionLogPanel(host);
+    if (gen !== sessionLogGen) return;
+
+    let target = null;
+    if (currentViewId === 'setlist') {
+      target = ensureSessionLogHost(root).host;
+      if (target) target.hidden = false;
+    } else {
+      target = document.getElementById('admin-set-log');
+    }
+
+    if (!sessionLogMountEl || !unmountSessionLog) {
+      sessionLogMountEl = document.createElement('div');
+      sessionLogMountEl.className = 'set-log-mount';
+      unmountSessionLog?.();
+      unmountSessionLog = mountSessionLogPanel(sessionLogMountEl, {
+        getWho: () => currentViewId,
+      });
+    }
+    if (target && sessionLogMountEl.parentNode !== target) {
+      target.appendChild(sessionLogMountEl);
+    }
   }
 
   function applyHistory(nextId, href, historyMode) {
@@ -1457,6 +1547,7 @@ export function connectView({
       sessionLogGen += 1;
       unmountSessionLog?.();
       unmountSessionLog = null;
+      sessionLogMountEl = null;
       leaveSettings();
       breathCtl?.destroy();
       breathCtl = null;

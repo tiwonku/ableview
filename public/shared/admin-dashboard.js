@@ -46,6 +46,51 @@ export function writeStoredAdminBoardMode(mode, storage) {
   }
 }
 
+export const ADMIN_SET_DRAWER_STORAGE_KEY = 'ableview.adminSetDrawer';
+export const ADMIN_SET_DRAWER_WIDE_QUERY = '(min-width: 64rem)';
+
+export function normalizeAdminSetDrawer(value) {
+  return value === 'open' || value === 'closed' ? value : null;
+}
+
+export function isWideAdminViewport(win) {
+  try {
+    const media = win?.matchMedia?.(ADMIN_SET_DRAWER_WIDE_QUERY);
+    return Boolean(media?.matches);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Stored preference wins, then kiosk / wide viewport → open, else closed.
+ * @param {{ stored?: string|null, kiosk?: boolean, wide?: boolean }} opts
+ */
+export function resolveAdminSetDrawer({ stored = null, kiosk = false, wide = false } = {}) {
+  return normalizeAdminSetDrawer(stored)
+    ?? ((kiosk || wide) ? 'open' : 'closed');
+}
+
+export function readStoredAdminSetDrawer(storage) {
+  try {
+    const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+    return normalizeAdminSetDrawer(store?.getItem(ADMIN_SET_DRAWER_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredAdminSetDrawer(state, storage) {
+  const next = normalizeAdminSetDrawer(state);
+  if (!next) return;
+  try {
+    const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+    store?.setItem(ADMIN_SET_DRAWER_STORAGE_KEY, next);
+  } catch {
+    // private mode / disabled storage
+  }
+}
+
 export function withAdminBoardMode(path, mode, search) {
   const url = new URL(path, 'http://ableview.local');
   const fromSearch = new URLSearchParams(String(search ?? '').replace(/^\?/, ''));

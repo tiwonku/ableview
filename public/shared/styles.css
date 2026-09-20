@@ -5065,6 +5065,192 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
   font-weight: 400;
 }
 
+.admin-dashboard-board--set-open {
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22%);
+  grid-template-rows: minmax(0, 1fr) minmax(9.5rem, 34%);
+}
+
+.admin-dashboard-main {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--dash-gap);
+}
+
+.admin-dashboard-main:not(:has(> .admin-dashboard-look)),
+.admin-dashboard-main:not(:has(> .admin-dashboard-notes)) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.admin-dashboard-board--set-open > .admin-dashboard-main {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.admin-dashboard-board--set-open > .admin-set-drawer {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.admin-dashboard-board--set-open > .admin-dashboard-session {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.admin-set-drawer {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.admin-set-log {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-set-log .set-log-name {
+  max-width: none;
+  min-width: 0;
+}
+
+.admin-set-log .set-log-status {
+  flex: 1 0 100%;
+}
+
+.admin-set-log .set-note-input {
+  min-width: 0;
+}
+
+.admin-set-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.set-nav {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.set-nav-head {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.set-nav-select {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.set-nav-open {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.set-nav-open:hover {
+  text-decoration: underline;
+}
+
+.set-nav-items {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.3rem 0.4rem 0.45rem;
+}
+
+.set-nav-empty {
+  margin: 0.55rem 0.25rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.set-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.32rem 0.35rem;
+  border-radius: 0.35rem;
+}
+
+.set-nav-item + .set-nav-item {
+  margin-top: 0.15rem;
+}
+
+.set-nav-item--current {
+  background: rgba(230, 162, 60, 0.14);
+}
+
+.set-nav-item--pinned {
+  box-shadow: inset 2px 0 0 var(--warn);
+}
+
+.set-nav-item--missing {
+  opacity: 0.7;
+}
+
+.set-nav-item-index {
+  flex: 0 0 1.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: right;
+}
+
+.set-nav-item-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.set-nav-item-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.4rem;
+}
+
+.set-nav-item-title {
+  min-width: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.set-nav-item-btn {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.72rem;
+}
+
+body.layout-admin-dashboard .view-edit-btn--set[aria-expanded="true"] {
+  background: rgba(230, 162, 60, 0.18);
+  border-color: var(--warn);
+}
+
 .admin-dashboard-session {
   display: flex;
   flex-direction: column;
@@ -5120,5 +5306,28 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
   .admin-dashboard-board {
     overflow: auto;
     grid-template-rows: auto auto minmax(14rem, auto);
+  }
+
+  .admin-dashboard-board--set-open {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(12rem, 40%) minmax(14rem, auto);
+  }
+
+  .admin-dashboard-board--set-open > .admin-dashboard-main,
+  .admin-dashboard-board--set-open > .admin-set-drawer,
+  .admin-dashboard-board--set-open > .admin-dashboard-session {
+    grid-column: 1;
+  }
+
+  .admin-dashboard-board--set-open > .admin-dashboard-main {
+    grid-row: 1;
+  }
+
+  .admin-dashboard-board--set-open > .admin-set-drawer {
+    grid-row: 2;
+  }
+
+  .admin-dashboard-board--set-open > .admin-dashboard-session {
+    grid-row: 3;
   }
 }

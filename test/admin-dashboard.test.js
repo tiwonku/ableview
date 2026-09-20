@@ -8,13 +8,19 @@ import {
   dashboardFieldKind,
   fieldIdentity,
   flattenOperatorFields,
+  isWideAdminViewport,
   normalizeAdminBoardMode,
+  normalizeAdminSetDrawer,
   parseAdminBoardMode,
   readStoredAdminBoardMode,
+  readStoredAdminSetDrawer,
   resolveAdminBoardMode,
+  resolveAdminSetDrawer,
   withAdminBoardMode,
   writeStoredAdminBoardMode,
+  writeStoredAdminSetDrawer,
   ADMIN_BOARD_STORAGE_KEY,
+  ADMIN_SET_DRAWER_STORAGE_KEY,
 } from '../public/shared/admin-dashboard.js';
 
 const exampleViews = {
@@ -72,6 +78,33 @@ test('parseAdminBoardMode and withAdminBoardMode keep kiosk', () => {
     '/views/admin?kiosk=1&mode=dashboard',
   );
   assert.equal(withAdminBoardMode('/views/admin', 'detail', ''), '/views/admin?mode=detail');
+});
+
+test('resolveAdminSetDrawer prefers storage, then kiosk or wide viewport', () => {
+  assert.equal(resolveAdminSetDrawer({ stored: 'closed', kiosk: true, wide: true }), 'closed');
+  assert.equal(resolveAdminSetDrawer({ stored: 'open', kiosk: false, wide: false }), 'open');
+  assert.equal(resolveAdminSetDrawer({ stored: null, kiosk: true, wide: false }), 'open');
+  assert.equal(resolveAdminSetDrawer({ stored: null, kiosk: false, wide: true }), 'open');
+  assert.equal(resolveAdminSetDrawer({ stored: null, kiosk: false, wide: false }), 'closed');
+  assert.equal(normalizeAdminSetDrawer('open'), 'open');
+  assert.equal(normalizeAdminSetDrawer('nope'), null);
+  assert.equal(isWideAdminViewport({ matchMedia: () => ({ matches: true }) }), true);
+  assert.equal(isWideAdminViewport({ matchMedia: () => ({ matches: false }) }), false);
+  assert.equal(isWideAdminViewport(null), false);
+});
+
+test('stored admin set drawer round-trips', () => {
+  const mem = new Map();
+  const storage = {
+    getItem: (key) => (mem.has(key) ? mem.get(key) : null),
+    setItem: (key, value) => { mem.set(key, value); },
+  };
+  assert.equal(readStoredAdminSetDrawer(storage), null);
+  writeStoredAdminSetDrawer('open', storage);
+  assert.equal(storage.getItem(ADMIN_SET_DRAWER_STORAGE_KEY), 'open');
+  assert.equal(readStoredAdminSetDrawer(storage), 'open');
+  writeStoredAdminSetDrawer('nope', storage);
+  assert.equal(readStoredAdminSetDrawer(storage), 'open');
 });
 
 test('stored admin board mode round-trips', () => {
@@ -148,6 +181,10 @@ test('admin dashboard is wired in render, client, and session tracks', () => {
   assert.match(renderSrc, /buildDashboardZones/);
   assert.match(renderSrc, /renderSessionTracks/);
   assert.match(renderSrc, /admin-dash-breath/);
+  assert.match(renderSrc, /admin-set-drawer/);
+  assert.match(renderSrc, /admin-dashboard-board--set-open/);
+  assert.match(renderSrc, /<span>Set<\/span>/);
+  assert.match(renderSrc, /onSetDrawerChange/);
   assert.match(clientSrc, /boardMode/);
   assert.match(clientSrc, /setBoardMode/);
   assert.match(clientSrc, /operatorViews/);
@@ -159,6 +196,13 @@ test('admin dashboard is wired in render, client, and session tracks', () => {
   assert.match(clientSrc, /noMatchHero: currentViewId === 'admin' && boardMode === 'dashboard'/);
   assert.match(clientSrc, /updateAdminChrome\(\{ refreshClipHead: false \}\)/);
   assert.match(clientSrc, /syncDashBreath/);
+  assert.match(clientSrc, /setDrawerOpen/);
+  assert.match(clientSrc, /setSetDrawer/);
+  assert.match(clientSrc, /renderSetNav/);
+  assert.match(clientSrc, /parkSessionLogMount/);
+  assert.match(clientSrc, /sessionLogKeepMounted/);
+  assert.match(clientSrc, /admin-set-log/);
+  assert.match(clientSrc, /getWho: \(\) => currentViewId/);
   assert.match(clientSrc, /dashBreathCtl\?\.park/);
   assert.match(clientSrc, /dashBreathCtl\.attach/);
   assert.match(clientSrc, /t\.trackIndex/);
@@ -171,6 +215,9 @@ test('admin dashboard is wired in render, client, and session tracks', () => {
   assert.match(css, /body\.layout-admin-dashboard/);
   assert.match(css, /\.admin-dashboard-notes/);
   assert.match(css, /\.admin-dashboard-breath/);
+  assert.match(css, /\.admin-dashboard-board--set-open/);
+  assert.match(css, /\.admin-set-drawer/);
+  assert.match(css, /\.set-nav-item--current/);
   assert.match(css, /\.admin-dashboard-breath-wave \{[\s\S]*?height: 7\.5rem;/);
   const dashFn = clientSrc.match(/function dashboardCueChanged\([\s\S]*?\n\}/);
   assert.ok(dashFn, 'dashboardCueChanged should exist');

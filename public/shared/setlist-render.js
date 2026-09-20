@@ -6,6 +6,7 @@ import { prependDopeButton } from './moment-controls.js';
 import { renderRowEditorPanel, updateEditContextBanner } from './admin-row-editor.js';
 import { renderAliasPanel } from './alias-panel.js';
 import { renderPinPanel } from './pin-panel.js';
+import { withKioskQuery } from './kiosk-controls.js';
 
 export const SETLIST_STATUSES = Object.freeze(['confirmed', 'likely', 'maybe']);
 
@@ -775,5 +776,168 @@ export function renderSetlist(root, ctx) {
   queueMicrotask(() => {
     restoreSetlistFocus(root, focusRestore, { autoFocusSearch });
     scrollCurrentIntoView(root, liveRowId);
+  });
+}
+
+let lastSetNavScrolledRowId = null;
+
+export function resetSetNavScroll() {
+  lastSetNavScrolledRowId = null;
+}
+
+/** Compact glance model for the admin dashboard set drawer. */
+export function setNavModel(payload, setlist) {
+  const items = Array.isArray(setlist?.items) ? setlist.items : [];
+  const liveRowId = currentSetlistRowId(payload);
+  const pinned = payload?.match?.viaOverride === true;
+  return {
+    name: setlist?.name ?? '',
+    library: Array.isArray(setlist?.library) ? setlist.library : [],
+    items: items.map((item, index) => {
+      const rowId = String(item.rowId);
+      const current = liveRowId != null && liveRowId === rowId;
+      return {
+        rowId,
+        title: itemDisplayTitle(item),
+        index,
+        current,
+        pinned: current && pinned,
+        missing: Boolean(item.missing),
+        canPin: !current && !item.missing,
+      };
+    }),
+  };
+}
+
+function scrollSetNavCurrent(root, liveRowId) {
+  if (!liveRowId) {
+    lastSetNavScrolledRowId = null;
+    return;
+  }
+  if (liveRowId === lastSetNavScrolledRowId) return;
+  lastSetNavScrolledRowId = liveRowId;
+  root.querySelector('.set-nav-item--current')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+/**
+ * Compact set navigator for the admin dashboard drawer.
+ * Switch + pin + jump; full edit stays on the Set page.
+ */
+export function renderSetNav(root, ctx) {
+  if (!root) return;
+  const {
+    payload,
+    setlist,
+    onSwitch,
+    onPin,
+    onClearPin,
+    onOpenSet,
+    busy = false,
+  } = ctx;
+
+  const model = setNavModel(payload, setlist);
+  root.replaceChildren();
+  root.classList.add('set-nav');
+
+  const head = el('div', 'set-nav-head');
+  const select = el('select', 'setlist-select set-nav-select');
+  select.setAttribute('aria-label', 'Saved sets');
+  select.disabled = busy || model.library.length === 0;
+  if (model.library.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = model.name || 'No sets';
+    select.appendChild(opt);
+  } else {
+    for (const entry of model.library) {
+      const opt = document.createElement('option');
+      opt.value = entry.name;
+      const count = entry.itemCount != null ? ` (${entry.itemCount})` : '';
+      opt.textContent = `${entry.name}${count}`;
+      if (entry.name === model.name) opt.selected = true;
+      select.appendChild(opt);
+    }
+  }
+  select.addEventListener('change', () => {
+    const name = select.value;
+    if (name && name !== model.name) onSwitch?.(name);
+  });
+  head.appendChild(select);
+
+  const open = el('a', 'set-nav-open', 'Open Set page');
+  open.href = withKioskQuery('/views/setlist');
+  if (typeof onOpenSet === 'function') {
+    open.addEventListener('click', (event) => {
+      if (event.defaultPrevented) return;
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      event.preventDefault();
+      onOpenSet(open.href);
+    });
+  }
+  head.appendChild(open);
+  root.appendChild(head);
+
+  const list = el('div', 'set-nav-items');
+  list.setAttribute('role', 'list');
+
+  if (model.items.length === 0) {
+    list.appendChild(el(
+      'p',
+      'set-nav-empty',
+      'No songs on tonight’s set. Open the Set page to add them.',
+    ));
+  } else {
+    for (const item of model.items) {
+      const row = el('div', 'set-nav-item');
+      row.setAttribute('role', 'listitem');
+      if (item.current) row.classList.add('set-nav-item--current');
+      if (item.pinned) row.classList.add('set-nav-item--pinned');
+      if (item.missing) row.classList.add('set-nav-item--missing');
+
+      row.appendChild(el('div', 'set-nav-item-index', String(item.index + 1)));
+
+      const body = el('div', 'set-nav-item-body');
+      const titleRow = el('div', 'set-nav-item-title-row');
+      titleRow.appendChild(el('div', 'set-nav-item-title', item.title));
+      if (item.current) {
+        titleRow.appendChild(el(
+          'span',
+          'setlist-badge setlist-badge--now',
+          item.pinned ? 'Pinned now' : 'Now',
+        ));
+      }
+      if (item.missing) {
+        titleRow.appendChild(el('span', 'setlist-badge setlist-badge--missing', 'Missing'));
+      }
+      body.appendChild(titleRow);
+      row.appendChild(body);
+
+      if (item.current && item.pinned && onClearPin) {
+        const clearBtn = el('button', 'admin-editor-btn view-edit-btn--unpin set-nav-item-btn', 'Clear');
+        clearBtn.type = 'button';
+        clearBtn.disabled = busy;
+        clearBtn.title = 'Return the live board to automatic matching';
+        clearBtn.addEventListener('click', () => onClearPin());
+        row.appendChild(clearBtn);
+      } else if (item.canPin && onPin) {
+        const pinBtn = el('button', 'admin-editor-btn admin-editor-btn--primary set-nav-item-btn', 'Pin');
+        pinBtn.type = 'button';
+        pinBtn.disabled = busy;
+        pinBtn.title = 'Show this row as the live cue until the next automatic match';
+        pinBtn.addEventListener('click', () => onPin(item.rowId));
+        row.appendChild(pinBtn);
+      }
+
+      list.appendChild(row);
+    }
+  }
+
+  root.appendChild(list);
+
+  const liveRowId = currentSetlistRowId(payload);
+  queueMicrotask(() => {
+    scrollSetNavCurrent(root, liveRowId);
   });
 }

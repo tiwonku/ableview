@@ -94,7 +94,7 @@ function showBanner(container, message) {
   container.prepend(banner);
 }
 
-export function mountSessionLogPanel(selector) {
+export function mountSessionLogPanel(selector, { getWho = () => 'setlist' } = {}) {
   const root = typeof selector === 'string'
     ? document.querySelector(selector)
     : selector;
@@ -112,7 +112,7 @@ export function mountSessionLogPanel(selector) {
 
   const shell = el('div', 'set-log-bar');
   root.appendChild(shell);
-  mountSetNoteRow(root, { getWho: () => 'setlist' });
+  mountSetNoteRow(root, { getWho });
 
   async function fetchStatus() {
     const res = await fetch('/api/session-log');

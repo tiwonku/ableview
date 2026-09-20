@@ -42,6 +42,7 @@ import { renderSceneBanner, renderSessionTracks } from './session-tracks.js';
 const TRANSPORT_PLAY_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5.5v13l11-6.5L8 5.5z"/></svg>`;
 const TRANSPORT_PAUSE_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M7 5h3.5v14H7V5zm6.5 0H17v14h-3.5V5z"/></svg>`;
 const EDIT_ICON = `<svg class="view-edit-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
+const SET_ICON = `<svg class="view-edit-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`;
 
 /** @type {HTMLElement | null} */
 let fieldExpandOverlay = null;
@@ -1138,6 +1139,8 @@ function appendAdminActionButtons(actions, {
   flashLookTitle = '',
   showEdit = false,
   showFlash = false,
+  setDrawerOpen = false,
+  onSetDrawerChange,
 }) {
   if (showFlash) {
     appendLookWriteButton(actions, { onStartFlashLook, flashLookReady, flashLookTitle });
@@ -1166,6 +1169,17 @@ function appendAdminActionButtons(actions, {
     editBtn.addEventListener('click', onStartEdit);
     actions.appendChild(editBtn);
   }
+  if (typeof onSetDrawerChange === 'function') {
+    const setBtn = document.createElement('button');
+    setBtn.type = 'button';
+    setBtn.className = 'view-edit-btn view-edit-btn--set';
+    setBtn.setAttribute('aria-expanded', setDrawerOpen ? 'true' : 'false');
+    setBtn.setAttribute('aria-controls', 'admin-set-drawer');
+    setBtn.title = setDrawerOpen ? 'Hide set drawer' : 'Show set drawer';
+    setBtn.innerHTML = `${SET_ICON}<span>Set</span>`;
+    setBtn.addEventListener('click', () => onSetDrawerChange(!setDrawerOpen));
+    actions.appendChild(setBtn);
+  }
 }
 
 function renderAdminClipRow(root, {
@@ -1186,6 +1200,8 @@ function renderAdminClipRow(root, {
   showEdit = false,
   showFlash = false,
   noMatchHero = false,
+  setDrawerOpen = false,
+  onSetDrawerChange,
 }) {
   const clipRow = document.createElement('div');
   clipRow.className = 'clip-head-row';
@@ -1212,6 +1228,8 @@ function renderAdminClipRow(root, {
     flashLookTitle,
     showEdit,
     showFlash,
+    setDrawerOpen,
+    onSetDrawerChange,
   });
   if (actions.childNodes.length) clipRow.appendChild(actions);
   root.appendChild(clipRow);
@@ -1321,6 +1339,8 @@ function renderAdminDashboard(root, ctx) {
     onStartFlashLook,
     flashLookReady = false,
     flashLookTitle = '',
+    setDrawerOpen = false,
+    onSetDrawerChange,
   } = ctx;
 
   closeColorPicker();
@@ -1350,6 +1370,8 @@ function renderAdminDashboard(root, ctx) {
     showEdit: true,
     showFlash,
     noMatchHero: true,
+    setDrawerOpen,
+    onSetDrawerChange,
   });
 
   const board = document.createElement('div');
@@ -1405,6 +1427,33 @@ function renderAdminDashboard(root, ctx) {
     onStartCreate,
     compact: true,
   });
+
+  const showSetDrawer = setDrawerOpen === true && !busy;
+  if (showSetDrawer) {
+    board.classList.add('admin-dashboard-board--set-open');
+    const main = document.createElement('div');
+    main.className = 'admin-dashboard-main';
+    while (board.firstChild) main.appendChild(board.firstChild);
+    board.appendChild(main);
+
+    const drawer = document.createElement('aside');
+    drawer.id = 'admin-set-drawer';
+    drawer.className = 'admin-set-drawer';
+    drawer.setAttribute('aria-label', 'Set');
+
+    const log = document.createElement('div');
+    log.id = 'admin-set-log';
+    log.className = 'admin-set-log';
+    drawer.appendChild(log);
+
+    const nav = document.createElement('div');
+    nav.id = 'admin-set-nav';
+    nav.className = 'admin-set-nav';
+    drawer.appendChild(nav);
+
+    board.appendChild(drawer);
+  }
+
   board.appendChild(sessionPane);
 
   root.appendChild(board);
@@ -1442,6 +1491,8 @@ export function renderAdmin(root, {
   onStartFlashLook,
   flashLookReady = false,
   flashLookTitle = '',
+  setDrawerOpen = false,
+  onSetDrawerChange,
 }) {
   if (boardMode === 'dashboard') {
     renderAdminDashboard(root, {
@@ -1475,6 +1526,8 @@ export function renderAdmin(root, {
       onStartFlashLook,
       flashLookReady,
       flashLookTitle,
+      setDrawerOpen,
+      onSetDrawerChange,
     });
     return;
   }
