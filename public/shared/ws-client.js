@@ -31,6 +31,9 @@ import {
   resolveCreateClipName,
   canStartCreate,
   resolveMatchedTitle,
+  readStoredCuePane,
+  resolveStoredCuePane,
+  writeStoredCuePane,
 } from './playing-clips-strip.js';
 import { mountViewNav, viewIdFromPath } from './view-nav.js';
 import { isKioskMode, kioskLinkAction, mountKioskControls } from './kiosk-controls.js';
@@ -154,7 +157,7 @@ export function connectView({
   let aliasSearchTimer = null;
   let aliasSearchSeq = 0;
   let aliasAutoFocusSearch = false;
-  let cuePane = 'last';
+  let cuePane = resolveStoredCuePane(readStoredCuePane());
   let pinSession = null;
   let lastSetlist = null;
   let setlistAddQuery = '';
@@ -226,6 +229,7 @@ export function connectView({
       matchColumn,
       editSession,
       noMatchHero: currentViewId === 'admin' && boardMode === 'dashboard',
+      cuePane,
     };
   }
 
@@ -249,7 +253,7 @@ export function connectView({
     if (viewConfig.system) {
       updateAdminChrome();
     } else {
-      updateViewLiveChrome(root, { ...chrome, matchColumn });
+      updateViewLiveChrome(root, { ...chrome, matchColumn, cuePane });
     }
   }
 
@@ -368,9 +372,6 @@ export function connectView({
       const prevPayload = lastPayload;
       lastPayload = msg.payload;
       if (cueContentChanged(prevPayload, msg.payload)) lastUpdate = new Date();
-      if (prevPayload?.match?.matched !== true && msg.payload.match?.matched === true) {
-        cuePane = 'last';
-      }
       applySimState(msg.payload.simulated === true);
       onPayload?.(lastPayload);
       if (editSession || aliasSession || pinSession) {
@@ -402,6 +403,7 @@ export function connectView({
 
   function setCuePane(next) {
     cuePane = next === 'current' ? 'current' : 'last';
+    writeStoredCuePane(cuePane);
     render();
   }
 
@@ -1217,6 +1219,8 @@ export function connectView({
         ...(adminDashboardFlash() ? flashLookProps() : {}),
         setDrawerOpen,
         onSetDrawerChange: currentViewId === 'admin' ? setSetDrawer : undefined,
+        cuePane,
+        onCuePaneChange: setCuePane,
       });
     } else {
       renderView(root, {
@@ -1495,7 +1499,6 @@ export function connectView({
     pinSession = null;
     saveState = 'idle';
     saveError = null;
-    cuePane = 'last';
     setlistAddQuery = '';
     setlistAddResults = [];
     setlistAddSearching = false;

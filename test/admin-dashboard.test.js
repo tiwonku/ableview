@@ -176,6 +176,7 @@ test('admin dashboard is wired in render, client, and session tracks', () => {
   );
 
   assert.match(renderSrc, /function renderAdminDashboard/);
+  assert.match(renderSrc, /const showZones = matched \|\| pane === 'last'/);
   assert.match(renderSrc, /admin-dashboard-board/);
   assert.match(renderSrc, /Dashboard/);
   assert.match(renderSrc, /buildDashboardZones/);

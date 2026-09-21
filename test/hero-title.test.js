@@ -12,6 +12,11 @@ import {
   resolveCuePane,
   lastPanePayload,
   hasLastMatchedRow,
+  normalizeCuePane,
+  resolveStoredCuePane,
+  readStoredCuePane,
+  writeStoredCuePane,
+  CUE_PANE_STORAGE_KEY,
 } from '../public/shared/playing-clips-strip.js';
 import { getFieldValue } from '../public/shared/field-display.js';
 
@@ -59,12 +64,25 @@ test('resolveHeroDisplay shows No Match as operator hero when clips play unmatch
   assert.equal(hero.empty, false);
 });
 
-test('resolveHeroDisplay shows last matched title as operator hero when unmatched', () => {
+test('resolveHeroDisplay keeps No Match as hero on Current when lastMatched exists', () => {
   const hero = resolveHeroDisplay({
     match: { matched: false },
     tracks: [{ trackIndex: 1, trackName: 'DECK A', clipName: 'INTRO' }],
     lastMatched: { title: 'Yellow Bird', rowId: '87' },
   }, 'Song Title', { noMatchHero: true });
+  assert.equal(hero.showHero, true);
+  assert.equal(hero.text, 'No Match');
+  assert.equal(hero.noMatch, true);
+  assert.equal(hero.lastMatched, undefined);
+  assert.equal(hero.empty, false);
+});
+
+test('resolveHeroDisplay shows last matched title as operator hero on Last pane', () => {
+  const hero = resolveHeroDisplay({
+    match: { matched: false },
+    tracks: [{ trackIndex: 1, trackName: 'DECK A', clipName: 'INTRO' }],
+    lastMatched: { title: 'Yellow Bird', rowId: '87' },
+  }, 'Song Title', { noMatchHero: true, cuePane: 'last' });
   assert.equal(hero.showHero, true);
   assert.equal(hero.text, 'Yellow Bird');
   assert.equal(hero.noMatch, true);
@@ -177,8 +195,9 @@ test('hasLastMatchedRow requires a row object', () => {
   assert.equal(hasLastMatchedRow({ match: { matched: false } }), false);
 });
 
-test('resolveCuePane defaults to last during no-match when a previous row exists', () => {
-  assert.equal(resolveCuePane(unmatchedWithLast), 'last');
+test('resolveCuePane defaults to current during no-match when a previous row exists', () => {
+  assert.equal(resolveCuePane(unmatchedWithLast), 'current');
+  assert.equal(resolveCuePane(unmatchedWithLast, 'last'), 'last');
   assert.equal(resolveCuePane(unmatchedWithLast, 'current'), 'current');
   assert.equal(resolveCuePane(unmatchedWithLast, 'last', { busy: true }), null);
   assert.equal(resolveCuePane(yellowBirdPayload), null);
@@ -186,6 +205,23 @@ test('resolveCuePane defaults to last during no-match when a previous row exists
     match: { matched: false },
     tracks: [{ trackIndex: 1, trackName: 'DECK A', clipName: 'INTRO' }],
   }), null);
+});
+
+test('cue pane preference persists per machine and defaults to current', () => {
+  const store = new Map();
+  const storage = {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => { store.set(key, String(value)); },
+  };
+  assert.equal(normalizeCuePane('nope'), null);
+  assert.equal(resolveStoredCuePane(null), 'current');
+  assert.equal(resolveStoredCuePane('last'), 'last');
+  assert.equal(readStoredCuePane(storage), null);
+  writeStoredCuePane('last', storage);
+  assert.equal(store.get(CUE_PANE_STORAGE_KEY), 'last');
+  assert.equal(readStoredCuePane(storage), 'last');
+  writeStoredCuePane('bogus', storage);
+  assert.equal(readStoredCuePane(storage), 'last');
 });
 
 test('lastPanePayload exposes lastMatched.row without treating it as a live match', () => {
@@ -209,8 +245,10 @@ test('operator Last/Current toggle is wired in view-render and ws-client', () =>
   assert.match(viewSrc, /no-match-panel--last-fields/);
   assert.match(viewSrc, /resolveCuePane/);
   assert.match(viewSrc, /lastPanePayload/);
-  assert.match(clientSrc, /let cuePane = 'last'/);
+  assert.match(clientSrc, /resolveStoredCuePane\(readStoredCuePane\(\)\)/);
+  assert.match(clientSrc, /writeStoredCuePane/);
   assert.match(clientSrc, /onCuePaneChange: setCuePane/);
+  assert.doesNotMatch(clientSrc, /cuePane = 'last'/);
 });
 
 test('operator pin cue is wired in view-render and ws-client', () => {

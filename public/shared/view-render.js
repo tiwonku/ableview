@@ -32,7 +32,6 @@ import {
   renderPlayingClipsStrip,
   resolveCuePane,
   lastPanePayload,
-  hasLastMatchedRow,
 } from './playing-clips-strip.js';
 import { prependDopeButton } from './moment-controls.js';
 import { copyTextToClipboard } from './clipboard.js';
@@ -289,7 +288,7 @@ export function renderView(root, {
   onStartAlias,
   onCancelEdit,
   onSaveEdit,
-  cuePane = 'last',
+  cuePane = 'current',
   onCuePaneChange,
   pinSession = null,
   pinPanel = null,
@@ -321,7 +320,7 @@ export function renderView(root, {
   const clipHead = document.createElement('div');
   clipHead.id = 'view-clip-head';
   clipRow.appendChild(clipHead);
-  renderViewClipHead(clipHead, payload, matchColumn, { busy, editSession });
+  renderViewClipHead(clipHead, payload, matchColumn, { busy, editSession, cuePane: pane ?? cuePane });
 
   const editActions = renderViewEditActions({
     editSession,
@@ -409,10 +408,17 @@ export function renderView(root, {
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-export function updateViewLiveChrome(root, { payload, connected, lastUpdate, editSession, matchColumn = null }) {
+export function updateViewLiveChrome(root, {
+  payload,
+  connected,
+  lastUpdate,
+  editSession,
+  matchColumn = null,
+  cuePane = 'current',
+}) {
   const clipHead = root.querySelector('#view-clip-head');
   const busy = Boolean(editSession);
-  if (clipHead) renderViewClipHead(clipHead, payload, matchColumn, { busy, editSession });
+  if (clipHead) renderViewClipHead(clipHead, payload, matchColumn, { busy, editSession, cuePane });
 
   if (editSession) updateEditContextBanner(root, editSession, payload);
 
@@ -431,7 +437,11 @@ function frozenEditHeroText(editSession, matchColumn) {
   return editSession.mode === 'create' ? 'New cue' : 'Editing';
 }
 
-function renderViewClipHead(parent, payload, matchColumn = null, { busy = false, editSession = null } = {}) {
+function renderViewClipHead(parent, payload, matchColumn = null, {
+  busy = false,
+  editSession = null,
+  cuePane = 'current',
+} = {}) {
   parent.innerHTML = '';
   if (editSession) {
     renderHeroRow(parent, frozenEditHeroText(editSession, matchColumn), payload, {
@@ -439,7 +449,7 @@ function renderViewClipHead(parent, payload, matchColumn = null, { busy = false,
     });
     return;
   }
-  const hero = resolveHeroDisplay(payload, matchColumn, { busy, noMatchHero: true });
+  const hero = resolveHeroDisplay(payload, matchColumn, { busy, noMatchHero: true, cuePane });
   if (!hero.showHero) return;
   renderHeroRow(parent, hero.text, payload, {
     empty: hero.empty,
@@ -714,6 +724,8 @@ function renderColorGroup(fields, payload, { onPickColor } = {}) {
   for (const field of fields) {
     row.appendChild(renderColorField(field, payload, { onPickColor }));
   }
+  const cards = [...row.querySelectorAll(':scope > .field-color')];
+  row.hidden = cards.length > 0 && cards.every((card) => card.hidden);
 
   return row;
 }
@@ -796,7 +808,10 @@ function renderColorField(field, payload, { onPickColor } = {}) {
   labelEl.textContent = label;
   card.appendChild(labelEl);
 
+  if (!color) card.classList.add('field-color--empty');
+
   if (!color && !onPickColor) {
+    card.hidden = true;
     const empty = document.createElement('p');
     empty.className = 'field-value empty';
     empty.textContent = '—';
@@ -1202,6 +1217,8 @@ function renderAdminClipRow(root, {
   noMatchHero = false,
   setDrawerOpen = false,
   onSetDrawerChange,
+  cuePane = 'current',
+  onCuePaneChange,
 }) {
   const clipRow = document.createElement('div');
   clipRow.className = 'clip-head-row';
@@ -1209,13 +1226,21 @@ function renderAdminClipRow(root, {
   const clipHead = document.createElement('div');
   clipHead.id = 'admin-clip-head';
   clipRow.appendChild(clipHead);
-  renderAdminClipHead(clipHead, payload, matchColumn, { busy, noMatchHero });
+  const pane = resolveCuePane(payload, cuePane, { busy });
+  renderAdminClipHead(clipHead, payload, matchColumn, {
+    busy,
+    noMatchHero,
+    cuePane: pane ?? cuePane,
+  });
 
   const actions = document.createElement('div');
   actions.className = 'view-edit-actions';
   if (getMomentWho != null) prependDopeButton(actions, getMomentWho);
   const toggle = renderBoardModeToggle(boardMode, onBoardModeChange);
   if (toggle) actions.appendChild(toggle);
+  if (pane && typeof onCuePaneChange === 'function') {
+    actions.appendChild(renderCuePaneToggle(pane, onCuePaneChange));
+  }
   appendAdminActionButtons(actions, {
     busy,
     matched,
@@ -1271,11 +1296,13 @@ function renderDashboardLook(parent, zones, payload) {
   if (zones.colors.length) {
     const mast = document.createElement('div');
     mast.className = 'admin-dashboard-mast';
-    mast.appendChild(renderColorGroup(zones.colors, payload));
+    const colors = renderColorGroup(zones.colors, payload);
+    mast.appendChild(colors);
+    mast.hidden = colors.hidden;
     look.appendChild(mast);
   }
 
-  parent.appendChild(look);
+  if ([...look.children].some((el) => !el.hidden)) parent.appendChild(look);
 }
 
 function renderDashboardNotes(parent, zones, payload) {
@@ -1341,6 +1368,8 @@ function renderAdminDashboard(root, ctx) {
     flashLookTitle = '',
     setDrawerOpen = false,
     onSetDrawerChange,
+    cuePane = 'current',
+    onCuePaneChange,
   } = ctx;
 
   closeColorPicker();
@@ -1349,6 +1378,7 @@ function renderAdminDashboard(root, ctx) {
   const busy = Boolean(editSession || aliasSession || pinSession);
   const pinned = payload?.match?.viaOverride === true;
   const matched = payload?.match?.matched === true;
+  const pane = resolveCuePane(payload, cuePane, { busy });
   const zones = buildDashboardZones(operatorViews);
   const showFlash = !busy && matched && typeof onStartFlashLook === 'function';
 
@@ -1372,6 +1402,8 @@ function renderAdminDashboard(root, ctx) {
     noMatchHero: true,
     setDrawerOpen,
     onSetDrawerChange,
+    cuePane,
+    onCuePaneChange,
   });
 
   const board = document.createElement('div');
@@ -1395,7 +1427,7 @@ function renderAdminDashboard(root, ctx) {
       saveError,
     });
   } else {
-    const showZones = matched || hasLastMatchedRow(payload);
+    const showZones = matched || pane === 'last';
     const zonePayload = matched ? payload : lastPanePayload(payload);
     if (showNoMatch && !showZones) {
       renderNoMatchPanel(board, {
@@ -1493,6 +1525,8 @@ export function renderAdmin(root, {
   flashLookTitle = '',
   setDrawerOpen = false,
   onSetDrawerChange,
+  cuePane = 'current',
+  onCuePaneChange,
 }) {
   if (boardMode === 'dashboard') {
     renderAdminDashboard(root, {
@@ -1528,6 +1562,8 @@ export function renderAdmin(root, {
       flashLookTitle,
       setDrawerOpen,
       onSetDrawerChange,
+      cuePane,
+      onCuePaneChange,
     });
     return;
   }
@@ -1554,6 +1590,8 @@ export function renderAdmin(root, {
     onBoardModeChange,
     onStartPin,
     onClearPin,
+    cuePane,
+    onCuePaneChange,
   });
 
   const stats = document.createElement('div');
@@ -1617,13 +1655,14 @@ export function updateAdminLiveChrome(root, {
   matchColumn = null,
   noMatchHero = false,
   refreshClipHead = true,
+  cuePane = 'current',
 } = {}) {
   const clipHead = root.querySelector('#admin-clip-head');
   const busy = Boolean(editSession);
   // Dashboard paints No Match / Last matched in the hero. Chrome ticks (sACN,
   // timecode status) must use the same noMatchHero flag or the title vanishes.
   if (refreshClipHead && clipHead) {
-    renderAdminClipHead(clipHead, payload, matchColumn, { busy, noMatchHero });
+    renderAdminClipHead(clipHead, payload, matchColumn, { busy, noMatchHero, cuePane });
   }
 
   const stats = root.querySelector('#admin-stats');
@@ -1634,9 +1673,13 @@ export function updateAdminLiveChrome(root, {
   updateStatusBar({ connected, lastUpdate, payload });
 }
 
-function renderAdminClipHead(parent, payload, matchColumn = null, { busy = false, noMatchHero = false } = {}) {
+function renderAdminClipHead(parent, payload, matchColumn = null, {
+  busy = false,
+  noMatchHero = false,
+  cuePane = 'current',
+} = {}) {
   parent.innerHTML = '';
-  const hero = resolveHeroDisplay(payload, matchColumn, { busy, noMatchHero });
+  const hero = resolveHeroDisplay(payload, matchColumn, { busy, noMatchHero, cuePane });
   if (!hero.showHero) {
     return;
   }

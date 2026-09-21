@@ -91,15 +91,48 @@ export function hasLastMatchedRow(payload) {
   return Boolean(row) && typeof row === 'object';
 }
 
+/** Per-machine Last/Current preference (this browser, not show config). */
+export const CUE_PANE_STORAGE_KEY = 'ableview.cuePane';
+
+export function normalizeCuePane(value) {
+  return value === 'current' || value === 'last' ? value : null;
+}
+
+/** Default Current so unmatched boards do not lead with the past (NFR-7). */
+export function resolveStoredCuePane(stored = null) {
+  return normalizeCuePane(stored) ?? 'current';
+}
+
+export function readStoredCuePane(storage) {
+  try {
+    const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+    return normalizeCuePane(store?.getItem(CUE_PANE_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredCuePane(pane, storage) {
+  const next = normalizeCuePane(pane);
+  if (!next) return;
+  try {
+    const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+    store?.setItem(CUE_PANE_STORAGE_KEY, next);
+  } catch {
+    // private mode / disabled storage
+  }
+}
+
 /**
  * Last/Current toggle during no-match. null = hide the control (NFR-7).
+ * Unknown / omitted requested pane is Current.
  * @returns {'last' | 'current' | null}
  */
-export function resolveCuePane(payload, requested = 'last', { busy = false } = {}) {
+export function resolveCuePane(payload, requested = 'current', { busy = false } = {}) {
   if (!payload || payload.match?.matched === true || busy) return null;
   if (!hasPlayingClips(payload)) return null;
   if (!hasLastMatchedRow(payload)) return null;
-  return requested === 'current' ? 'current' : 'last';
+  return requested === 'last' ? 'last' : 'current';
 }
 
 /** CuePayload slice for the Last pane: previous row, still unmatched. */
@@ -112,7 +145,11 @@ export function lastPanePayload(payload) {
  * Hero line for operator views.
  * @returns {{ text?: string, empty?: boolean, showHero: boolean, noMatch?: boolean, lastMatched?: boolean, pinned?: boolean }}
  */
-export function resolveHeroDisplay(payload, matchColumn = null, { busy = false, noMatchHero = false } = {}) {
+export function resolveHeroDisplay(payload, matchColumn = null, {
+  busy = false,
+  noMatchHero = false,
+  cuePane = 'current',
+} = {}) {
   if (busy) return { showHero: false };
 
   const matchedTitle = resolveMatchedTitle(payload, matchColumn);
@@ -123,7 +160,7 @@ export function resolveHeroDisplay(payload, matchColumn = null, { busy = false, 
   if (hasPlayingClips(payload)) {
     if (noMatchHero) {
       const lastTitle = payload?.lastMatched?.title?.trim();
-      if (lastTitle) {
+      if (cuePane === 'last' && lastTitle) {
         return { text: lastTitle, empty: false, showHero: true, noMatch: true, lastMatched: true };
       }
       return { text: 'No Match', empty: false, showHero: true, noMatch: true };

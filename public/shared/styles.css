@@ -781,6 +781,12 @@ body.layout-operator .clip-name--pinned {
   border-radius: 0.5rem;
 }
 
+.field-color[hidden],
+.colors-row[hidden],
+.admin-dashboard-mast[hidden] {
+  display: none !important;
+}
+
 .color-swatch {
   width: 100%;
   aspect-ratio: 1;

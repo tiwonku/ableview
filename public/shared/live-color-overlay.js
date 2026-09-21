@@ -42,6 +42,18 @@ export function lookColorsFromStatus(status) {
   return null;
 }
 
+/** Live overlay only when sACN is on and that slot has a known RGB. */
+export function liveOverlayVisible(status, slot) {
+  if (status?.enabled !== true || !slot) return false;
+  return Boolean(rgbToLiveDisplay(status.colors?.[slot]));
+}
+
+/** Empty sheet color stays hidden unless editing or GrandMA has a value. */
+export function colorFieldVisible({ sheetColor = false, liveColor = false, editing = false } = {}) {
+  if (editing) return true;
+  return Boolean(sheetColor) || Boolean(liveColor);
+}
+
 export function renderLiveColorHost(column) {
   const live = document.createElement('div');
   live.className = 'color-live';
@@ -72,24 +84,20 @@ export function renderLiveColorHost(column) {
 export function applyLiveColorOverlay(root, status, columnMap = DEFAULT_LIVE_COLOR_COLUMNS) {
   if (!root) return;
   const hosts = root.querySelectorAll('[data-role="live-color"]');
-  const enabled = status?.enabled === true;
 
   for (const host of hosts) {
     const column = host.dataset.liveColumn;
     const slot = slotForColumn(column, columnMap);
-    if (!enabled || !slot) {
-      host.hidden = true;
-      continue;
-    }
+    const color = rgbToLiveDisplay(status?.colors?.[slot]);
+    const showLive = liveOverlayVisible(status, slot);
+    host.hidden = !showLive;
 
-    host.hidden = false;
-    const live = status.live === true;
-    const color = rgbToLiveDisplay(status.colors?.[slot]);
+    const live = status?.live === true;
     const swatch = host.querySelector('[data-role="live-swatch"]');
     const meta = host.querySelector('[data-role="live-meta"]');
     applyColorSwatchStyle(swatch, color);
-    host.classList.toggle('color-live--stale', !live);
-    host.classList.toggle('color-live--live', live && Boolean(color));
+    host.classList.toggle('color-live--stale', showLive && !live);
+    host.classList.toggle('color-live--live', showLive && live && Boolean(color));
 
     let text = 'No signal';
     if (!live && color) text = `Stale ${color.rgbText}`;
@@ -102,5 +110,19 @@ export function applyLiveColorOverlay(root, status, columnMap = DEFAULT_LIVE_COL
       'aria-label',
       `GrandMA ${SLOT_LABELS[slot] ?? slot}: ${text}`,
     );
+
+    const field = host.closest('.field-color--empty');
+    if (field && !field.querySelector('.color-swatch-open')) {
+      field.hidden = !showLive;
+    }
+  }
+
+  for (const row of root.querySelectorAll('.colors-row')) {
+    const fields = [...row.querySelectorAll(':scope > .field-color')];
+    row.hidden = fields.length > 0 && fields.every((field) => field.hidden);
+  }
+  for (const mast of root.querySelectorAll('.admin-dashboard-mast')) {
+    const rows = [...mast.querySelectorAll('.colors-row')];
+    mast.hidden = rows.length > 0 && rows.every((row) => row.hidden);
   }
 }
