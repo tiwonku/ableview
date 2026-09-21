@@ -13,6 +13,8 @@ import { sanitizeSessionName } from '../session-log/sanitize.js';
 export const SETLIST_STATUSES = Object.freeze(['confirmed', 'likely', 'maybe']);
 export const DEFAULT_SETLIST_STATUS = 'confirmed';
 export const SIDECAR_NAME = '.active.json';
+export const KEY_COLUMN = 'Key';
+const ALS_FOLDER_COLUMN = 'ALS Folder';
 
 export function sanitizeSetlistName(raw) {
   let name;
@@ -97,10 +99,13 @@ function persistableDocument(doc) {
   };
 }
 
+function cellFromRow(row, column) {
+  if (!column || !row?.data || typeof row.data !== 'object') return '';
+  return String(row.data[column] ?? '').trim();
+}
+
 function titleFromRow(row, matchColumn) {
-  if (!row?.data || typeof row.data !== 'object') return '';
-  if (matchColumn) return String(row.data[matchColumn] ?? '').trim();
-  return '';
+  return cellFromRow(row, matchColumn);
 }
 
 function findSheetRow(snapshot, rowId) {
@@ -210,15 +215,15 @@ export function createSetlistStore({
     const snapshot = typeof getSnapshot === 'function' ? getSnapshot() : null;
     const found = findSheetRow(snapshot, item.rowId);
     const liveTitle = titleFromRow(found, snapshot?.matchColumn);
-    const als = found?.data && typeof found.data === 'object'
-      ? String(found.data['ALS Folder'] ?? '').trim()
-      : '';
+    const als = cellFromRow(found, ALS_FOLDER_COLUMN);
+    const key = cellFromRow(found, KEY_COLUMN);
     return {
       rowId: item.rowId,
       title: item.title,
       status: item.status,
       liveTitle: liveTitle || null,
       subtitle: als || null,
+      key: key || null,
       missing: !found,
     };
   }

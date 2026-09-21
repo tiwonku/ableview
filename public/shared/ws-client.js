@@ -15,6 +15,7 @@ import {
   captureSetlistFocus,
   updateSetlistLiveChrome,
   resetSetNavScroll,
+  buildQuickCueChanges,
 } from './setlist-render.js';
 import {
   collectEditorChanges,
@@ -164,6 +165,7 @@ export function connectView({
   let setlistAddResults = [];
   let setlistAddSearching = false;
   let setlistAddOpen = null;
+  let setlistCreateKey = '';
   let setlistNameDraft = '';
   let setlistAutoFocusSearch = false;
   let setlistSyncing = false;
@@ -859,6 +861,51 @@ export function connectView({
     if (result?.ok) {
       setlistAddQuery = '';
       setlistAddResults = [];
+      setlistCreateKey = '';
+      render();
+    }
+  }
+
+  async function createSetlistCueRow({ title, key } = {}) {
+    if (saveState === 'saving') return;
+    const changes = buildQuickCueChanges({ title, key, matchColumn });
+    if (!matchColumn || !changes[matchColumn] || !String(key ?? '').trim()) return;
+
+    saveState = 'saving';
+    saveError = null;
+    render();
+    try {
+      const createRes = await fetch('/api/sheets/rows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changes),
+      });
+      const created = await createRes.json().catch(() => ({}));
+      if (!createRes.ok) {
+        throw new Error(created.error ?? `Create failed (${createRes.status})`);
+      }
+      const rowId = created.rowId;
+      if (!rowId) throw new Error('Create succeeded without a row id');
+
+      const addRes = await fetch('/api/setlist/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rowId }),
+      });
+      const added = await addRes.json().catch(() => ({}));
+      if (!addRes.ok) {
+        throw new Error(added.error ?? `Added cue row ${rowId}, but setlist failed (${addRes.status})`);
+      }
+      applySetlistState(added);
+      setlistAddQuery = '';
+      setlistAddResults = [];
+      setlistCreateKey = '';
+      saveState = 'idle';
+      saveError = null;
+      render();
+    } catch (err) {
+      saveState = 'idle';
+      saveError = err.message ?? 'Create failed';
       render();
     }
   }
@@ -1161,12 +1208,19 @@ export function connectView({
             setlistAddQuery = '';
             setlistAddResults = [];
             setlistAddSearching = false;
+            setlistCreateKey = '';
           } else {
             setlistAutoFocusSearch = true;
           }
           render();
         },
         onAddRow: addSetlistRow,
+        createKey: setlistCreateKey,
+        onCreateKeyChange: (value) => {
+          setlistCreateKey = value;
+          render();
+        },
+        onCreateCue: createSetlistCueRow,
         onRemove: (rowId) => mutateSetlist(`/api/setlist/items/${encodeURIComponent(rowId)}`, { method: 'DELETE' }),
         onStatus: (rowId, status) => mutateSetlist(
           `/api/setlist/items/${encodeURIComponent(rowId)}`,
@@ -1508,6 +1562,7 @@ export function connectView({
     setlistAddResults = [];
     setlistAddSearching = false;
     setlistAddOpen = null;
+    setlistCreateKey = '';
     applyHistory(nextId, href, historyMode);
     reconnectNow();
   }

@@ -9,6 +9,7 @@ import { renderPinPanel } from './pin-panel.js';
 import { withKioskQuery } from './kiosk-controls.js';
 
 export const SETLIST_STATUSES = Object.freeze(['confirmed', 'likely', 'maybe']);
+export const SETLIST_KEY_COLUMN = 'Key';
 
 const STATUS_LABELS = {
   confirmed: 'Confirmed',
@@ -34,6 +35,33 @@ export function currentSetlistRowId(payload) {
 
 export function itemDisplayTitle(item) {
   return String(item?.liveTitle || item?.title || '').trim() || `Row ${item?.rowId ?? '?'}`;
+}
+
+export function itemDisplayKey(item) {
+  return String(item?.key ?? '').trim();
+}
+
+/** Sheet columns for the empty-search shortcut (title + key only). */
+export function buildQuickCueChanges({
+  title,
+  key,
+  matchColumn,
+  keyColumn = SETLIST_KEY_COLUMN,
+} = {}) {
+  const song = String(title ?? '').trim();
+  const changes = {};
+  if (matchColumn && song) changes[matchColumn] = song;
+  const trimmedKey = String(key ?? '').trim();
+  if (keyColumn && trimmedKey) changes[keyColumn] = trimmedKey;
+  return changes;
+}
+
+function renderKeyBadge(key, className = 'setlist-item-key') {
+  const value = String(key ?? '').trim();
+  const badge = el('div', value ? className : `${className} setlist-item-key--empty`);
+  badge.textContent = value || '—';
+  badge.title = value ? `Key ${value}` : 'No key on cue sheet';
+  return badge;
 }
 
 export function formatSetConfidence(confidence) {
@@ -120,7 +148,9 @@ export function liveBoardModel(payload, { matchColumn = null, setlist = null } =
     eyebrow: pinned ? 'PINNED' : 'LIVE',
     title,
     meta: parts.join(' · '),
-    next: nextItem ? `Next · ${itemDisplayTitle(nextItem)}` : '',
+    next: nextItem
+      ? `Next · ${itemDisplayTitle(nextItem)}${itemDisplayKey(nextItem) ? ` · ${itemDisplayKey(nextItem)}` : ''}`
+      : '',
     last: '',
     onSet: currentIndex >= 0,
     currentIndex,
@@ -222,6 +252,44 @@ function secondaryLabel(result) {
   if (als?.value) return als.value;
   if (result.aliases) return `Aliases: ${result.aliases}`;
   return '';
+}
+
+function renderQuickCreate({ title, key, busy, onCreateKeyChange, onCreateCue }) {
+  const form = el('form', 'setlist-create');
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (busy) return;
+    onCreateCue?.({ title, key });
+  });
+
+  form.appendChild(el(
+    'p',
+    'setlist-create-copy',
+    `No cue row for “${title}”. Add it with a key:`,
+  ));
+
+  const field = el('label', 'setlist-create-field');
+  field.appendChild(el('span', 'setlist-create-label', 'Key'));
+  const keyInput = el('input', 'alias-search-input setlist-create-key');
+  keyInput.type = 'text';
+  keyInput.name = 'key';
+  keyInput.placeholder = 'Am, F#, Bb…';
+  keyInput.value = key ?? '';
+  keyInput.autocomplete = 'off';
+  keyInput.spellcheck = false;
+  keyInput.dataset.setlistField = 'create-key';
+  keyInput.disabled = busy;
+  keyInput.setAttribute('aria-label', `Key for ${title}`);
+  keyInput.addEventListener('input', () => onCreateKeyChange?.(keyInput.value));
+  field.appendChild(keyInput);
+  form.appendChild(field);
+
+  const submit = el('button', 'admin-editor-btn admin-editor-btn--primary', 'Add to set');
+  submit.type = 'submit';
+  submit.disabled = busy || !String(title ?? '').trim() || !String(key ?? '').trim();
+  submit.title = 'Create a cue sheet row with this title and key, then add it to tonight’s set';
+  form.appendChild(submit);
+  return form;
 }
 
 function fillLiveCopy(copy, model) {
@@ -440,6 +508,7 @@ export function renderSetlist(root, ctx) {
     addResults = [],
     addSearching = false,
     addOpen = false,
+    createKey = '',
     nameDraft = '',
     saveState = 'idle',
     saveError = null,
@@ -455,6 +524,8 @@ export function renderSetlist(root, ctx) {
     onAddQueryChange,
     onAddOpenChange,
     onAddRow,
+    onCreateKeyChange,
+    onCreateCue,
     onRemove,
     onStatus,
     onMove,
@@ -626,7 +697,12 @@ export function renderSetlist(root, ctx) {
         btn.addEventListener('click', () => {
           if (!already) onAddRow?.(result);
         });
-        btn.appendChild(el('span', 'alias-search-result-title', result.title));
+        const titleRow = el('span', 'alias-search-result-title-row');
+        titleRow.appendChild(el('span', 'alias-search-result-title', result.title));
+        if (result.key) {
+          titleRow.appendChild(renderKeyBadge(result.key, 'setlist-item-key setlist-search-key'));
+        }
+        btn.appendChild(titleRow);
         const meta = el(
           'span',
           'alias-search-result-meta',
@@ -639,6 +715,22 @@ export function renderSetlist(root, ctx) {
       }
     }
     addSection.appendChild(resultsList);
+
+    if (
+      !addSearching
+      && String(addQuery ?? '').trim()
+      && !addResults.length
+      && typeof onCreateCue === 'function'
+      && matchColumn
+    ) {
+      addSection.appendChild(renderQuickCreate({
+        title: String(addQuery ?? '').trim(),
+        key: createKey,
+        busy,
+        onCreateKeyChange,
+        onCreateCue,
+      }));
+    }
   }
   root.appendChild(addSection);
 
@@ -698,6 +790,7 @@ export function renderSetlist(root, ctx) {
 
       const indexEl = el('div', 'setlist-item-index', String(index + 1));
       row.appendChild(indexEl);
+      row.appendChild(renderKeyBadge(itemDisplayKey(item)));
 
       const body = el('div', 'setlist-item-body');
       const titleRowInner = el('div', 'setlist-item-title-row');
@@ -799,6 +892,7 @@ export function setNavModel(payload, setlist) {
       return {
         rowId,
         title: itemDisplayTitle(item),
+        key: itemDisplayKey(item),
         index,
         current,
         pinned: current && pinned,
@@ -897,6 +991,7 @@ export function renderSetNav(root, ctx) {
       if (item.missing) row.classList.add('set-nav-item--missing');
 
       row.appendChild(el('div', 'set-nav-item-index', String(item.index + 1)));
+      row.appendChild(renderKeyBadge(item.key, 'setlist-item-key set-nav-item-key'));
 
       const body = el('div', 'set-nav-item-body');
       const titleRow = el('div', 'set-nav-item-title-row');

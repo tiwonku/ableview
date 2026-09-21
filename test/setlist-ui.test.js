@@ -31,6 +31,11 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
   assert.match(renderSrc, /Delete set/);
   assert.match(renderSrc, /onDelete/);
   assert.match(renderSrc, /onStartEdit/);
+  assert.match(renderSrc, /setlist-item-key/);
+  assert.match(renderSrc, /onCreateCue/);
+  assert.match(renderSrc, /Add to set/);
+  assert.match(renderSrc, /create-key/);
+  assert.match(renderSrc, /buildQuickCueChanges/);
   assert.match(renderSrc, /setHealthChips/);
   assert.match(renderSrc, /getMomentWho/);
   assert.match(renderSrc, /prependDopeButton/);
@@ -49,6 +54,8 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
   assert.match(clientSrc, /mergePinResults/);
   assert.match(clientSrc, /updateSetlistLiveChrome/);
   assert.match(clientSrc, /onStartEdit: startEdit/);
+  assert.match(clientSrc, /onCreateCue: createSetlistCueRow/);
+  assert.match(clientSrc, /\/api\/sheets\/rows/);
   assert.match(clientSrc, /\/api\/sheets\/sync/);
   const momentSrc = readFileSync(
     fileURLToPath(new URL('../public/shared/moment-controls.js', import.meta.url)),

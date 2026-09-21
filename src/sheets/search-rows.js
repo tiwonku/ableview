@@ -26,6 +26,7 @@ export function searchSheetRows(snapshot, {
   matchColumn,
   aliasColumn,
   secondaryColumns = [],
+  keyColumn = 'Key',
   limit = 15,
 } = {}) {
   const q = String(query ?? '').trim();
@@ -54,6 +55,7 @@ export function searchSheetRows(snapshot, {
       score,
       rowId: String(row.rowId),
       title: String(title).trim(),
+      key: keyColumn ? String(data[keyColumn] ?? '').trim() : '',
       aliases: aliasColumn ? String(data[aliasColumn] ?? '').trim() : '',
       secondary: secondaryColumns
         .map((col) => ({ column: col, value: String(data[col] ?? '').trim() }))

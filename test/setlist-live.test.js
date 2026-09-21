@@ -6,12 +6,14 @@ import {
   setNavModel,
   formatSetConfidence,
   formatSyncedAge,
+  itemDisplayKey,
+  buildQuickCueChanges,
 } from '../public/shared/setlist-render.js';
 
 const setlist = {
   items: [
-    { rowId: '12', title: 'Hot Rox', status: 'confirmed' },
-    { rowId: '7', title: 'Breeze', status: 'likely' },
+    { rowId: '12', title: 'Hot Rox', status: 'confirmed', key: 'Ebm' },
+    { rowId: '7', title: 'Breeze', status: 'likely', key: 'Dm' },
   ],
 };
 
@@ -53,7 +55,7 @@ test('liveBoardModel matched on-set includes next and confidence', () => {
   assert.equal(live.title, 'Hot Rox');
   assert.match(live.meta, /94%/);
   assert.match(live.meta, /on set · #1/);
-  assert.equal(live.next, 'Next · Breeze');
+  assert.equal(live.next, 'Next · Breeze · Dm');
   assert.equal(live.onSet, true);
 });
 
@@ -124,7 +126,7 @@ test('setNavModel marks current, pinned, and pin-able rows', () => {
       name: 'festival',
       library: [{ name: 'festival', itemCount: 2 }],
       items: [
-        { rowId: '12', title: 'Hot Rox', status: 'confirmed' },
+        { rowId: '12', title: 'Hot Rox', status: 'confirmed', key: 'Ebm' },
         { rowId: '7', title: 'Breeze', status: 'likely' },
         { rowId: '3', title: 'Ghost', missing: true },
       ],
@@ -133,11 +135,25 @@ test('setNavModel marks current, pinned, and pin-able rows', () => {
   assert.equal(model.name, 'festival');
   assert.equal(model.items[0].current, true);
   assert.equal(model.items[0].pinned, true);
+  assert.equal(model.items[0].key, 'Ebm');
   assert.equal(model.items[0].canPin, false);
   assert.equal(model.items[1].current, false);
   assert.equal(model.items[1].canPin, true);
   assert.equal(model.items[2].canPin, false);
   assert.equal(model.items[2].missing, true);
+});
+
+test('itemDisplayKey and buildQuickCueChanges keep the create form to title + key', () => {
+  assert.equal(itemDisplayKey({ key: 'F#' }), 'F#');
+  assert.equal(itemDisplayKey({ title: 'Song A' }), '');
+  assert.deepEqual(
+    buildQuickCueChanges({ title: 'Sunshine', key: 'Am', matchColumn: 'Song Title' }),
+    { 'Song Title': 'Sunshine', Key: 'Am' },
+  );
+  assert.deepEqual(
+    buildQuickCueChanges({ title: '  ', key: 'Am', matchColumn: 'Song Title' }),
+    { Key: 'Am' },
+  );
 });
 
 test('setNavModel has no current row when unmatched', () => {

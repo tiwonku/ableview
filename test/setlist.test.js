@@ -140,6 +140,23 @@ test('hydrate exposes ALS Folder as subtitle without persisting it', () => {
   assert.equal(saved.items[0].subtitle, undefined);
 });
 
+test('hydrate exposes Key without persisting it', () => {
+  const { store, dir } = tempStore({
+    snapshot: {
+      matchColumn: 'Song Title',
+      rows: [
+        { rowId: '5', data: { 'Song Title': 'Song A', Key: 'Am' } },
+      ],
+    },
+  });
+  store.start();
+  store.addItem('5');
+  const state = store.getState();
+  assert.equal(state.items[0].key, 'Am');
+  const saved = JSON.parse(readFileSync(join(dir, 'default.json'), 'utf8'));
+  assert.equal(saved.items[0].key, undefined);
+});
+
 test('hydrate marks missing rows when the sheet snapshot drops them', () => {
   const { store, setSnapshot } = tempStore();
   store.start();

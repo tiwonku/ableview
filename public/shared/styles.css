@@ -4552,6 +4552,57 @@ body.layout-setlist .setlist-main {
   margin-top: 0.35rem;
 }
 
+.alias-search-result-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+}
+
+.setlist-search-key {
+  font-size: 0.82rem;
+  padding: 0.08rem 0.4rem;
+}
+
+.setlist-create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.65rem;
+  margin-top: 0.15rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.setlist-create-copy {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.setlist-create-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.setlist-create-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.setlist-create-key {
+  width: 7rem;
+  font-weight: 700;
+}
+
 .setlist-items {
   flex: 1 1 auto;
   min-height: 0;
@@ -4570,13 +4621,38 @@ body.layout-setlist .setlist-main {
 
 .setlist-item {
   display: grid;
-  grid-template-columns: 2.2rem minmax(0, 1fr) auto;
+  grid-template-columns: 2.2rem 3.8rem minmax(0, 1fr) auto;
   gap: 0.65rem 0.85rem;
   align-items: center;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 0.45rem;
   background: var(--surface);
+}
+
+.setlist-item-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 1.05rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.setlist-item-key--empty {
+  color: var(--muted);
+  font-weight: 500;
+  background: transparent;
+  border-color: transparent;
 }
 
 .setlist-item.is-dragging {
@@ -4666,7 +4742,7 @@ body.layout-setlist .setlist-main {
 
 @media (max-width: 820px) {
   .setlist-item {
-    grid-template-columns: 1.6rem minmax(0, 1fr);
+    grid-template-columns: 1.6rem 3.2rem minmax(0, 1fr);
   }
 
   .setlist-item-actions {
@@ -5390,6 +5466,13 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
   font-weight: 700;
   color: var(--muted);
   text-align: right;
+}
+
+.set-nav-item-key {
+  flex: 0 0 2.7rem;
+  min-height: 1.45rem;
+  padding: 0.08rem 0.15rem;
+  font-size: 0.78rem;
 }
 
 .set-nav-item-body {

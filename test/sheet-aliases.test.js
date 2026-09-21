@@ -41,6 +41,7 @@ test('searchSheetRows ranks title and ALS Folder hits', () => {
         data: {
           'Song Title': 'Hot Like Rox',
           Aliases: '',
+          Key: 'Ebm',
           'ALS Folder': 'Ebm_80bpm_HotRox_24',
         },
       },
@@ -65,4 +66,5 @@ test('searchSheetRows ranks title and ALS Folder hits', () => {
 
   assert.equal(results[0].rowId, '70');
   assert.equal(results[0].title, 'Hot Like Rox');
+  assert.equal(results[0].key, 'Ebm');
 });
