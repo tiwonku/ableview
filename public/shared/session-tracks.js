@@ -2,6 +2,7 @@
 
 import {
   matchForTrack,
+  tiePinRowId,
   isAliasTargetTrack,
   isCreateTargetTrack,
   isArrangementTrack,
@@ -73,6 +74,7 @@ export function renderSessionTracks(parent, {
   editSession = null,
   onStartAlias,
   onStartCreate,
+  onPinRow,
   compact = false,
 } = {}) {
   const createSession = editSession?.mode === 'create' ? editSession : null;
@@ -150,7 +152,22 @@ export function renderSessionTracks(parent, {
       }
       meta.appendChild(matchLine);
 
-      if (playing && canLinkUnmatchedClip(tm) && !busy && (onStartAlias || onStartCreate)) {
+      const pinRowId = !busy && onPinRow ? tiePinRowId(payload, tm) : null;
+      if (playing && pinRowId) {
+        const actions = document.createElement('div');
+        actions.className = 'session-track-actions';
+        const pinBtn = document.createElement('button');
+        pinBtn.type = 'button';
+        pinBtn.className = 'session-track-pin-btn';
+        pinBtn.textContent = 'Pin';
+        const song = tm.matchedValue?.trim();
+        pinBtn.title = song
+          ? `Pin ${song} until the next automatic match`
+          : 'Pin this match until the next automatic match';
+        pinBtn.addEventListener('click', () => onPinRow(pinRowId));
+        actions.appendChild(pinBtn);
+        meta.appendChild(actions);
+      } else if (playing && canLinkUnmatchedClip(tm) && !busy && (onStartAlias || onStartCreate)) {
         const actions = document.createElement('div');
         actions.className = 'session-track-actions';
 

@@ -21,6 +21,7 @@ import { renderSceneBanner, renderSessionTracks } from './session-tracks.js';
  *   saveError?: string|null,
  *   onStartAlias?: (clipName: string, track?: object) => void,
  *   onStartCreate?: (clipName: string, track?: object) => void,
+ *   onPinRow?: (rowId: string) => void,
  *   onCancelEdit?: Function,
  *   onSaveEdit?: Function,
  * }} ctx
@@ -39,6 +40,7 @@ export function renderSession(root, ctx) {
     saveError = null,
     onStartAlias,
     onStartCreate,
+    onPinRow,
     onCancelEdit,
     onSaveEdit,
     getMomentWho = null,
@@ -88,5 +90,6 @@ export function renderSession(root, ctx) {
     editSession,
     onStartAlias,
     onStartCreate,
+    onPinRow,
   });
 }

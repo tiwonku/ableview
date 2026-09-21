@@ -39,6 +39,17 @@ export function matchForTrack(payload, track) {
   ) ?? null;
 }
 
+/**
+ * Sheet row to pin when the board refused the match but this clip still hit a row.
+ * A decided match (including an existing pin) returns null so loser decks stay unlabeled.
+ */
+export function tiePinRowId(payload, trackMatch) {
+  if (payload?.match?.matched === true) return null;
+  if (!trackMatch?.matched) return null;
+  const id = trackMatch.rowId != null ? String(trackMatch.rowId).trim() : '';
+  return id || null;
+}
+
 export function isAliasTargetTrack(aliasSession, track) {
   if (!aliasSession) return false;
   if (aliasSession.trackIndex != null && track.trackIndex != null) {
@@ -199,6 +210,7 @@ export function operatorCreateColumns(viewFields, matchColumn, aliasColumn) {
  * @param {{
  *   onStartAlias?: Function,
  *   onStartCreate?: Function,
+ *   onPinRow?: (rowId: string) => void,
  *   aliasSession?: object|null,
  *   createSession?: object|null,
  *   showDeckNames?: boolean,
@@ -208,6 +220,7 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
   const {
     onStartAlias,
     onStartCreate,
+    onPinRow,
     aliasSession = null,
     createSession = null,
     showDeckNames = true,
@@ -262,11 +275,26 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
     }
     chip.appendChild(meta);
 
-    if (!aliasSession && !createSession && unmatched) {
+    const pinRowId = onPinRow ? tiePinRowId(payload, tm) : null;
+
+    if (!aliasSession && !createSession && (unmatched || pinRowId)) {
       const actions = document.createElement('div');
       actions.className = 'playing-clip-chip-actions';
 
-      if (onStartAlias) {
+      if (pinRowId) {
+        const pinBtn = document.createElement('button');
+        pinBtn.type = 'button';
+        pinBtn.className = 'playing-clip-chip-pin-btn';
+        pinBtn.textContent = 'Pin';
+        const song = tm.matchedValue?.trim();
+        pinBtn.title = song
+          ? `Pin ${song} until the next automatic match`
+          : 'Pin this match until the next automatic match';
+        pinBtn.addEventListener('click', () => onPinRow(pinRowId));
+        actions.appendChild(pinBtn);
+      }
+
+      if (unmatched && onStartAlias) {
         const aliasBtn = document.createElement('button');
         aliasBtn.type = 'button';
         aliasBtn.className = 'playing-clip-chip-alias-btn';
@@ -275,7 +303,7 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
         actions.appendChild(aliasBtn);
       }
 
-      if (onStartCreate) {
+      if (unmatched && onStartCreate) {
         const createBtn = document.createElement('button');
         createBtn.type = 'button';
         createBtn.className = 'playing-clip-chip-create-btn';

@@ -227,6 +227,7 @@ function renderNoMatchPanel(root, {
   onStartAlias,
   onStartPin,
   onPinLast,
+  onPinRow,
   liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
 }) {
   const playing = hasPlayingClips(payload);
@@ -258,6 +259,7 @@ function renderNoMatchPanel(root, {
     renderPlayingClipsStrip(noMatch, payload, {
       onStartAlias: editable ? onStartAlias : undefined,
       onStartCreate: editable ? onStartCreate : undefined,
+      onPinRow,
       aliasSession,
       createSession,
       showDeckNames: true,
@@ -307,6 +309,7 @@ export function renderView(root, {
   pinPanel = null,
   onStartPin,
   onPinLast,
+  onPinRow,
   onClearPin,
   getMomentWho = null,
   onStartFlashLook,
@@ -371,6 +374,7 @@ export function renderView(root, {
       onStartAlias,
       onStartPin,
       onPinLast,
+      onPinRow,
       liveColorColumns,
     });
   }
@@ -1447,6 +1451,7 @@ function renderAdminDashboard(root, ctx) {
     pinPanel = null,
     onStartPin,
     onPinLast,
+    onPinRow,
     onClearPin,
     getMomentWho = null,
     operatorViews = [],
@@ -1535,6 +1540,7 @@ function renderAdminDashboard(root, ctx) {
         onStartAlias,
         onStartPin,
         onPinLast,
+        onPinRow,
         liveColorColumns,
       });
     }
@@ -1559,6 +1565,7 @@ function renderAdminDashboard(root, ctx) {
     editSession,
     onStartAlias,
     onStartCreate,
+    onPinRow,
     compact: true,
   });
 
@@ -1617,6 +1624,7 @@ export function renderAdmin(root, {
   pinPanel = null,
   onStartPin,
   onPinLast,
+  onPinRow,
   onClearPin,
   getMomentWho = null,
   boardMode = 'detail',
@@ -1655,6 +1663,7 @@ export function renderAdmin(root, {
       pinPanel,
       onStartPin,
       onPinLast,
+      onPinRow,
       onClearPin,
       getMomentWho,
       operatorViews,
@@ -1716,6 +1725,7 @@ export function renderAdmin(root, {
       onStartAlias,
       onStartPin,
       onPinLast,
+      onPinRow,
       liveColorColumns,
     });
   }

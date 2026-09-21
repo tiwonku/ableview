@@ -8,6 +8,7 @@ import {
   hasArrangementPlayback,
   isArrangementTrack,
   canStartCreate,
+  tiePinRowId,
   resolveCreateClipName,
   resolveCuePane,
   lastPanePayload,
@@ -167,6 +168,48 @@ test('canStartCreate allows per-deck create for an unmatched clip while another 
 test('canStartCreate ignores click-event objects passed as the override', () => {
   assert.equal(canStartCreate(scenePayload, { type: 'click' }), false);
   assert.equal(resolveCreateClipName(scenePayload, { type: 'click' }), 'Mickman INTRO');
+});
+
+test('tiePinRowId offers each tied row and hides once a winner exists', () => {
+  const tie = {
+    match: { matched: false, confidence: 0 },
+    trackMatches: [
+      { trackIndex: 0, matched: true, rowId: '1', matchedValue: 'Alpha Song' },
+      { trackIndex: 1, matched: true, rowId: 2, matchedValue: 'Beta Song' },
+      { trackIndex: 2, matched: false, rowId: null },
+    ],
+  };
+  assert.equal(tiePinRowId(tie, tie.trackMatches[0]), '1');
+  assert.equal(tiePinRowId(tie, tie.trackMatches[1]), '2');
+  assert.equal(tiePinRowId(tie, tie.trackMatches[2]), null);
+  assert.equal(tiePinRowId(tie, null), null);
+  const won = { match: { matched: true, rowId: '1' }, trackMatches: tie.trackMatches };
+  assert.equal(tiePinRowId(won, tie.trackMatches[0]), null);
+  assert.equal(tiePinRowId(won, tie.trackMatches[1]), null);
+});
+
+test('tie pin buttons are wired on clip chips and the session grid', () => {
+  const stripSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/playing-clips-strip.js', import.meta.url)),
+    'utf8',
+  );
+  const sessionSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/session-tracks.js', import.meta.url)),
+    'utf8',
+  );
+  const viewSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)),
+    'utf8',
+  );
+  const clientSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/ws-client.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(stripSrc, /tiePinRowId\(payload, tm\)/);
+  assert.match(stripSrc, /playing-clip-chip-pin-btn/);
+  assert.match(sessionSrc, /session-track-pin-btn/);
+  assert.match(viewSrc, /onPinRow/);
+  assert.match(clientSrc, /onPinRow: postPin/);
 });
 
 test('canStartCreate allows generic create when nothing has matched', () => {

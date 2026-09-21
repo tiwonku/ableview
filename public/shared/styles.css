@@ -546,6 +546,22 @@ body.layout-operator .clip-name--pinned {
   background: rgba(91, 200, 120, 0.22);
 }
 
+.playing-clip-chip-pin-btn {
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(76, 139, 245, 0.28);
+  border: 1px solid rgba(76, 139, 245, 0.75);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.playing-clip-chip-pin-btn:hover {
+  background: rgba(76, 139, 245, 0.42);
+}
+
 .clip-head-sub {
   margin: 0.35rem 0 0;
   font-size: 0.85rem;
@@ -2517,8 +2533,9 @@ body.layout-operator .playing-clip-chip-actions {
 }
 
 body.layout-operator .playing-clip-chip-alias-btn,
-body.layout-operator .playing-clip-chip-create-btn {
-  padding: 0.45rem 0.75rem;
+body.layout-operator .playing-clip-chip-create-btn,
+body.layout-operator .playing-clip-chip-pin-btn {
+  padding: 0.45rem 0.85rem;
   font-size: clamp(0.8rem, 2.2dvh, 1rem);
 }
 
@@ -4218,6 +4235,23 @@ body.layout-session .session-main {
 
 .session-track-create-btn:hover {
   background: rgba(91, 200, 120, 0.22);
+}
+
+.session-track-pin-btn {
+  margin: 0;
+  padding: 0.3rem 0.7rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(76, 139, 245, 0.28);
+  border: 1px solid rgba(76, 139, 245, 0.75);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.session-track-pin-btn:hover {
+  background: rgba(76, 139, 245, 0.42);
 }
 
 .session-track-meta {
