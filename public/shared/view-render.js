@@ -18,6 +18,7 @@ import {
   captureEditSession,
   renderRowEditorPanel,
   renderOperatorRowEditorPanel,
+  renderOperatorColorGroup,
   renderReadOnlyRowPanel,
   updateEditContextBanner,
   buildViewEditorColumns,
@@ -808,6 +809,11 @@ function renderColorField(field, payload, { onPickColor } = {}) {
   labelEl.textContent = label;
   card.appendChild(labelEl);
 
+  const sheetKicker = document.createElement('p');
+  sheetKicker.className = 'color-sheet-kicker';
+  sheetKicker.textContent = 'Sheet';
+  card.appendChild(sheetKicker);
+
   if (!color) card.classList.add('field-color--empty');
 
   if (!color && !onPickColor) {
@@ -1149,6 +1155,10 @@ function appendAdminActionButtons(actions, {
   onStartPin,
   onClearPin,
   onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  saveState = 'idle',
+  editSession = null,
   onStartFlashLook,
   flashLookReady = false,
   flashLookTitle = '',
@@ -1157,6 +1167,28 @@ function appendAdminActionButtons(actions, {
   setDrawerOpen = false,
   onSetDrawerChange,
 }) {
+  if (editSession?.dashboardColorEdit && onCancelEdit && onSaveEdit) {
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'view-edit-btn';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.disabled = saveState === 'saving';
+    cancelBtn.addEventListener('click', onCancelEdit);
+    actions.appendChild(cancelBtn);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'view-edit-btn view-edit-btn--primary';
+    saveBtn.textContent = saveState === 'saving' ? 'Saving…' : 'Save';
+    saveBtn.disabled = saveState === 'saving';
+    saveBtn.addEventListener('click', () => {
+      const section = actions.closest('#app')?.querySelector('#view-row-panel')
+        ?? document.getElementById('view-row-panel');
+      if (section) onSaveEdit(section);
+    });
+    actions.appendChild(saveBtn);
+    return;
+  }
   if (showFlash) {
     appendLookWriteButton(actions, { onStartFlashLook, flashLookReady, flashLookTitle });
   }
@@ -1209,6 +1241,10 @@ function renderAdminClipRow(root, {
   onStartPin,
   onClearPin,
   onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  saveState = 'idle',
+  editSession = null,
   onStartFlashLook,
   flashLookReady,
   flashLookTitle,
@@ -1248,6 +1284,10 @@ function renderAdminClipRow(root, {
     onStartPin,
     onClearPin,
     onStartEdit,
+    onCancelEdit,
+    onSaveEdit,
+    saveState,
+    editSession,
     onStartFlashLook,
     flashLookReady,
     flashLookTitle,
@@ -1260,7 +1300,12 @@ function renderAdminClipRow(root, {
   root.appendChild(clipRow);
 }
 
-function renderDashboardLook(parent, zones, payload) {
+function renderDashboardLook(parent, zones, payload, {
+  onPickColor,
+  editSession = null,
+  editorColumns = {},
+  saveError = null,
+} = {}) {
   const camelot = zones.camelot ?? [];
   if (!zones.images.length && !zones.tokens.length && !zones.colors.length && !camelot.length) return;
 
@@ -1296,9 +1341,40 @@ function renderDashboardLook(parent, zones, payload) {
   if (zones.colors.length) {
     const mast = document.createElement('div');
     mast.className = 'admin-dashboard-mast';
-    const colors = renderColorGroup(zones.colors, payload);
-    mast.appendChild(colors);
-    mast.hidden = colors.hidden;
+    if (editSession?.dashboardColorEdit) {
+      const panel = document.createElement('section');
+      panel.id = 'view-row-panel';
+      panel.className = 'operator-editor admin-dashboard-color-editor';
+      if (saveError) {
+        const err = document.createElement('p');
+        err.className = 'admin-editor-error operator-editor-error';
+        err.textContent = saveError;
+        panel.appendChild(err);
+      }
+      const form = document.createElement('div');
+      form.className = 'fields fields--edit';
+      if (editSession.rowId != null) form.dataset.rowId = editSession.rowId;
+      const fieldLabels = Object.fromEntries(
+        zones.colors.map((field) => [field.column, field.label ?? field.column]),
+      );
+      const group = renderOperatorColorGroup(zones.colors, editSession, editorColumns, fieldLabels);
+      for (const card of group.querySelectorAll('.field-color--edit')) {
+        const label = card.querySelector('.field-label');
+        const kicker = document.createElement('p');
+        kicker.className = 'color-sheet-kicker';
+        kicker.textContent = 'Sheet';
+        label?.after(kicker);
+        const column = card.querySelector('[data-column]')?.dataset.column;
+        if (column) card.appendChild(renderLiveColorHost(column));
+      }
+      form.appendChild(group);
+      panel.appendChild(form);
+      mast.appendChild(panel);
+    } else {
+      const colors = renderColorGroup(zones.colors, payload, { onPickColor });
+      mast.appendChild(colors);
+      mast.hidden = colors.hidden;
+    }
     look.appendChild(mast);
   }
 
@@ -1394,6 +1470,10 @@ function renderAdminDashboard(root, ctx) {
     onStartPin,
     onClearPin,
     onStartEdit,
+    onCancelEdit,
+    onSaveEdit,
+    saveState,
+    editSession,
     onStartFlashLook,
     flashLookReady,
     flashLookTitle,
@@ -1416,7 +1496,7 @@ function renderAdminDashboard(root, ctx) {
     renderPinPanel(board, pinPanel);
   } else if (aliasSession && aliasPanel) {
     renderAliasPanel(board, aliasPanel);
-  } else if (editSession) {
+  } else if (editSession && !editSession.dashboardColorEdit) {
     renderRowEditorPanel(board, {
       session: editSession,
       editorColumns,
@@ -1427,8 +1507,10 @@ function renderAdminDashboard(root, ctx) {
       saveError,
     });
   } else {
-    const showZones = matched || pane === 'last';
-    const zonePayload = matched ? payload : lastPanePayload(payload);
+    const showZones = matched || pane === 'last' || editSession?.dashboardColorEdit;
+    const zonePayload = matched || editSession?.dashboardColorEdit
+      ? payload
+      : lastPanePayload(payload);
     if (showNoMatch && !showZones) {
       renderNoMatchPanel(board, {
         payload,
@@ -1442,7 +1524,12 @@ function renderAdminDashboard(root, ctx) {
       });
     }
     if (showZones && zonePayload) {
-      renderDashboardLook(board, zones, zonePayload);
+      renderDashboardLook(board, zones, zonePayload, {
+        onPickColor: matched && onStartEdit ? (column) => onStartEdit(column) : undefined,
+        editSession,
+        editorColumns,
+        saveError,
+      });
       renderDashboardNotes(board, zones, zonePayload);
     }
   }

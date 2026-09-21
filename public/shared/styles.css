@@ -844,19 +844,44 @@ body.layout-operator .clip-name--pinned {
   outline-offset: 1px;
 }
 
-.color-live {
-  margin-top: 0.55rem;
-  padding-top: 0.5rem;
-  border-top: 1px dashed var(--border);
-}
-
-.color-live-kicker {
+.color-sheet-kicker,
+.color-live-kicker,
+.color-live-bus-label {
   margin: 0 0 0.3rem;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+.color-sheet-kicker {
+  display: none;
+}
+
+.color-live {
+  margin-top: 0.55rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+.color-live-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.45rem;
+}
+
+.color-live-bus {
+  min-width: 0;
+}
+
+.color-live-bus + .color-live-bus {
+  padding-left: 0.45rem;
+  border-left: 1px solid var(--border);
+}
+
+.color-live-bus-label {
+  margin-bottom: 0.2rem;
 }
 
 .color-swatch--live {
@@ -872,12 +897,15 @@ body.layout-operator .clip-name--pinned {
   color: var(--muted);
 }
 
-.color-live--live .color-live-kicker {
+.color-live--live .color-live-kicker,
+.color-live-bus--live .color-live-bus-label {
   color: var(--accent, #7dffb3);
 }
 
 .color-live--stale .color-live-kicker,
-.color-live--stale .color-live-meta {
+.color-live--stale .color-live-meta,
+.color-live-bus--stale .color-live-bus-label,
+.color-live-bus--stale .color-live-meta {
   color: #e6b450;
 }
 
@@ -2985,7 +3013,8 @@ body.layout-operator .colors-row .color-live {
   padding-top: clamp(0.25rem, 0.5dvh, 0.4rem);
 }
 
-body.layout-operator .colors-row .color-live-kicker {
+body.layout-operator .colors-row .color-live-kicker,
+body.layout-operator .colors-row .color-live-bus-label {
   font-size: clamp(0.58rem, 1dvh, 0.7rem);
   margin-bottom: 0.2rem;
 }
@@ -5003,14 +5032,95 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
   padding: var(--dash-pad);
 }
 
+.admin-dashboard-look .field-color:not(.field-color--empty) .color-sheet-kicker,
+.admin-dashboard-look .field-color:has(.color-swatch-open) .color-sheet-kicker {
+  display: block;
+  margin: 0 0 0.2rem;
+}
+
 .admin-dashboard-look .color-swatch {
   width: 100%;
   height: clamp(2.4rem, 6.5dvh, 3.6rem);
   max-height: 3.6rem;
 }
 
+.admin-dashboard-look .color-swatch--live {
+  height: clamp(1.2rem, 3.2dvh, 1.85rem);
+  max-height: 1.85rem;
+  margin-bottom: 0.15rem;
+}
+
+.admin-dashboard-look .color-live-kicker,
+.admin-dashboard-look .color-sheet-kicker,
+.admin-dashboard-look .color-live-bus-label {
+  font-size: clamp(0.6rem, 1.1dvh, 0.72rem);
+}
+
+.admin-dashboard-look .color-live-meta {
+  font-size: clamp(0.6rem, 1.05dvh, 0.72rem);
+}
+
 .admin-dashboard-look .color-values {
   display: none;
+}
+
+.admin-dashboard-look .color-swatch-open {
+  display: block;
+  position: relative;
+  width: 100%;
+  margin: 0 0 0.2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 0.45rem;
+}
+
+.admin-dashboard-look .color-swatch-open .color-swatch {
+  margin-bottom: 0;
+  pointer-events: none;
+}
+
+.admin-dashboard-look .color-swatch-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.admin-dashboard-look .color-swatch-edit-badge {
+  position: absolute;
+  right: 0.35rem;
+  bottom: 0.35rem;
+  padding: 0.18rem 0.4rem;
+  border-radius: 0.3rem;
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.admin-dashboard-look .colors-row--edit {
+  width: 100%;
+}
+
+.admin-dashboard-look .colors-row--edit .color-values,
+.admin-dashboard-look .colors-row--edit .color-values--edit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem;
+}
+
+.admin-dashboard-look .admin-dashboard-color-editor {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-dashboard-look .admin-dashboard-color-editor .fields--edit {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .admin-dashboard-notes {

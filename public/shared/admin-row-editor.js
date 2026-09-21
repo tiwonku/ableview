@@ -262,7 +262,7 @@ function renderOperatorTextField(field, session, editorColumns, fieldLabels) {
   return card;
 }
 
-function renderOperatorColorGroup(fields, session, editorColumns, fieldLabels) {
+export function renderOperatorColorGroup(fields, session, editorColumns, fieldLabels) {
   const row = document.createElement('div');
   row.className = 'colors-row colors-row--edit';
 

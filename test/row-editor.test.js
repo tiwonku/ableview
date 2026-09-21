@@ -229,8 +229,10 @@ test('read-mode color swatches start edit and open the picker', () => {
   );
   assert.match(viewSrc, /onPickColor/);
   assert.match(viewSrc, /makeColorPickButton/);
+  assert.match(viewSrc, /onPickColor: matched && onStartEdit/);
   assert.match(clientSrc, /openOperatorColorField\(root, column\)/);
   assert.match(clientSrc, /typeof openColorColumn === 'string'/);
+  assert.match(clientSrc, /dashboardColorEdit = true/);
 });
 
 test('operator color fields open the custom picker instead of a native overlay', () => {

@@ -7,6 +7,7 @@ import {
   slotForColumn,
   DEFAULT_LIVE_COLOR_COLUMNS,
   liveOverlayVisible,
+  liveBusMeta,
   colorFieldVisible,
 } from '../public/shared/live-color-overlay.js';
 
@@ -39,6 +40,30 @@ test('liveOverlayVisible requires enabled sACN and a known slot RGB', () => {
   assert.equal(liveOverlayVisible({ enabled: true, colors: { main: { r: 1, g: 2, b: 3 } } }, 'accent'), false);
   assert.equal(liveOverlayVisible({ enabled: false, colors: { main: { r: 1, g: 2, b: 3 } } }, 'main'), false);
   assert.equal(liveOverlayVisible({ enabled: true, colors: {} }, 'main'), false);
+  assert.equal(liveOverlayVisible({
+    enabled: true,
+    staticColors: { accent: { r: 9, g: 8, b: 7 } },
+  }, 'accent'), true);
+});
+
+test('liveBusMeta distinguishes live, stale, and empty buses', () => {
+  const color = rgbToLiveDisplay({ r: 10, g: 20, b: 30 });
+  assert.equal(liveBusMeta(color, true), '10, 20, 30');
+  assert.equal(liveBusMeta(color, false), 'Stale 10, 20, 30');
+  assert.equal(liveBusMeta(null, false), 'No signal');
+  assert.equal(liveBusMeta(null, true), 'No data');
+});
+
+test('live overlay markup splits NOW into Look and FX', () => {
+  const overlay = readFileSync(fileURLToPath(new URL('../public/shared/live-color-overlay.js', import.meta.url)), 'utf8');
+  const render = readFileSync(fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)), 'utf8');
+  const css = readFileSync(fileURLToPath(new URL('../public/shared/styles.css', import.meta.url)), 'utf8');
+  assert.match(overlay, /kicker\.textContent = 'Now'/);
+  assert.match(overlay, /renderLiveBus\('look', 'Look'\)/);
+  assert.match(overlay, /renderLiveBus\('fx', 'FX'\)/);
+  assert.match(render, /sheetKicker\.textContent = 'Sheet'/);
+  assert.match(css, /\.color-live-split/);
+  assert.match(css, /\.admin-dashboard-look \.field-color:not\(\.field-color--empty\) \.color-sheet-kicker/);
 });
 
 test('colorFieldVisible hides empty sheet color unless live or editing', () => {

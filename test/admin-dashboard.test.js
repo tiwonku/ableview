@@ -186,6 +186,10 @@ test('admin dashboard is wired in render, client, and session tracks', () => {
   assert.match(renderSrc, /admin-dashboard-board--set-open/);
   assert.match(renderSrc, /<span>Set<\/span>/);
   assert.match(renderSrc, /onSetDrawerChange/);
+  assert.match(renderSrc, /onPickColor: matched && onStartEdit/);
+  assert.match(renderSrc, /editSession\?\.dashboardColorEdit/);
+  assert.match(renderSrc, /renderOperatorColorGroup/);
+  assert.match(clientSrc, /dashboardColorEdit = true/);
   assert.match(clientSrc, /boardMode/);
   assert.match(clientSrc, /setBoardMode/);
   assert.match(clientSrc, /operatorViews/);

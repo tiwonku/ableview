@@ -519,10 +519,15 @@ export function connectView({
     if (pinSession) cancelPin();
     if (aliasSession) cancelAlias();
     const column = typeof openColorColumn === 'string' ? openColorColumn : null;
-    const scope = viewConfig.editable
-      ? { columns: viewFieldColumns(viewConfig.fields) }
-      : undefined;
+    const dashboardColor = currentViewId === 'admin' && boardMode === 'dashboard' && Boolean(column);
+    const colorColumns = dashboardColor ? flashLookColumns() : null;
+    const scope = colorColumns?.length
+      ? { columns: colorColumns }
+      : viewConfig.editable
+        ? { columns: viewFieldColumns(viewConfig.fields) }
+        : undefined;
     editSession = captureEditSession(lastPayload, scope);
+    if (dashboardColor) editSession.dashboardColorEdit = true;
     saveState = 'idle';
     saveError = null;
     render();

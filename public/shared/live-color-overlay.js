@@ -42,10 +42,60 @@ export function lookColorsFromStatus(status) {
   return null;
 }
 
-/** Live overlay only when sACN is on and that slot has a known RGB. */
+/** Live overlay when sACN is on and either bus has RGB for that slot. */
 export function liveOverlayVisible(status, slot) {
   if (status?.enabled !== true || !slot) return false;
-  return Boolean(rgbToLiveDisplay(status.colors?.[slot]));
+  return Boolean(rgbToLiveDisplay(status.colors?.[slot]))
+    || Boolean(rgbToLiveDisplay(status.staticColors?.[slot]));
+}
+
+export function liveBusMeta(color, busLive) {
+  if (!busLive && color) return `Stale ${color.rgbText}`;
+  if (!busLive) return 'No signal';
+  if (color) return color.rgbText;
+  return 'No data';
+}
+
+function busIsLive(status, flag, color) {
+  if (status?.[flag] === true) return true;
+  if (status?.[flag] === false) return false;
+  return status?.live === true && Boolean(color);
+}
+
+function renderLiveBus(id, label) {
+  const bus = document.createElement('div');
+  bus.className = 'color-live-bus';
+  bus.dataset.role = `live-${id}`;
+
+  const name = document.createElement('p');
+  name.className = 'color-live-bus-label';
+  name.textContent = label;
+  bus.appendChild(name);
+
+  const swatch = document.createElement('div');
+  swatch.className = 'color-swatch color-swatch--live';
+  swatch.dataset.role = `live-${id}-swatch`;
+  swatch.setAttribute('aria-hidden', 'true');
+  bus.appendChild(swatch);
+
+  const meta = document.createElement('p');
+  meta.className = 'color-live-meta';
+  meta.dataset.role = `live-${id}-meta`;
+  meta.textContent = 'No signal';
+  bus.appendChild(meta);
+  return bus;
+}
+
+function paintLiveBus(host, id, color, busLive, slot) {
+  const bus = host.querySelector(`[data-role="live-${id}"]`);
+  const swatch = host.querySelector(`[data-role="live-${id}-swatch"]`);
+  const meta = host.querySelector(`[data-role="live-${id}-meta"]`);
+  applyColorSwatchStyle(swatch, color);
+  bus?.classList.toggle('color-live-bus--stale', Boolean(color) && !busLive);
+  bus?.classList.toggle('color-live-bus--live', busLive && Boolean(color));
+  const text = liveBusMeta(color, busLive);
+  if (meta) meta.textContent = text;
+  swatch?.setAttribute('aria-label', `${id} ${SLOT_LABELS[slot] ?? slot}: ${text}`);
 }
 
 /** Empty sheet color stays hidden unless editing or GrandMA has a value. */
@@ -63,20 +113,14 @@ export function renderLiveColorHost(column) {
 
   const kicker = document.createElement('p');
   kicker.className = 'color-live-kicker';
-  kicker.textContent = 'GrandMA';
+  kicker.textContent = 'Now';
   live.appendChild(kicker);
 
-  const swatch = document.createElement('div');
-  swatch.className = 'color-swatch color-swatch--live';
-  swatch.dataset.role = 'live-swatch';
-  swatch.setAttribute('aria-hidden', 'true');
-  live.appendChild(swatch);
-
-  const meta = document.createElement('p');
-  meta.className = 'color-live-meta';
-  meta.dataset.role = 'live-meta';
-  meta.textContent = 'No signal';
-  live.appendChild(meta);
+  const split = document.createElement('div');
+  split.className = 'color-live-split';
+  split.appendChild(renderLiveBus('look', 'Look'));
+  split.appendChild(renderLiveBus('fx', 'FX'));
+  live.appendChild(split);
 
   return live;
 }
@@ -88,28 +132,18 @@ export function applyLiveColorOverlay(root, status, columnMap = DEFAULT_LIVE_COL
   for (const host of hosts) {
     const column = host.dataset.liveColumn;
     const slot = slotForColumn(column, columnMap);
-    const color = rgbToLiveDisplay(status?.colors?.[slot]);
+    const lookColor = rgbToLiveDisplay(status?.staticColors?.[slot]);
+    const fxColor = rgbToLiveDisplay(status?.colors?.[slot]);
     const showLive = liveOverlayVisible(status, slot);
     host.hidden = !showLive;
 
     const live = status?.live === true;
-    const swatch = host.querySelector('[data-role="live-swatch"]');
-    const meta = host.querySelector('[data-role="live-meta"]');
-    applyColorSwatchStyle(swatch, color);
+    const lookLive = busIsLive(status, 'staticLive', lookColor);
+    const fxLive = busIsLive(status, 'fxLive', fxColor);
+    paintLiveBus(host, 'look', lookColor, lookLive, slot);
+    paintLiveBus(host, 'fx', fxColor, fxLive, slot);
     host.classList.toggle('color-live--stale', showLive && !live);
-    host.classList.toggle('color-live--live', showLive && live && Boolean(color));
-
-    let text = 'No signal';
-    if (!live && color) text = `Stale ${color.rgbText}`;
-    else if (!live) text = 'No signal';
-    else if (color) text = color.rgbText;
-    else text = 'No data';
-
-    if (meta) meta.textContent = text;
-    swatch?.setAttribute(
-      'aria-label',
-      `GrandMA ${SLOT_LABELS[slot] ?? slot}: ${text}`,
-    );
+    host.classList.toggle('color-live--live', showLive && live && Boolean(lookColor || fxColor));
 
     const field = host.closest('.field-color--empty');
     if (field && !field.querySelector('.color-swatch-open')) {
