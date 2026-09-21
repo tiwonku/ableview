@@ -8,6 +8,7 @@ import {
   formatSyncedAge,
   itemDisplayKey,
   buildQuickCueChanges,
+  peekSwatches,
 } from '../public/shared/setlist-render.js';
 
 const setlist = {
@@ -42,6 +43,8 @@ test('liveBoardModel waiting and no-match', () => {
   assert.match(nomatch.meta, /Hot Rox_DRUMS/);
   assert.equal(nomatch.last, 'Last: Song A');
   assert.equal(nomatch.onSet, false);
+  assert.deepEqual(idle.nextColors, []);
+  assert.deepEqual(nomatch.nextColors, []);
 });
 
 test('liveBoardModel matched on-set includes next and confidence', () => {
@@ -56,7 +59,45 @@ test('liveBoardModel matched on-set includes next and confidence', () => {
   assert.match(live.meta, /94%/);
   assert.match(live.meta, /on set · #1/);
   assert.equal(live.next, 'Next · Breeze · Dm');
+  assert.equal(live.nextTitle, 'Breeze');
+  assert.deepEqual(live.nextColors, []);
   assert.equal(live.onSet, true);
+});
+
+test('liveBoardModel carries the next song colors for a peek', () => {
+  const withColors = {
+    items: [
+      {
+        rowId: '12',
+        title: 'Hot Rox',
+        key: 'Ebm',
+        colors: [{ column: 'RGB_1', label: 'Color 1', value: '1, 2, 3' }],
+      },
+      {
+        rowId: '7',
+        title: 'Breeze',
+        key: 'Dm',
+        colors: [
+          { column: 'RGB_1', label: 'Color 1', value: '9, 8, 7' },
+          { column: 'RGB_2', label: 'Color 2', value: 'nope' },
+          { column: 'RGB_3', label: 'Color 3', value: 'RAINBOW' },
+        ],
+      },
+    ],
+  };
+  const live = liveBoardModel({
+    clipName: 'Hot Rox',
+    match: { matched: true, rowId: '12', confidence: 1, matchedValue: 'Hot Rox' },
+  }, { setlist: withColors });
+  assert.equal(live.nextTitle, 'Breeze');
+  assert.equal(live.nextColors.length, 3);
+  const swatches = peekSwatches(live.nextColors);
+  assert.equal(swatches.length, 2);
+  assert.equal(swatches[0].label, 'Color 1');
+  assert.equal(swatches[0].color.rgbText, '9, 8, 7');
+  assert.equal(swatches[1].color.kind, 'rainbow');
+  assert.equal(peekSwatches(null).length, 0);
+  assert.equal(peekSwatches([{ value: '' }]).length, 0);
 });
 
 test('liveBoardModel pinned and not-on-set', () => {
@@ -78,6 +119,7 @@ test('liveBoardModel pinned and not-on-set', () => {
   assert.match(pinned.meta, /Pinned/);
   assert.match(pinned.meta, /Not on tonight/);
   assert.equal(pinned.next, '');
+  assert.deepEqual(pinned.nextColors, []);
 });
 
 test('setHealthChips flags Ableton, stale sheet, no match, and other views', () => {

@@ -7,6 +7,7 @@ import { createBus, EVENTS } from '../src/core/bus.js';
 import { createLogger } from '../src/core/logger.js';
 import { DEFAULTS } from '../src/config/index.js';
 import {
+  colorColumnsFromConfig,
   createSetlistStore,
   currentSetlistRowId,
   sanitizeSetlistName,
@@ -38,6 +39,7 @@ function tempStore(overrides = {}) {
       defaultName: 'default',
       ...overrides.setlist,
     },
+    ...(overrides.views ? { views: overrides.views } : {}),
   };
   const bus = overrides.bus ?? createBus();
   let sheet = overrides.snapshot ?? snapshot();
@@ -138,6 +140,86 @@ test('hydrate exposes ALS Folder as subtitle without persisting it', () => {
   assert.equal(state.items[0].subtitle, 'Ableton/HotRox');
   const saved = JSON.parse(readFileSync(join(dir, 'default.json'), 'utf8'));
   assert.equal(saved.items[0].subtitle, undefined);
+});
+
+test('colorColumnsFromConfig prefers view color fields and keeps first label', () => {
+  const columns = colorColumnsFromConfig({
+    views: {
+      visuals: {
+        title: 'Visuals',
+        fields: [
+          { column: 'RGB_1', label: 'Color 1', type: 'color' },
+          { column: 'Notes' },
+        ],
+      },
+      lighting: {
+        title: 'Lighting',
+        fields: [
+          { column: 'RGB_1', label: 'Main', type: 'color' },
+          { column: 'RGB_2', label: 'Color 2', type: 'color' },
+        ],
+      },
+    },
+    sheets: { editorColumns: { RGB_3: { type: 'color' } } },
+  });
+  assert.deepEqual(columns, [
+    { column: 'RGB_1', label: 'Color 1' },
+    { column: 'RGB_2', label: 'Color 2' },
+  ]);
+});
+
+test('colorColumnsFromConfig falls back to editor color columns', () => {
+  const columns = colorColumnsFromConfig({
+    views: { setlist: { title: 'Set', system: true } },
+    sheets: {
+      editorColumns: {
+        BPM: { type: 'number' },
+        RGB_1: { type: 'color' },
+        RGB_2: { type: 'color' },
+      },
+    },
+  });
+  assert.deepEqual(columns, [
+    { column: 'RGB_1', label: 'RGB_1' },
+    { column: 'RGB_2', label: 'RGB_2' },
+  ]);
+});
+
+test('hydrate exposes sheet colors without persisting them', () => {
+  const { store, dir } = tempStore({
+    views: {
+      lighting: {
+        title: 'Lighting',
+        fields: [
+          { column: 'RGB_2', label: 'Color 2', type: 'color' },
+          { column: 'RGB_1', label: 'Color 1', type: 'color' },
+          { column: 'Key' },
+        ],
+      },
+    },
+    snapshot: {
+      matchColumn: 'Song Title',
+      rows: [
+        {
+          rowId: '5',
+          data: {
+            'Song Title': 'Song A',
+            RGB_1: '10, 20, 30',
+            RGB_2: '   ',
+            RGB_3: '1,2,3',
+          },
+        },
+      ],
+    },
+  });
+  store.start();
+  store.addItem('5');
+  const state = store.getState();
+  assert.deepEqual(state.items[0].colors, [
+    { column: 'RGB_1', label: 'Color 1', value: '10, 20, 30' },
+  ]);
+  const saved = JSON.parse(readFileSync(join(dir, 'default.json'), 'utf8'));
+  assert.equal(saved.items[0].colors, undefined);
 });
 
 test('hydrate exposes Key without persisting it', () => {

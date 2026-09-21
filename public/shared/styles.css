@@ -4407,6 +4407,27 @@ body.layout-setlist .setlist-main {
   font-weight: 600;
 }
 
+.setlist-color-peek {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  align-items: center;
+  margin-top: 0.28rem;
+}
+
+.setlist-color-peek--next {
+  margin-top: 0.35rem;
+}
+
+.setlist-color-swatch {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 0.22rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  flex: 0 0 auto;
+}
+
 .setlist-live-actions {
   margin-left: auto;
 }

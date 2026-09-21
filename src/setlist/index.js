@@ -113,6 +113,55 @@ function findSheetRow(snapshot, rowId) {
   return snapshot?.rows?.find((r) => String(r.rowId) === id) ?? null;
 }
 
+/**
+ * Sheet columns drawn as color swatches on the Set page.
+ * View fields of type "color" win, in first-seen order. Otherwise editor
+ * color columns, then sACN view column names.
+ */
+export function colorColumnsFromConfig(config) {
+  const seen = new Set();
+  const columns = [];
+
+  function add(column, label) {
+    const name = String(column ?? '').trim();
+    if (!name || seen.has(name)) return;
+    seen.add(name);
+    const text = String(label ?? '').trim();
+    columns.push({ column: name, label: text || name });
+  }
+
+  const views = config?.views ?? {};
+  for (const view of Object.values(views)) {
+    if (!view || view.system || !Array.isArray(view.fields)) continue;
+    for (const field of view.fields) {
+      if (field?.type !== 'color' || !field.column) continue;
+      add(field.column, field.label);
+    }
+  }
+  if (columns.length) return columns;
+
+  const editor = config?.sheets?.editorColumns ?? {};
+  for (const [column, spec] of Object.entries(editor)) {
+    if (spec?.type === 'color') add(column, spec.label);
+  }
+  if (columns.length) return columns;
+
+  const mapped = config?.sacn?.viewColumns ?? {};
+  for (const column of Object.keys(mapped)) add(column);
+  return columns;
+}
+
+function colorCells(row, columns) {
+  if (!row || !Array.isArray(columns) || columns.length === 0) return [];
+  const colors = [];
+  for (const col of columns) {
+    const value = cellFromRow(row, col.column);
+    if (!value) continue;
+    colors.push({ column: col.column, label: col.label, value });
+  }
+  return colors;
+}
+
 export function createSetlistStore({
   getConfig,
   getSnapshot,
@@ -211,8 +260,7 @@ export function createSetlistStore({
     return names;
   }
 
-  function hydrateItem(item) {
-    const snapshot = typeof getSnapshot === 'function' ? getSnapshot() : null;
+  function hydrateItem(item, snapshot, columns) {
     const found = findSheetRow(snapshot, item.rowId);
     const liveTitle = titleFromRow(found, snapshot?.matchColumn);
     const als = cellFromRow(found, ALS_FOLDER_COLUMN);
@@ -224,16 +272,19 @@ export function createSetlistStore({
       liveTitle: liveTitle || null,
       subtitle: als || null,
       key: key || null,
+      colors: colorCells(found, columns),
       missing: !found,
     };
   }
 
   function getState() {
+    const snapshot = typeof getSnapshot === 'function' ? getSnapshot() : null;
+    const columns = colorColumnsFromConfig(typeof getConfig === 'function' ? getConfig() : null);
     return {
       name: document.name,
       updatedAt: document.updatedAt,
       itemCount: document.items.length,
-      items: document.items.map(hydrateItem),
+      items: document.items.map((item) => hydrateItem(item, snapshot, columns)),
       library: listLibrary(),
     };
   }

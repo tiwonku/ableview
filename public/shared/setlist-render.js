@@ -7,6 +7,7 @@ import { renderRowEditorPanel, updateEditContextBanner } from './admin-row-edito
 import { renderAliasPanel } from './alias-panel.js';
 import { renderPinPanel } from './pin-panel.js';
 import { withKioskQuery } from './kiosk-controls.js';
+import { applyColorSwatchStyle, parseRgbCell } from './color-parse.js';
 
 export const SETLIST_STATUSES = Object.freeze(['confirmed', 'likely', 'maybe']);
 export const SETLIST_KEY_COLUMN = 'Key';
@@ -39,6 +40,38 @@ export function itemDisplayTitle(item) {
 
 export function itemDisplayKey(item) {
   return String(item?.key ?? '').trim();
+}
+
+/** Parseable sheet colors for a setlist peek. Blank and invalid cells are omitted. */
+export function peekSwatches(colors) {
+  if (!Array.isArray(colors)) return [];
+  const swatches = [];
+  for (const entry of colors) {
+    const color = parseRgbCell(entry?.value);
+    if (!color) continue;
+    const column = String(entry?.column ?? '').trim();
+    const label = String(entry?.label ?? '').trim() || column || 'Color';
+    swatches.push({ column, label, color });
+  }
+  return swatches;
+}
+
+function renderColorPeek(colors, { title } = {}) {
+  const swatches = peekSwatches(colors);
+  if (!swatches.length) return null;
+  const row = el('div', 'setlist-color-peek');
+  const song = String(title ?? '').trim();
+  const detail = swatches.map((swatch) => `${swatch.label} ${swatch.color.rgbText}`).join(', ');
+  row.setAttribute('role', 'img');
+  row.setAttribute('aria-label', song ? `Colors for ${song}: ${detail}` : `Colors: ${detail}`);
+  for (const swatch of swatches) {
+    const node = el('span', 'setlist-color-swatch');
+    applyColorSwatchStyle(node, swatch.color);
+    node.title = `${swatch.label}: ${swatch.color.rgbText}`;
+    node.setAttribute('aria-hidden', 'true');
+    row.appendChild(node);
+  }
+  return row;
 }
 
 /** Sheet columns for the empty-search shortcut (title + key only). */
@@ -88,6 +121,8 @@ export function formatSyncedAge(iso, now = Date.now()) {
  *   title: string,
  *   meta: string,
  *   next: string,
+ *   nextTitle: string,
+ *   nextColors: Array<{ column: string, label: string, value: string }>,
  *   last: string,
  *   onSet: boolean|null,
  *   currentIndex: number,
@@ -100,6 +135,8 @@ export function liveBoardModel(payload, { matchColumn = null, setlist = null } =
     ? items.findIndex((item) => String(item.rowId) === liveRowId)
     : -1;
   const nextItem = currentIndex >= 0 ? items[currentIndex + 1] ?? null : null;
+  const nextTitle = nextItem ? itemDisplayTitle(nextItem) : '';
+  const nextColors = Array.isArray(nextItem?.colors) ? nextItem.colors : [];
 
   if (!payload) {
     return {
@@ -108,6 +145,8 @@ export function liveBoardModel(payload, { matchColumn = null, setlist = null } =
       title: 'Waiting for Ableton…',
       meta: '',
       next: '',
+      nextTitle: '',
+      nextColors: [],
       last: '',
       onSet: null,
       currentIndex: -1,
@@ -123,6 +162,8 @@ export function liveBoardModel(payload, { matchColumn = null, setlist = null } =
       title: clip || 'No confident match',
       meta: clip ? `Playing “${clip}”` : 'No confident match',
       next: '',
+      nextTitle: '',
+      nextColors: [],
       last: lastTitle ? `Last: ${lastTitle}` : '',
       onSet: false,
       currentIndex: -1,
@@ -149,8 +190,10 @@ export function liveBoardModel(payload, { matchColumn = null, setlist = null } =
     title,
     meta: parts.join(' · '),
     next: nextItem
-      ? `Next · ${itemDisplayTitle(nextItem)}${itemDisplayKey(nextItem) ? ` · ${itemDisplayKey(nextItem)}` : ''}`
+      ? `Next · ${nextTitle}${itemDisplayKey(nextItem) ? ` · ${itemDisplayKey(nextItem)}` : ''}`
       : '',
+    nextTitle,
+    nextColors,
     last: '',
     onSet: currentIndex >= 0,
     currentIndex,
@@ -299,6 +342,11 @@ function fillLiveCopy(copy, model) {
   if (model.meta) copy.appendChild(el('p', 'setlist-live-meta', model.meta));
   if (model.last) copy.appendChild(el('p', 'setlist-live-last', model.last));
   if (model.next) copy.appendChild(el('p', 'setlist-live-next', model.next));
+  const nextPeek = renderColorPeek(model.nextColors, { title: model.nextTitle });
+  if (nextPeek) {
+    nextPeek.classList.add('setlist-color-peek--next');
+    copy.appendChild(nextPeek);
+  }
 }
 
 function fillHealthChips(host, chips, { onSyncSheet, syncing = false } = {}) {
@@ -802,6 +850,9 @@ export function renderSetlist(root, ctx) {
         titleRowInner.appendChild(el('span', 'setlist-badge setlist-badge--missing', 'Missing from sheet'));
       }
       body.appendChild(titleRowInner);
+
+      const peek = renderColorPeek(item.colors, { title: itemDisplayTitle(item) });
+      if (peek) body.appendChild(peek);
 
       const metaParts = [`Row ${item.rowId}`];
       if (item.subtitle) metaParts.push(item.subtitle);
