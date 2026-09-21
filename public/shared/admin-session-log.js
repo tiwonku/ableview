@@ -3,6 +3,109 @@
 import { subscribeSessionLog } from './session-log-live.js';
 import { mountSetNoteRow } from './moment-controls.js';
 
+const SESSION_LOG_PARK_ID = 'session-log-park';
+
+function isTextField(el) {
+  if (el?.tagName === 'TEXTAREA') return true;
+  if (el?.tagName !== 'INPUT') return false;
+  const type = String(el.type ?? 'text').toLowerCase();
+  return type === 'text' || type === 'search';
+}
+
+function readSelection(el) {
+  try {
+    return {
+      start: typeof el.selectionStart === 'number' ? el.selectionStart : null,
+      end: typeof el.selectionEnd === 'number' ? el.selectionEnd : null,
+    };
+  } catch {
+    return { start: null, end: null };
+  }
+}
+
+function focusIsIdle(doc) {
+  const active = doc?.activeElement;
+  return !active || active === doc.body || active === doc.documentElement;
+}
+
+/** True when the field is in the visible log bar, not the off-screen park. */
+export function mountedFieldHostVisible(el) {
+  if (!el?.isConnected) return false;
+  let node = el;
+  while (node) {
+    if (node.id === SESSION_LOG_PARK_ID || node.hidden) return false;
+    node = node.parentNode;
+  }
+  return true;
+}
+
+/**
+ * Snapshot of a focused text field inside `root`.
+ * @returns {{ el: Element, start: number|null, end: number|null } | null}
+ */
+export function captureMountedFieldFocus(root, doc) {
+  const active = doc?.activeElement;
+  if (!root || !active || !isTextField(active) || !root.contains(active)) return null;
+  const selection = readSelection(active);
+  return { el: active, ...selection };
+}
+
+/**
+ * Put the caret back only if the operator has not focused something else.
+ * @returns {boolean}
+ */
+export function restoreMountedFieldFocus(saved, doc) {
+  if (!saved?.el || !mountedFieldHostVisible(saved.el) || !focusIsIdle(doc)) return false;
+  saved.el.focus();
+  if (typeof saved.start === 'number' && typeof saved.el.setSelectionRange === 'function') {
+    try {
+      saved.el.setSelectionRange(saved.start, saved.end ?? saved.start);
+    } catch {
+      // number and color inputs reject setSelectionRange
+    }
+  }
+  return true;
+}
+
+/** In-document holder. Stays rendered so moving the note field does not blur it. */
+export function ensureSessionLogPark(doc) {
+  const existing = doc.getElementById(SESSION_LOG_PARK_ID);
+  if (existing) return existing;
+  const park = doc.createElement('div');
+  park.id = SESSION_LOG_PARK_ID;
+  park.className = 'session-log-park';
+  park.setAttribute('aria-hidden', 'true');
+  doc.body.appendChild(park);
+  return park;
+}
+
+/**
+ * Move the log bar out of #app before a redraw.
+ * On Set, leave it in #session-log — that host sits outside #app.
+ * @returns {ReturnType<typeof captureMountedFieldFocus>}
+ */
+export function parkSessionLogForRender(mountEl, { viewId, doc }) {
+  const focus = captureMountedFieldFocus(mountEl, doc);
+  if (!mountEl) return focus;
+  if (viewId === 'setlist') {
+    const host = doc.getElementById('session-log');
+    if (host?.contains(mountEl)) return focus;
+  }
+  const park = ensureSessionLogPark(doc);
+  if (mountEl.parentNode !== park) park.appendChild(mountEl);
+  return focus;
+}
+
+/** Put an existing log bar back in the Set host or the admin Set drawer. */
+export function placeSessionLogMount(mountEl, { viewId, doc }) {
+  if (!mountEl) return false;
+  const targetId = viewId === 'setlist' ? 'session-log' : 'admin-set-log';
+  const target = doc.getElementById(targetId);
+  if (!target || mountEl.parentNode === target) return false;
+  target.appendChild(mountEl);
+  return true;
+}
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;

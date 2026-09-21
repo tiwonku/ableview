@@ -4234,6 +4234,20 @@ body.layout-session .session-main {
   display: none !important;
 }
 
+/* Off-screen, still rendered. display:none / hidden would blur the note field. */
+.session-log-park {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: none;
+  clip-path: inset(50%);
+}
+
 .set-log-bar {
   display: flex;
   flex-wrap: wrap;

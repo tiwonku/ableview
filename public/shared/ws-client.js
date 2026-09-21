@@ -39,6 +39,11 @@ import {
 import { mountViewNav, viewIdFromPath } from './view-nav.js';
 import { isKioskMode, kioskLinkAction, mountKioskControls } from './kiosk-controls.js';
 import {
+  parkSessionLogForRender,
+  placeSessionLogMount,
+  restoreMountedFieldFocus,
+} from './admin-session-log.js';
+import {
   flattenOperatorFields,
   isWideAdminViewport,
   parseAdminBoardMode,
@@ -172,6 +177,7 @@ export function connectView({
   let sessionLogGen = 0;
   let unmountSessionLog = null;
   let sessionLogMountEl = null;
+  let sessionLogFocusGen = 0;
   let operatorViews = [];
   let boardMode = resolveAdminBoardMode({
     search: typeof location !== 'undefined' ? location.search : '',
@@ -1133,7 +1139,8 @@ export function connectView({
       setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
       return;
     }
-    parkSessionLogMount();
+    const focusGen = ++sessionLogFocusGen;
+    const sessionLogFocus = parkSessionLogMount();
     try {
     const aliasFocus = (aliasSession || pinSession) ? captureAliasPanelFocus() : null;
     const setlistFocus = currentViewId === 'setlist' ? captureSetlistFocus() : null;
@@ -1321,7 +1328,13 @@ export function connectView({
       if (nav) renderSetNav(nav, setNavCtx());
     }
     } finally {
-      syncSessionLogPanel();
+      repositionSessionLogMount();
+      const restoreFocus = () => {
+        if (focusGen !== sessionLogFocusGen) return;
+        restoreMountedFieldFocus(sessionLogFocus, document);
+      };
+      restoreFocus();
+      void syncSessionLogPanel().then(restoreFocus);
     }
   }
 
@@ -1438,7 +1451,18 @@ export function connectView({
   }
 
   function parkSessionLogMount() {
-    sessionLogMountEl?.remove();
+    return parkSessionLogForRender(sessionLogMountEl, {
+      viewId: currentViewId,
+      doc: document,
+    });
+  }
+
+  function repositionSessionLogMount() {
+    if (!sessionLogKeepMounted()) return;
+    placeSessionLogMount(sessionLogMountEl, {
+      viewId: currentViewId,
+      doc: document,
+    });
   }
 
   function sessionLogKeepMounted() {
@@ -1458,6 +1482,7 @@ export function connectView({
       sessionLogGen += 1;
       unmountSessionLog?.();
       unmountSessionLog = null;
+      sessionLogMountEl?.remove();
       sessionLogMountEl = null;
       return;
     }
@@ -1612,6 +1637,7 @@ export function connectView({
       sessionLogGen += 1;
       unmountSessionLog?.();
       unmountSessionLog = null;
+      sessionLogMountEl?.remove();
       sessionLogMountEl = null;
       leaveSettings();
       breathCtl?.destroy();
