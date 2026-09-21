@@ -5,6 +5,8 @@ import {
   isAliasTargetTrack,
   isCreateTargetTrack,
   isArrangementTrack,
+  isExcludedArrangementMatch,
+  canLinkUnmatchedClip,
 } from './playing-clips-strip.js';
 
 function trackRows(payload) {
@@ -102,6 +104,7 @@ export function renderSessionTracks(parent, {
       const tm = matchForTrack(payload, track);
       const aliasTarget = isAliasTargetTrack(aliasSession, track);
       const createTarget = isCreateTargetTrack(createSession, track);
+      const excludedArrangement = isExcludedArrangementMatch(tm);
 
       if (playing) row.classList.add('session-track--playing');
       if (isArrangementTrack(track)) row.classList.add('session-track--arrangement');
@@ -109,7 +112,7 @@ export function renderSessionTracks(parent, {
       else if (createTarget) row.classList.add('session-track--create-target');
       else if (tm?.winner) row.classList.add('session-track--winner');
       else if (tm?.matched) row.classList.add('session-track--matched');
-      else if (playing) row.classList.add('session-track--nomatch');
+      else if (playing && !excludedArrangement) row.classList.add('session-track--nomatch');
 
       const meta = document.createElement('div');
       meta.className = 'session-track-meta';
@@ -138,13 +141,16 @@ export function renderSessionTracks(parent, {
           : `Match · ${conf} · ${label}`;
         if (tm.winner) matchLine.classList.add('session-track-match--winner');
         else matchLine.classList.add('session-track-match--ok');
+      } else if (excludedArrangement) {
+        matchLine.textContent = 'Arrangement';
+        matchLine.classList.add('session-track-match--arrangement');
       } else {
         matchLine.textContent = 'No match';
         matchLine.classList.add('session-track-match--none');
       }
       meta.appendChild(matchLine);
 
-      if (playing && !tm?.matched && !busy && (onStartAlias || onStartCreate)) {
+      if (playing && canLinkUnmatchedClip(tm) && !busy && (onStartAlias || onStartCreate)) {
         const actions = document.createElement('div');
         actions.className = 'session-track-actions';
 

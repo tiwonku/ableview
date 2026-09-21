@@ -16,6 +16,16 @@ export function isArrangementTrack(track) {
   return track?.source === 'arrangement';
 }
 
+/** Matcher skipped this clip (arrangement leftover). Not a sheet miss. */
+export function isExcludedArrangementMatch(trackMatch) {
+  return trackMatch?.excluded === 'arrangement';
+}
+
+/** Playing clip the operator can alias or turn into a cue row. */
+export function canLinkUnmatchedClip(trackMatch) {
+  return trackMatch?.matched !== true && !isExcludedArrangementMatch(trackMatch);
+}
+
 export function hasArrangementPlayback(payload) {
   return (payload?.tracks ?? []).some((t) => isArrangementTrack(t));
 }
@@ -214,7 +224,8 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
     const tm = matchForTrack(payload, track);
     const aliasTarget = isAliasTargetTrack(aliasSession, track);
     const createTarget = isCreateTargetTrack(createSession, track);
-    const unmatched = !tm?.matched;
+    const excludedArrangement = isExcludedArrangementMatch(tm);
+    const unmatched = canLinkUnmatchedClip(tm);
 
     const chip = document.createElement('div');
     chip.className = 'playing-clip-chip';
@@ -222,7 +233,7 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
     if (aliasTarget) chip.classList.add('playing-clip-chip--alias-target');
     else if (createTarget) chip.classList.add('playing-clip-chip--create-target');
     else if (tm?.matched) chip.classList.add('playing-clip-chip--weak-match');
-    else chip.classList.add('playing-clip-chip--nomatch');
+    else if (!excludedArrangement) chip.classList.add('playing-clip-chip--nomatch');
 
     if (showDeckNames && track.trackName) {
       const deck = document.createElement('div');
@@ -242,6 +253,9 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
     if (tm?.matched) {
       meta.textContent = `${formatConfidence(tm.confidence)} · ${tm.matchedValue || 'match'}`;
       meta.classList.add('playing-clip-chip-meta--match');
+    } else if (excludedArrangement) {
+      meta.textContent = 'Arrangement';
+      meta.classList.add('playing-clip-chip-meta--arrangement');
     } else {
       meta.textContent = 'No match';
       meta.classList.add('playing-clip-chip-meta--none');

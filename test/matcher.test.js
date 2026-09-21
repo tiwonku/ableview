@@ -396,6 +396,7 @@ test('bestMatch picks song deck over drums cue track', () => {
   assert.equal(winner?.trackName, 'DECK C');
   const drums = payload.trackMatches.find((t) => t.trackName === 'DECK A');
   assert.equal(drums?.matched, false);
+  assert.equal(drums?.excluded, undefined);
 });
 
 test('bestMatch skips arrangement leftovers by default', () => {
@@ -420,6 +421,34 @@ test('bestMatch skips arrangement leftovers by default', () => {
   assert.equal(deckA?.clipName, 'HWDED STAB INTRO');
   assert.equal(deckA?.matched, false);
   assert.equal(deckA?.winner, false);
+  assert.equal(deckA?.excluded, 'arrangement');
+});
+
+test('stopped arrangement track is not marked excluded', () => {
+  const payload = matchBestOfTracks(
+    [{ trackIndex: 11, trackName: 'DECK A', clipName: null, source: 'arrangement' }],
+    snapshot({ rows: [] }),
+    testConfig()
+  );
+  const deckA = payload.trackMatches[0];
+  assert.equal(deckA?.clipName, null);
+  assert.equal(deckA?.excluded, undefined);
+});
+
+test('arrangement miss stays linkable when includeArrangement is on', () => {
+  const payload = matchBestOfTracks(
+    [{
+      trackIndex: 11,
+      trackName: 'DECK A',
+      clipName: 'Totally Unknown Clip',
+      source: 'arrangement',
+    }],
+    snapshot({ rows: [{ rowId: '90', data: { 'Clip Name': 'How We Do', Aliases: '' } }] }),
+    testConfig({ match: { ...DEFAULTS.match, threshold: 0.4, includeArrangement: true } })
+  );
+  const deckA = payload.trackMatches.find((t) => t.trackName === 'DECK A');
+  assert.equal(deckA?.matched, false);
+  assert.equal(deckA?.excluded, undefined);
 });
 
 test('bestMatch uses arrangement clips when includeArrangement is on', () => {
@@ -443,6 +472,7 @@ test('bestMatch uses arrangement clips when includeArrangement is on', () => {
   assert.equal(payload.clipName, 'HWDED STAB INTRO');
   const winner = payload.trackMatches.find((t) => t.winner);
   assert.equal(winner?.trackName, 'DECK A');
+  assert.equal(winner?.excluded, undefined);
 });
 
 test('bestMatch still prefers a session clip over arrangement leftovers', () => {
@@ -473,6 +503,9 @@ test('bestMatch still prefers a session clip over arrangement leftovers', () => 
   assert.equal(payload.clipName, 'Yellow Bird');
   const winner = payload.trackMatches.find((t) => t.winner);
   assert.equal(winner?.trackName, 'DECK B');
+  const leftover = payload.trackMatches.find((t) => t.trackName === 'DECK A');
+  assert.equal(leftover?.excluded, 'arrangement');
+  assert.equal(winner?.excluded, undefined);
 });
 
 test('track strategy skips arrangement authoritative clip by default', () => {

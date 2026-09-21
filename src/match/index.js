@@ -262,7 +262,7 @@ export function matchBestOfTracks(tracks, snapshot, config) {
   for (const track of candidates) {
     const query = clipNameForMatch(track, config);
     if (!query?.trim()) {
-      trackMatches.push({
+      const entry = {
         trackIndex: track.trackIndex,
         trackName: track.trackName,
         clipName: track.clipName ?? null,
@@ -271,7 +271,12 @@ export function matchBestOfTracks(tracks, snapshot, config) {
         rowId: null,
         matchedValue: null,
         winner: false,
-      });
+      };
+      // Leftover arrangement clips stay on the board but are not sheet misses.
+      if (skipArrangementTrack(track, config) && track.clipName?.trim()) {
+        entry.excluded = 'arrangement';
+      }
+      trackMatches.push(entry);
       continue;
     }
 

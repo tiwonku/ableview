@@ -505,6 +505,11 @@ body.layout-operator .clip-name--pinned {
   color: var(--warn, #e8a048);
 }
 
+.playing-clip-chip-meta--arrangement {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .playing-clip-chip-meta--match {
   color: rgba(91, 141, 239, 0.95);
 }
@@ -4147,6 +4152,11 @@ body.layout-session .session-main {
 
 .session-track-match--none {
   color: var(--warn, #e8a048);
+}
+
+.session-track-match--arrangement {
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .session-track-match--ok {

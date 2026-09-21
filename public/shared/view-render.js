@@ -29,6 +29,9 @@ import { renderPinPanel } from './pin-panel.js';
 import {
   hasPlayingClips,
   hasArrangementPlayback,
+  playingTracks,
+  matchForTrack,
+  canLinkUnmatchedClip,
   resolveHeroDisplay,
   renderPlayingClipsStrip,
   resolveCuePane,
@@ -234,8 +237,13 @@ function renderNoMatchPanel(root, {
   if (editable || !playing) {
     const message = document.createElement('p');
     message.className = 'no-match';
-    if (playing) {
+    const linkable = playingTracks(payload).some((track) => (
+      canLinkUnmatchedClip(matchForTrack(payload, track))
+    ));
+    if (playing && linkable) {
       message.textContent = 'No confident match — link a playing clip to the cue sheet below.';
+    } else if (playing) {
+      message.textContent = 'No confident match.';
     } else {
       message.textContent = 'No confident match — check the cue sheet or clip name.';
     }
