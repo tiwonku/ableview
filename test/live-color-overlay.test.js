@@ -9,6 +9,7 @@ import {
   liveOverlayVisible,
   liveBusMeta,
   colorFieldVisible,
+  liveStripColumns,
 } from '../public/shared/live-color-overlay.js';
 
 test('slotForColumn maps RGB columns onto Jake slots', () => {
@@ -76,4 +77,28 @@ test('colorFieldVisible hides empty sheet color unless live or editing', () => {
 test('empty color cards keep [hidden] above layout display:flex', () => {
   const css = readFileSync(fileURLToPath(new URL('../public/shared/styles.css', import.meta.url)), 'utf8');
   assert.match(css, /\.field-color\[hidden\][\s\S]*display:\s*none\s*!important/);
+});
+
+test('liveStripColumns keeps Main / Secondary / Accent and drops duplicate slots', () => {
+  assert.deepEqual(liveStripColumns(), [
+    { slot: 'main', column: 'RGB_1', label: 'Main' },
+    { slot: 'secondary', column: 'RGB_2', label: 'Secondary' },
+    { slot: 'accent', column: 'RGB_3', label: 'Accent' },
+  ]);
+  assert.deepEqual(liveStripColumns({ RGB_3: 'accent', Extra: 'main', RGB_1: 'main' }), [
+    { slot: 'main', column: 'Extra', label: 'Main' },
+    { slot: 'accent', column: 'RGB_3', label: 'Accent' },
+  ]);
+  assert.deepEqual(liveStripColumns({}), []);
+  assert.deepEqual(liveStripColumns(null), liveStripColumns());
+});
+
+test('no-match mounts a fixed desk strip and leaves the clip grid to fill', () => {
+  const render = readFileSync(fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)), 'utf8');
+  const css = readFileSync(fileURLToPath(new URL('../public/shared/styles.css', import.meta.url)), 'utf8');
+  assert.match(render, /renderDeskColorStrip\(liveColorColumns\)/);
+  assert.match(css, /\.desk-color-strip\s*\{[^}]*flex:\s*0 0 auto/);
+  assert.match(css, /\.desk-color-strip\[hidden\][\s\S]*display:\s*none\s*!important/);
+  assert.match(css, /body\.layout-operator \.playing-clips-strip\s*\{[^}]*flex:\s*1 1 auto/);
+  assert.match(css, /body\.layout-operator \.desk-color-strip\s*\{[^}]*flex:\s*0 0 auto/);
 });

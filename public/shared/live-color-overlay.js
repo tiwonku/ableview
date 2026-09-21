@@ -6,11 +6,26 @@ export const DEFAULT_LIVE_COLOR_COLUMNS = Object.freeze({
   RGB_3: 'accent',
 });
 
+const SLOT_ORDER = Object.freeze(['main', 'secondary', 'accent']);
+
 const SLOT_LABELS = Object.freeze({
   main: 'Main',
   secondary: 'Secondary',
   accent: 'Accent',
 });
+
+/** One column per slot, in Main / Secondary / Accent order. First column wins a duplicate slot. */
+export function liveStripColumns(columnMap = DEFAULT_LIVE_COLOR_COLUMNS) {
+  const map = columnMap && typeof columnMap === 'object' ? columnMap : DEFAULT_LIVE_COLOR_COLUMNS;
+  const bySlot = new Map();
+  for (const [column, slot] of Object.entries(map)) {
+    if (!column || !SLOT_ORDER.includes(slot) || bySlot.has(slot)) continue;
+    bySlot.set(slot, column);
+  }
+  return SLOT_ORDER
+    .filter((slot) => bySlot.has(slot))
+    .map((slot) => ({ slot, column: bySlot.get(slot), label: SLOT_LABELS[slot] }));
+}
 
 export function rgbToLiveDisplay(c) {
   if (!c || !Number.isInteger(c.r) || !Number.isInteger(c.g) || !Number.isInteger(c.b)) return null;
@@ -125,6 +140,44 @@ export function renderLiveColorHost(column) {
   return live;
 }
 
+/** Compact GrandMA bar for the no-match clip board. Hidden until a bus has RGB. */
+export function renderDeskColorStrip(columnMap = DEFAULT_LIVE_COLOR_COLUMNS) {
+  const columns = liveStripColumns(columnMap);
+  if (!columns.length) return null;
+
+  const strip = document.createElement('div');
+  strip.className = 'desk-color-strip';
+  strip.dataset.role = 'desk-color-strip';
+  strip.hidden = true;
+  strip.setAttribute('aria-label', 'GrandMA colors');
+
+  for (const { column, label } of columns) {
+    const slot = document.createElement('div');
+    slot.className = 'desk-color-slot';
+    slot.hidden = true;
+
+    const name = document.createElement('p');
+    name.className = 'desk-color-slot-label';
+    name.textContent = label;
+    slot.appendChild(name);
+    slot.appendChild(renderLiveColorHost(column));
+    strip.appendChild(slot);
+  }
+
+  return strip;
+}
+
+function syncDeskColorStrips(root) {
+  for (const strip of root.querySelectorAll('[data-role="desk-color-strip"]')) {
+    for (const slot of strip.querySelectorAll(':scope > .desk-color-slot')) {
+      const host = slot.querySelector('[data-role="live-color"]');
+      slot.hidden = !host || host.hidden;
+    }
+    const slots = [...strip.querySelectorAll(':scope > .desk-color-slot')];
+    strip.hidden = slots.length === 0 || slots.every((slot) => slot.hidden);
+  }
+}
+
 export function applyLiveColorOverlay(root, status, columnMap = DEFAULT_LIVE_COLOR_COLUMNS) {
   if (!root) return;
   const hosts = root.querySelectorAll('[data-role="live-color"]');
@@ -159,4 +212,6 @@ export function applyLiveColorOverlay(root, status, columnMap = DEFAULT_LIVE_COL
     const rows = [...mast.querySelectorAll('.colors-row')];
     mast.hidden = rows.length > 0 && rows.every((row) => row.hidden);
   }
+
+  syncDeskColorStrips(root);
 }

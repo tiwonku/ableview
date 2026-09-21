@@ -1,7 +1,7 @@
 // Shared view rendering (spec §9.4). Maps CuePayload + field config → DOM.
 
 import { applyColorSwatchStyle, parseRgbCell } from './color-parse.js';
-import { renderLiveColorHost, DEFAULT_LIVE_COLOR_COLUMNS } from './live-color-overlay.js';
+import { renderLiveColorHost, renderDeskColorStrip, DEFAULT_LIVE_COLOR_COLUMNS } from './live-color-overlay.js';
 import { parseImageCell } from './image-parse.js';
 import { closeColorPicker } from './color-picker.js';
 import { flashableColorColumns } from './flash-look.js';
@@ -227,6 +227,7 @@ function renderNoMatchPanel(root, {
   onStartAlias,
   onStartPin,
   onPinLast,
+  liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
 }) {
   const playing = hasPlayingClips(payload);
   const noMatch = document.createElement('div');
@@ -249,6 +250,9 @@ function renderNoMatchPanel(root, {
     }
     noMatch.appendChild(message);
   }
+
+  const deskStrip = renderDeskColorStrip(liveColorColumns);
+  if (deskStrip) noMatch.appendChild(deskStrip);
 
   if (playing) {
     renderPlayingClipsStrip(noMatch, payload, {
@@ -367,6 +371,7 @@ export function renderView(root, {
       onStartAlias,
       onStartPin,
       onPinLast,
+      liveColorColumns,
     });
   }
 
@@ -1454,6 +1459,7 @@ function renderAdminDashboard(root, ctx) {
     onSetDrawerChange,
     cuePane = 'current',
     onCuePaneChange,
+    liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
   } = ctx;
 
   closeColorPicker();
@@ -1529,6 +1535,7 @@ function renderAdminDashboard(root, ctx) {
         onStartAlias,
         onStartPin,
         onPinLast,
+        liveColorColumns,
       });
     }
     if (showZones && zonePayload) {
@@ -1622,6 +1629,7 @@ export function renderAdmin(root, {
   onSetDrawerChange,
   cuePane = 'current',
   onCuePaneChange,
+  liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
 }) {
   if (boardMode === 'dashboard') {
     renderAdminDashboard(root, {
@@ -1659,6 +1667,7 @@ export function renderAdmin(root, {
       onSetDrawerChange,
       cuePane,
       onCuePaneChange,
+      liveColorColumns,
     });
     return;
   }
@@ -1707,6 +1716,7 @@ export function renderAdmin(root, {
       onStartAlias,
       onStartPin,
       onPinLast,
+      liveColorColumns,
     });
   }
 

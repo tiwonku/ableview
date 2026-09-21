@@ -1283,6 +1283,7 @@ export function connectView({
         onBoardModeChange: currentViewId === 'admin' ? setBoardMode : undefined,
         operatorViews,
         ...(adminDashboardFlash() ? flashLookProps() : {}),
+        liveColorColumns,
         setDrawerOpen,
         onSetDrawerChange: currentViewId === 'admin' ? setSetDrawer : undefined,
         cuePane,
@@ -1312,6 +1313,7 @@ export function connectView({
         onSaveEdit: saveEdit,
         getMomentWho,
         ...flashLookProps(),
+        liveColorColumns,
       });
     }
     paintLiveColors();

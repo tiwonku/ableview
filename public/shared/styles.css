@@ -914,6 +914,90 @@ body.layout-operator .clip-name--pinned {
   color: #e6b450;
 }
 
+/* No-match desk bar: one fixed line above the playing-clip grid. */
+.desk-color-strip {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+  min-width: 0;
+  margin: 0 0 0.65rem;
+  color: var(--text);
+}
+
+.desk-color-strip[hidden],
+.desk-color-slot[hidden],
+.desk-color-strip .color-live[hidden] {
+  display: none !important;
+}
+
+.desk-color-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.desk-color-slot-label {
+  margin: 0;
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.desk-color-strip .color-live {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.desk-color-strip .color-live-kicker,
+.desk-color-strip .color-live-meta {
+  display: none;
+}
+
+.desk-color-strip .color-live-split {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.desk-color-strip .color-live-bus {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.desk-color-strip .color-live-bus + .color-live-bus {
+  padding-left: 0.4rem;
+  border-left: 1px solid var(--border);
+}
+
+.desk-color-strip .color-live-bus-label {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.desk-color-strip .color-swatch--live {
+  width: 2.25rem;
+  height: 1.35rem;
+  max-height: 1.35rem;
+  margin: 0;
+  aspect-ratio: auto;
+  flex-shrink: 0;
+}
+
 .color-copy-kind {
   flex-shrink: 0;
   min-width: 2rem;
@@ -2373,6 +2457,22 @@ body.layout-operator .no-match--clips {
 
 body.layout-operator .no-match-panel.no-match--clips {
   flex: 1 1 auto;
+}
+
+body.layout-operator .desk-color-strip {
+  flex: 0 0 auto;
+  margin-bottom: var(--op-gap);
+}
+
+body.layout-operator .desk-color-strip .desk-color-slot-label,
+body.layout-operator .desk-color-strip .color-live-bus-label {
+  font-size: clamp(0.72rem, 1.5dvh, 0.9rem);
+}
+
+body.layout-operator .desk-color-strip .color-swatch--live {
+  width: clamp(2.75rem, 7vw, 4.25rem);
+  height: clamp(1.55rem, 3.2dvh, 2.15rem);
+  max-height: 2.15rem;
 }
 
 body.layout-operator .playing-clips-strip {
