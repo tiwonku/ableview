@@ -9,6 +9,7 @@ export const EVENTS = Object.freeze({
   TIMECODE: 'timecode',
   LIVE_COLORS: 'liveColors',
   SETLIST: 'setlist',
+  PROGRAM_DECK_STATE: 'programDeckState',
 });
 
 export function createBus() {

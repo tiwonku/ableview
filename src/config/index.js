@@ -109,6 +109,7 @@ export const DEFAULTS = Object.freeze({
     destinations: [],
     breath: { ...DEFAULT_BREATH },
   },
+  externalSources: [],
   views: {},
 });
 
@@ -379,6 +380,58 @@ export function validateConfig(config) {
           errors.push(`oscOut.breath.${key} must be a number 0–1`);
         }
       }
+    }
+  }
+
+  const sources = config.externalSources;
+  if (sources != null) {
+    if (!Array.isArray(sources)) {
+      errors.push('externalSources must be an array');
+    } else {
+      const ids = new Set();
+      const portsUsed = new Set();
+      const reserved = new Set();
+      if (port(config.ingest?.oscListenPort)) reserved.add(config.ingest.oscListenPort);
+      if (port(config.ingest?.oscSendPort)) reserved.add(config.ingest.oscSendPort);
+      if (config.timecode?.enabled === true && port(config.timecode.port)) reserved.add(config.timecode.port);
+      if (config.sacn?.enabled === true && port(config.sacn.port)) reserved.add(config.sacn.port);
+      if (port(config.server?.httpPort)) reserved.add(config.server.httpPort);
+
+      sources.forEach((src, i) => {
+        const path = `externalSources[${i}]`;
+        if (!src || typeof src !== 'object' || Array.isArray(src)) {
+          errors.push(`${path} must be an object`);
+          return;
+        }
+        if (typeof src.id !== 'string' || !src.id.trim()) {
+          errors.push(`${path}.id is required`);
+        } else if (ids.has(src.id)) {
+          errors.push(`${path}.id must be unique`);
+        } else {
+          ids.add(src.id);
+        }
+        if (typeof src.label !== 'string' || !src.label.trim()) {
+          errors.push(`${path}.label is required`);
+        }
+        if (src.type !== 'deck-bridge-udp') {
+          errors.push(`${path}.type must be "deck-bridge-udp"`);
+        }
+        if (!port(src.listenPort)) {
+          errors.push(`${path}.listenPort must be a valid port`);
+        } else if (portsUsed.has(src.listenPort)) {
+          errors.push(`${path}.listenPort must be unique`);
+        } else if (reserved.has(src.listenPort)) {
+          errors.push(`${path}.listenPort collides with another AbleView listener`);
+        } else {
+          portsUsed.add(src.listenPort);
+        }
+        if (src.staleMs != null && !(Number.isFinite(src.staleMs) && src.staleMs >= 0)) {
+          errors.push(`${path}.staleMs must be >= 0`);
+        }
+        if (src.expectedDecks != null && !(Number.isInteger(src.expectedDecks) && src.expectedDecks >= 1)) {
+          errors.push(`${path}.expectedDecks must be an integer >= 1`);
+        }
+      });
     }
   }
 

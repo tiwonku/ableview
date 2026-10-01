@@ -302,7 +302,8 @@ Task Scheduler is workable but NSSM or systemd gives simpler crash restart behav
 
 M13a sidecar for live deck visibility. Runs on each **performer Mac** (not the show box),
 reads Algoriddim djay Pro via macOS Accessibility, and sends `DeckBridgeReport` JSON over
-UDP to AbleView. Show-box ingest arrives in M13b — until then, verify with `nc -u -l`.
+UDP to AbleView. The show box listens when `externalSources` lists that `sourceId` and
+port (`src/program/`). To watch the raw datagrams without AbleView, use `nc -u -l`.
 
 Source: [`bridge/deck-bridge/`](../bridge/deck-bridge/). Plan:
 [`docs/plans/M13-external-deck-monitor.md`](../docs/plans/M13-external-deck-monitor.md).

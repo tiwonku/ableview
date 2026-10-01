@@ -407,6 +407,9 @@ decks — no crash loop. When Djay opens, next poll resumes.
 - `src/program/` UDP listener(s), validation, stale detection, bus emit.
 - Config validation for `externalSources`.
 - Unit tests with injected UDP payloads.
+- **NFR-4:** emit `PROGRAM_DECK_STATE` only when the §6.3 fingerprint or the stale flag
+  changes. Identical reports and elapsed/BPM ticks stay in memory and off the bus.
+  The matcher and operator views do not subscribe.
 - **Accept:** two source ids on two ports aggregate independently; stale after silence.
 
 ### M13c — Admin Program Sources UI
@@ -498,7 +501,7 @@ Manual: two Macs on LAN, Djay load + crossfade, admin panel + JSONL tail.
 ## 15. Milestone completion checklist
 
 - [x] M13a — macOS deck-bridge LaunchAgent
-- [ ] M13b — program UDP ingest + bus
+- [x] M13b — program UDP ingest + bus
 - [ ] M13c — admin Program Sources UI + WS
 - [ ] M13d — multi-source deploy docs + turntablist path
 - [ ] M13e — `deck_on_air` session log events

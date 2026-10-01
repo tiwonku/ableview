@@ -72,6 +72,14 @@ The tool **MUST NOT** send any OSC message that can mutate the Ableton set.
 
 Sheets sync must never block the hot path. Match against in-memory data; refresh on an interval; serve from disk cache when Google/network is down; surface staleness in admin view.
 
+### NFR-4 — Hot path
+
+The cue path is clip → in-memory match → operator WebSocket. New ingress uses its own socket and its own bus event.
+
+- High-rate input is coalesced or change-filtered before it is emitted. It is not forwarded to operator views unless that view's job is to render it.
+- Per-packet work is parse, validate, and update memory. No sheet I/O, no matcher, no info log, no JSONL append on the packet itself.
+- Program ingest (`src/program/`) emits `PROGRAM_DECK_STATE` only when the deck fingerprint or stale flag changes. Guard: `test/program-ingest.test.js`.
+
 ### NFR-7 — Match safety
 
 Below-threshold matches **MUST** show an explicit "no confident match" state. Never silently display a wrong row.
@@ -110,18 +118,14 @@ AbletonOSC / Simulator  →  event bus  →  [matcher]  →  [view server]  → 
 | Session log | `src/session-log/` | Append-only JSONL of `track_clip` + `match` events (M10). |
 | Setlist | `src/setlist/` | Named JSON setlists (`data/setlists/`) + `.active.json` sidecar; glance + pin, not a match source. |
 | Deck bridge | `bridge/deck-bridge/` | macOS AX → UDP JSON sidecar for Djay Pro (M13a). Not AbleView ingest. |
-
-### Planned modules (not yet implemented)
-
-| Module | Path | Milestone |
-|---|---|---|
-| Program ingest | `src/program/` | M13b |
+| Program ingest | `src/program/` | Deck-bridge UDP listener (M13b). Own sockets; emits `PROGRAM_DECK_STATE` on fingerprint or stale change only. |
 
 ### Data contracts (keep stable — spec §9)
 
 - **`NowPlaying`** — ingest → matcher (`src/core/now-playing.js`)
 - **`CuePayload`** — matcher → server → views (implement in M3/M4)
 - **`EVENTS.NOW_PLAYING`** — add `EVENTS.CUE_PAYLOAD` (or similar) when wiring matcher → server
+- **`ProgramDeckState`** — program ingest → bus (`EVENTS.PROGRAM_DECK_STATE`). Not a match input and not an operator-view broadcast.
 
 ---
 
@@ -155,6 +159,7 @@ npm start         # real AbletonOSC (requires Ableton + AbletonOSC on network)
 |---|---|
 | `test/nfr1-readonly.test.js` | OSC allowlist, no write addresses, adapter source scan |
 | `test/simulator.test.js` | NowPlaying contract, scenario driver, config validation |
+| `test/program-ingest.test.js` | Deck-bridge UDP ingest, fingerprint gate, stale sources |
 
 Add tests per milestone where acceptance criteria are testable (matcher confidence, cache staleness, etc.).
 

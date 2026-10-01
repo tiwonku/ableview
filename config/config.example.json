@@ -135,6 +135,24 @@
       "fallStraight": 0
     }
   },
+  "externalSources": [
+    {
+      "id": "djay-d",
+      "label": "D",
+      "type": "deck-bridge-udp",
+      "listenPort": 9101,
+      "staleMs": 3000,
+      "expectedDecks": 2
+    },
+    {
+      "id": "tt-samples",
+      "label": "Turntables",
+      "type": "deck-bridge-udp",
+      "listenPort": 9102,
+      "staleMs": 3000,
+      "expectedDecks": 2
+    }
+  ],
   "views": {
     "band": {
       "title": "Band",

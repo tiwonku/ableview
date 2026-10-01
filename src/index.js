@@ -11,6 +11,7 @@ import { createSacnListener } from './sacn/index.js';
 import { createOscOutput } from './outputs/osc.js';
 import { createSessionLogger } from './session-log/index.js';
 import { createSetlistStore } from './setlist/index.js';
+import { createProgramIngest } from './program/index.js';
 
 const log = createLogger({ app: 'ableview' });
 
@@ -56,6 +57,12 @@ async function main() {
     getConfig,
     bus,
     log: log.child({ module: 'sacn' }),
+  });
+
+  const program = createProgramIngest({
+    getConfig,
+    bus,
+    log: log.child({ module: 'program' }),
   });
 
   const oscOut = createOscOutput({
@@ -207,6 +214,11 @@ async function main() {
       'sACN listener failed to start — pick the lighting NIC and confirm universe/port',
     );
   }
+  try {
+    await program.start();
+  } catch (err) {
+    log.error({ err: err.message }, 'program ingest failed to start — cue lane unchanged');
+  }
   log.info({ source: ingest.source.name, simulated: ingest.simulated, httpPort: viewServer.port }, 'AbleView started');
 
   const shutdown = async (signal) => {
@@ -216,6 +228,7 @@ async function main() {
     oscOut.stop();
     timecode.stop();
     sacn.stop();
+    program.stop();
     ingest.stop();
     sheets.stop();
     await viewServer.stop();

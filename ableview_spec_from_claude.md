@@ -159,7 +159,10 @@ Language: RFC-2119 (MUST / MUST NOT / SHOULD).
   working using the last successful sheet snapshot. The admin/status view MUST show that
   data is stale and when it was last synced.
 - **NFR-4 — Latency.** Clip-change → operator-view update SHOULD be < 200 ms on a wired LAN.
-  Matching MUST be in-memory (no per-trigger network I/O).
+  Matching MUST be in-memory (no per-trigger network I/O). New ingress MUST use its own
+  socket and bus event, and MUST coalesce or change-filter before emit. It MUST NOT add
+  per-packet work on the cue path (sheet I/O, matching, or operator-view fan-out) unless
+  that view's job is to render the new payload.
 - **NFR-5 — Headless / remote.** No GUI. All settings changeable via config file and/or the
   admin web page; the box is managed over SSH.
 - **NFR-6 — View resilience.** Views MUST auto-reconnect their WebSocket and MUST display a

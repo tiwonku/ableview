@@ -105,8 +105,21 @@ export function serializeFileConfig(config) {
     setlist: { ...config.setlist },
     moments: { ...config.moments },
     oscOut: serializeOscOut(config.oscOut),
+    externalSources: serializeExternalSources(config.externalSources),
     views: { ...config.views },
   };
+}
+
+function serializeExternalSources(sources) {
+  if (!Array.isArray(sources)) return [];
+  return sources.map((src) => ({
+    id: src.id,
+    label: src.label,
+    type: src.type,
+    listenPort: src.listenPort,
+    staleMs: src.staleMs ?? 3000,
+    expectedDecks: src.expectedDecks ?? 2,
+  }));
 }
 
 export function pickEditableSettings(config) {
