@@ -126,6 +126,7 @@ async function main() {
       getTimecodeStatus: () => timecode.getStatus(),
       getLiveColorsStatus: () => sacn.getStatus(),
       getOscOutStatus: () => oscOut.getStatus(),
+      getProgramStatus: () => program.getStatus(),
     }),
     sessionLog,
   });

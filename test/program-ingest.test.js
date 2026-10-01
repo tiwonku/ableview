@@ -280,10 +280,14 @@ test('validateConfig accepts deck-bridge sources and rejects collisions', () => 
   assert.throws(() => validateConfig(badType), /deck-bridge-udp/);
 });
 
-test('cue matcher and view server do not subscribe to program state', () => {
+test('cue matcher does not subscribe to program state', () => {
   const matchSrc = readFileSync(new URL('../src/match/index.js', import.meta.url), 'utf8');
-  const serverSrc = readFileSync(new URL('../src/server/index.js', import.meta.url), 'utf8');
   assert.doesNotMatch(matchSrc, /PROGRAM_DECK_STATE/);
-  assert.doesNotMatch(serverSrc, /PROGRAM_DECK_STATE/);
-  assert.doesNotMatch(serverSrc, /programDeckState/);
+  assert.doesNotMatch(matchSrc, /programDeckState/);
+});
+
+test('view server pushes program state to the admin socket only', () => {
+  const serverSrc = readFileSync(new URL('../src/server/index.js', import.meta.url), 'utf8');
+  assert.match(serverSrc, /EVENTS\.PROGRAM_DECK_STATE/);
+  assert.match(serverSrc, /viewId === 'admin' && ws\.readyState === ws\.OPEN/);
 });

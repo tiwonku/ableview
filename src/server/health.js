@@ -8,6 +8,7 @@ export function buildHealthReport({
   getTimecodeStatus,
   getLiveColorsStatus,
   getOscOutStatus,
+  getProgramStatus,
   lastCuePayload = null,
 }) {
   const sheets = getSheetSnapshot();
@@ -39,7 +40,7 @@ export function buildHealthReport({
   const timecode = getTimecodeStatus?.() ?? null;
   const liveColors = getLiveColorsStatus?.() ?? null;
 
-  return {
+  const report = {
     status: checks.length === 0 ? 'ok' : 'degraded',
     uptime: process.uptime(),
     simulated,
@@ -99,5 +100,26 @@ export function buildHealthReport({
         }
       : null,
     checks,
+  };
+
+  // Program sources are a parallel lane. A stale deck bridge does not degrade
+  // the cue path (M13 §7.4).
+  if (typeof getProgramStatus === 'function') {
+    report.program = compactProgram(getProgramStatus());
+  }
+
+  return report;
+}
+
+function compactProgram(status) {
+  const sources = Array.isArray(status?.sources) ? status.sources : [];
+  return {
+    sources: sources.map((source) => ({
+      id: source?.id ?? null,
+      label: source?.label ?? source?.id ?? null,
+      live: source?.live === true,
+      lastSeenAt: source?.lastSeenAt ?? null,
+      stale: source?.stale === true,
+    })),
   };
 }

@@ -33,6 +33,7 @@ export async function createViewServer({
   setlistStore,
 }) {
   let lastPayload = null;
+  let lastProgram = null;
   const clients = new Map();
 
   function getConnectedViewCount() {
@@ -170,6 +171,26 @@ export async function createViewServer({
     liveColorsBroadcastTimer.unref?.();
   });
 
+  function currentProgram() {
+    const fromIngest = getHealthContext?.()?.getProgramStatus?.();
+    if (fromIngest && Array.isArray(fromIngest.sources)) return fromIngest;
+    return lastProgram ?? { timestamp: null, sources: [] };
+  }
+
+  // Admin-only (M13c, OD-D4). Ingest already drops elapsed/BPM ticks;
+  // this fans out the emitted snapshot and nothing else.
+  function broadcastProgram(program) {
+    lastProgram = program;
+    const data = JSON.stringify({ type: 'program', program });
+    for (const [ws, { viewId }] of clients) {
+      if (viewId === 'admin' && ws.readyState === ws.OPEN) ws.send(data);
+    }
+  }
+
+  bus.on(EVENTS.PROGRAM_DECK_STATE, (program) => {
+    broadcastProgram(program);
+  });
+
   const app = Fastify({ logger: false });
 
   app.get('/', async (req, reply) => {
@@ -188,6 +209,7 @@ export async function createViewServer({
       getTimecodeStatus: ctx.getTimecodeStatus,
       getLiveColorsStatus: ctx.getLiveColorsStatus,
       getOscOutStatus: ctx.getOscOutStatus,
+      getProgramStatus: ctx.getProgramStatus,
       lastCuePayload: lastPayload,
     });
     const code = report.status === 'ok' ? 200 : 503;
@@ -326,6 +348,7 @@ export async function createViewServer({
       }
       if (viewId === 'admin') {
         init.operatorViews = collectOperatorViews(getLiveConfig().views);
+        init.program = currentProgram();
       }
     } else {
       init.editable = viewConfig.editable !== false;

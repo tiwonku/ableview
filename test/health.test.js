@@ -147,6 +147,46 @@ test('buildHealthReport flags osc_out_blocked when another instance holds OSC', 
   assert.equal(report.status, 'degraded');
 });
 
+test('buildHealthReport lists program sources without degrading the cue lane', () => {
+  const report = buildHealthReport({
+    simulated: false,
+    getSheetSnapshot: () => sheetSnapshot(),
+    getConnectedViewCount: () => 1,
+    getIngestStatus: () => ({ live: true, lastSeenAt: Date.now() }),
+    getProgramStatus: () => ({
+      timestamp: '2026-08-11T02:15:04.520Z',
+      sources: [
+        {
+          id: 'djay-d',
+          label: 'D',
+          live: false,
+          lastSeenAt: '2026-08-11T02:15:04.512Z',
+          stale: true,
+          decks: [{ deckIndex: 1, loaded: { title: 'Kept off health' }, playing: true, onAir: true }],
+        },
+      ],
+    }),
+    lastCuePayload: makeCuePayload({
+      clipName: 'Song A',
+      match: makeMatchResult({ matched: true, confidence: 0.9 }),
+    }),
+  });
+
+  assert.equal(report.status, 'ok');
+  assert.equal(report.checks.length, 0);
+  assert.deepEqual(report.program, {
+    sources: [
+      {
+        id: 'djay-d',
+        label: 'D',
+        live: false,
+        lastSeenAt: '2026-08-11T02:15:04.512Z',
+        stale: true,
+      },
+    ],
+  });
+});
+
 test('GET /health returns JSON and 503 when degraded', async () => {
   const bus = createBus();
   const server = await createViewServer({

@@ -502,7 +502,7 @@ Manual: two Macs on LAN, Djay load + crossfade, admin panel + JSONL tail.
 
 - [x] M13a — macOS deck-bridge LaunchAgent
 - [x] M13b — program UDP ingest + bus
-- [ ] M13c — admin Program Sources UI + WS
+- [x] M13c — admin Program Sources UI + WS
 - [ ] M13d — multi-source deploy docs + turntablist path
 - [ ] M13e — `deck_on_air` session log events
 - [ ] `ROADMAP.md` M13 marked done

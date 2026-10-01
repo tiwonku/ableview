@@ -40,6 +40,22 @@ function openSocket(url) {
   });
 }
 
+function waitForTypedMessage(messages, ws, type, timeoutMs = 3000) {
+  const existing = messages.findIndex((msg) => msg.type === type);
+  if (existing >= 0) return Promise.resolve(messages.splice(existing, 1)[0]);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`timed out waiting for ${type}`)), timeoutMs);
+    const onMessage = () => {
+      const index = messages.findIndex((msg) => msg.type === type);
+      if (index < 0) return;
+      clearTimeout(timer);
+      ws.off('message', onMessage);
+      resolve(messages.splice(index, 1)[0]);
+    };
+    ws.on('message', onMessage);
+  });
+}
+
 function waitForMessage(messages, ws, timeoutMs = 3000) {
   if (messages.length > 0) return Promise.resolve(messages.shift());
   return new Promise((resolve, reject) => {
@@ -528,4 +544,79 @@ test('role views receive configured field maps', async () => {
 
   ws.close();
   await server.stop();
+});
+
+test('admin init and program events stay off operator sockets', async () => {
+  const bus = createBus();
+  const config = testConfig({
+    views: {
+      band: { title: 'Band', fields: [{ column: 'Key' }] },
+      admin: { title: 'Admin', system: true },
+    },
+  });
+  const initial = {
+    timestamp: '2026-08-11T02:15:04.520Z',
+    sources: [
+      {
+        id: 'djay-d',
+        label: 'D',
+        live: true,
+        lastSeenAt: '2026-08-11T02:15:04.512Z',
+        stale: false,
+        decks: [
+          {
+            deckIndex: 1,
+            loaded: { title: 'What It Sounds Like', artist: 'HUNTR/X' },
+            playing: true,
+            onAir: true,
+          },
+        ],
+      },
+    ],
+  };
+  const server = await createViewServer({
+    config,
+    bus,
+    log: silentLog,
+    getHealthContext: () => ({
+      getProgramStatus: () => initial,
+    }),
+  });
+
+  const admin = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=admin`);
+  const band = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=band`);
+  try {
+    const adminInit = await waitForMessage(admin.messages, admin.ws);
+    const bandInit = await waitForMessage(band.messages, band.ws);
+    assert.equal(adminInit.program.sources[0].id, 'djay-d');
+    assert.equal(adminInit.program.sources[0].decks[0].onAir, true);
+    assert.equal(bandInit.program, undefined);
+
+    const next = {
+      ...initial,
+      timestamp: '2026-08-11T02:16:00.000Z',
+      sources: [
+        {
+          ...initial.sources[0],
+          decks: [
+            {
+              ...initial.sources[0].decks[0],
+              onAir: false,
+              playing: false,
+            },
+          ],
+        },
+      ],
+    };
+    bus.emit(EVENTS.PROGRAM_DECK_STATE, next);
+
+    const pushed = await waitForTypedMessage(admin.messages, admin.ws, 'program');
+    assert.equal(pushed.program.sources[0].decks[0].onAir, false);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.equal(band.messages.some((msg) => msg.type === 'program'), false);
+  } finally {
+    admin.ws.close();
+    band.ws.close();
+    await server.stop();
+  }
 });

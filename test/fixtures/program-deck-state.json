@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-08-11T02:15:04.520Z",
+  "sources": [
+    {
+      "id": "djay-d",
+      "label": "D",
+      "live": true,
+      "lastSeenAt": "2026-08-11T02:15:04.512Z",
+      "stale": false,
+      "decks": [
+        {
+          "deckIndex": 1,
+          "loaded": {
+            "title": "What It Sounds Like (AWAIAN Remix)",
+            "artist": "HUNTR/X, EJAE"
+          },
+          "playing": true,
+          "onAir": true,
+          "bpm": 124,
+          "key": "e minor",
+          "elapsedDisplay": "01:35"
+        },
+        {
+          "deckIndex": 2,
+          "loaded": { "title": "My Way (Remix)", "artist": "KATSEYE" },
+          "playing": false,
+          "onAir": false,
+          "bpm": 128,
+          "key": "e flat"
+        }
+      ]
+    },
+    {
+      "id": "tt-samples",
+      "label": "Turntables",
+      "live": false,
+      "lastSeenAt": "2026-08-11T02:14:50.000Z",
+      "stale": true,
+      "decks": [
+        {
+          "deckIndex": 1,
+          "loaded": { "title": "Waiting on a title", "artist": null },
+          "playing": false,
+          "onAir": false
+        }
+      ]
+    }
+  ]
+}

@@ -119,13 +119,14 @@ AbletonOSC / Simulator  →  event bus  →  [matcher]  →  [view server]  → 
 | Setlist | `src/setlist/` | Named JSON setlists (`data/setlists/`) + `.active.json` sidecar; glance + pin, not a match source. |
 | Deck bridge | `bridge/deck-bridge/` | macOS AX → UDP JSON sidecar for Djay Pro (M13a). Not AbleView ingest. |
 | Program ingest | `src/program/` | Deck-bridge UDP listener (M13b). Own sockets; emits `PROGRAM_DECK_STATE` on fingerprint or stale change only. |
+| Program panel | `public/shared/admin-program.js` | Admin Program Sources UI (M13c). Titles, playing, ON AIR. Admin WebSocket only. |
 
 ### Data contracts (keep stable — spec §9)
 
 - **`NowPlaying`** — ingest → matcher (`src/core/now-playing.js`)
 - **`CuePayload`** — matcher → server → views (implement in M3/M4)
 - **`EVENTS.NOW_PLAYING`** — add `EVENTS.CUE_PAYLOAD` (or similar) when wiring matcher → server
-- **`ProgramDeckState`** — program ingest → bus (`EVENTS.PROGRAM_DECK_STATE`). Not a match input and not an operator-view broadcast.
+- **`ProgramDeckState`** — program ingest → bus (`EVENTS.PROGRAM_DECK_STATE`) → admin WebSocket only (M13c). Not a match input and not an operator-view broadcast.
 
 ---
 
@@ -159,7 +160,7 @@ npm start         # real AbletonOSC (requires Ableton + AbletonOSC on network)
 |---|---|
 | `test/nfr1-readonly.test.js` | OSC allowlist, no write addresses, adapter source scan |
 | `test/simulator.test.js` | NowPlaying contract, scenario driver, config validation |
-| `test/program-ingest.test.js` | Deck-bridge UDP ingest, fingerprint gate, stale sources |
+| `test/program-ingest.test.js` | Deck-bridge UDP ingest, fingerprint gate, stale sources, admin-only WS |
 
 Add tests per milestone where acceptance criteria are testable (matcher confidence, cache staleness, etc.).
 

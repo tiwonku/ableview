@@ -55,6 +55,7 @@ import {
   writeStoredAdminSetDrawer,
 } from './admin-dashboard.js';
 import { applyLiveColorOverlay, DEFAULT_LIVE_COLOR_COLUMNS } from './live-color-overlay.js';
+import { hasProgramSources, renderProgramPanel } from './admin-program.js';
 import {
   buildFlashLookSlots,
   canFlashLook,
@@ -144,6 +145,7 @@ export function connectView({
   let viewsList = null;
   let lastPayload = null;
   let lastStatus = null;
+  let lastProgram = null;
   let lastLiveColors = null;
   let prevLiveColors = null;
   let liveColorColumns = { ...DEFAULT_LIVE_COLOR_COLUMNS };
@@ -296,6 +298,7 @@ export function connectView({
       }
       if (msg.liveColors) lastLiveColors = msg.liveColors;
       if (msg.liveColorColumns) liveColorColumns = msg.liveColorColumns;
+      if (msg.program) lastProgram = msg.program;
       applySimState(msg.simulated === true);
       if (msg.payload) {
         lastPayload = msg.payload;
@@ -355,6 +358,18 @@ export function connectView({
         const nav = root?.querySelector('#admin-set-nav');
         if (nav) renderSetNav(nav, setNavCtx());
       }
+      return;
+    }
+
+    if (msg.type === 'program') {
+      lastProgram = msg.program ?? { sources: [] };
+      if (currentViewId !== 'admin' || showingSettings || statusOnly) return;
+      const mount = root?.querySelector('#admin-program');
+      if (mount) {
+        renderProgramPanel(mount, lastProgram, { compact: boardMode === 'dashboard' });
+        return;
+      }
+      if (hasProgramSources(lastProgram)) render();
       return;
     }
 
@@ -1128,6 +1143,7 @@ export function connectView({
       ...viewConfig,
       payload: lastPayload,
       status: lastStatus,
+      program: lastProgram,
       connected,
       lastUpdate,
       matchColumn,

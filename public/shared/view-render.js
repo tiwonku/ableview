@@ -40,6 +40,7 @@ import {
 import { prependDopeButton } from './moment-controls.js';
 import { copyTextToClipboard } from './clipboard.js';
 import { buildDashboardZones } from './admin-dashboard.js';
+import { mountProgramPanel } from './admin-program.js';
 import { renderSceneBanner, renderSessionTracks } from './session-tracks.js';
 
 const TRANSPORT_PLAY_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5.5v13l11-6.5L8 5.5z"/></svg>`;
@@ -1465,6 +1466,7 @@ function renderAdminDashboard(root, ctx) {
     cuePane = 'current',
     onCuePaneChange,
     liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
+    program = null,
   } = ctx;
 
   closeColorPicker();
@@ -1558,6 +1560,7 @@ function renderAdminDashboard(root, ctx) {
   const sessionPane = document.createElement('section');
   sessionPane.className = 'admin-dashboard-session';
   sessionPane.setAttribute('aria-label', 'Session');
+  mountProgramPanel(sessionPane, program, { compact: true });
   renderSceneBanner(sessionPane, payload);
   renderSessionTracks(sessionPane, {
     payload,
@@ -1638,6 +1641,7 @@ export function renderAdmin(root, {
   cuePane = 'current',
   onCuePaneChange,
   liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
+  program = null,
 }) {
   if (boardMode === 'dashboard') {
     renderAdminDashboard(root, {
@@ -1677,6 +1681,7 @@ export function renderAdmin(root, {
       cuePane,
       onCuePaneChange,
       liveColorColumns,
+      program,
     });
     return;
   }
@@ -1706,6 +1711,8 @@ export function renderAdmin(root, {
     cuePane,
     onCuePaneChange,
   });
+
+  mountProgramPanel(root, program);
 
   const stats = document.createElement('div');
   stats.id = 'admin-stats';
