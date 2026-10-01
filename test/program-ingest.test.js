@@ -122,6 +122,19 @@ test('parseDeckBridgeReport trims the trailing newline and accepts omitted nils'
   assert.equal(parseDeckBridgeReport(Buffer.from('not-json\n'), 'djay-d'), null);
 });
 
+test('a paused deck is not on air even when the bridge says so', () => {
+  const paused = parseDeckBridgeReport(JSON.stringify(report('djay-d', [
+    deck({ playing: false, onAir: true }),
+  ])), 'djay-d');
+  assert.equal(paused.decks[0].playing, false);
+  assert.equal(paused.decks[0].onAir, false);
+
+  const playing = parseDeckBridgeReport(JSON.stringify(report('djay-d', [
+    deck({ playing: true, onAir: true }),
+  ])), 'djay-d');
+  assert.equal(playing.decks[0].onAir, true);
+});
+
 test('programDeckFingerprint ignores elapsed and bpm', () => {
   const a = [deck({ elapsedDisplay: '01:00', bpm: 120 })];
   const b = [deck({ elapsedDisplay: '01:05', bpm: 140 })];
@@ -142,20 +155,25 @@ test('identical and elapsed-only reports emit once; title and on-air emit again'
   }]);
   const socket = await openSender();
   try {
-    const first = report('djay-d', [deck({ elapsedDisplay: '01:00', bpm: 120 })]);
-    await sendTo(socket, port, first);
-    await waitUntil(() => events.length >= 1);
     assert.equal(events.length, 1);
     assert.equal(events[0].sources[0].id, 'djay-d');
-    assert.equal(events[0].sources[0].live, true);
-    assert.equal(events[0].sources[0].stale, false);
-    assert.equal(events[0].sources[0].decks[0].loaded.title, 'What It Sounds Like');
+    assert.equal(events[0].sources[0].live, false);
+    assert.deepEqual(events[0].sources[0].decks, []);
+
+    const first = report('djay-d', [deck({ elapsedDisplay: '01:00', bpm: 120 })]);
+    await sendTo(socket, port, first);
+    await waitUntil(() => events.length >= 2);
+    assert.equal(events.length, 2);
+    assert.equal(events[1].sources[0].id, 'djay-d');
+    assert.equal(events[1].sources[0].live, true);
+    assert.equal(events[1].sources[0].stale, false);
+    assert.equal(events[1].sources[0].decks[0].loaded.title, 'What It Sounds Like');
     assert.equal(cueEvents.length, 0);
 
     await sendTo(socket, port, first);
     await sendTo(socket, port, report('djay-d', [deck({ elapsedDisplay: '01:05', bpm: 140 })]));
     await delay(100);
-    assert.equal(events.length, 1);
+    assert.equal(events.length, 2);
     assert.equal(ingest.getStatus().sources[0].decks[0].elapsedDisplay, '01:05');
     assert.equal(ingest.getStatus().sources[0].decks[0].bpm, 140);
 
@@ -163,18 +181,18 @@ test('identical and elapsed-only reports emit once; title and on-air emit again'
       loaded: { title: 'My Way', artist: 'KATSEYE' },
       elapsedDisplay: '00:01',
     })]));
-    await waitUntil(() => events.length >= 2);
-    assert.equal(events.length, 2);
-    assert.equal(events[1].sources[0].decks[0].loaded.title, 'My Way');
+    await waitUntil(() => events.length >= 3);
+    assert.equal(events.length, 3);
+    assert.equal(events[2].sources[0].decks[0].loaded.title, 'My Way');
 
     await sendTo(socket, port, report('djay-d', [deck({
       loaded: { title: 'My Way', artist: 'KATSEYE' },
       onAir: false,
       playing: true,
     })]));
-    await waitUntil(() => events.length >= 3);
-    assert.equal(events.length, 3);
-    assert.equal(events[2].sources[0].decks[0].onAir, false);
+    await waitUntil(() => events.length >= 4);
+    assert.equal(events.length, 4);
+    assert.equal(events[3].sources[0].decks[0].onAir, false);
     assert.equal(cueEvents.length, 0);
   } finally {
     socket.close();
@@ -198,9 +216,9 @@ test('two source ids on two ports aggregate independently', async () => {
       onAir: false,
       playing: false,
     })]));
-    await waitUntil(() => events.length >= 2);
-    assert.equal(events.length, 2);
-    const latest = events[1];
+    await waitUntil(() => events.at(-1)?.sources?.every((source) => source.live));
+    assert.equal(events.length, 3);
+    const latest = events[2];
     assert.deepEqual(latest.sources.map((s) => s.id), ['djay-d', 'tt-samples']);
     const d = latest.sources.find((s) => s.id === 'djay-d');
     const tt = latest.sources.find((s) => s.id === 'tt-samples');
@@ -234,13 +252,13 @@ test('a source goes stale after silence and keeps the last decks', async () => {
   const socket = await openSender();
   try {
     await sendTo(socket, port, report('djay-d', [deck()]));
-    await waitUntil(() => events.length >= 1);
-    assert.equal(events[0].sources[0].stale, false);
-    await waitUntil(() => events.length >= 2, 500);
-    assert.equal(events.length, 2);
-    assert.equal(events[1].sources[0].live, false);
-    assert.equal(events[1].sources[0].stale, true);
-    assert.equal(events[1].sources[0].decks[0].loaded.title, 'What It Sounds Like');
+    await waitUntil(() => events.some((state) => state.sources[0].live));
+    assert.equal(events.at(-1).sources[0].stale, false);
+    await waitUntil(() => events.some((state) => state.sources[0].stale), 500);
+    assert.equal(events.length, 3);
+    assert.equal(events[2].sources[0].live, false);
+    assert.equal(events[2].sources[0].stale, true);
+    assert.equal(events[2].sources[0].decks[0].loaded.title, 'What It Sounds Like');
     assert.equal(ingest.getStatus().sources[0].stale, true);
   } finally {
     socket.close();

@@ -40,7 +40,8 @@ function normalizeDeck(deck) {
     deckIndex: deck.deckIndex,
     loaded,
     playing: deck.playing === true,
-    onAir: deck.onAir === true,
+    // Bridge copies may still flag a paused deck. On air requires transport.
+    onAir: deck.onAir === true && deck.playing === true,
     bpm: finiteOrNull(deck.bpm),
     bpmPercent: finiteOrNull(deck.bpmPercent),
     key: typeof deck.key === 'string' ? deck.key : null,
@@ -111,6 +112,7 @@ export function createProgramIngest({ getConfig, bus, log }) {
   let sources = [];
   let sockets = [];
   let lastEmitAt = null;
+  let announced = false;
 
   function publicSource(source) {
     return {
@@ -220,11 +222,25 @@ export function createProgramIngest({ getConfig, bus, log }) {
     log.info({ sourceId: source.id, port: source.listenPort }, 'listening for deck bridge');
   }
 
+  function publish() {
+    lastEmitAt = new Date().toISOString();
+    for (const source of sources) {
+      source.emitKey = `${programDeckFingerprint(source.decks)}|${source.live}|${source.stale}`;
+    }
+    announced = sources.length > 0;
+    bus.emit(EVENTS.PROGRAM_DECK_STATE, snapshot());
+  }
+
   async function start() {
+    const wasAnnounced = announced;
     stop();
     sources = readSources(getConfig);
-    if (sources.length === 0) return;
+    if (sources.length === 0) {
+      if (wasAnnounced) publish();
+      return;
+    }
     await Promise.all(sources.map((source) => bindSource(source)));
+    publish();
   }
 
   function stop() {

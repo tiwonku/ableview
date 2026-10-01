@@ -73,7 +73,7 @@ function serializeSacn(sacn) {
 }
 
 /** Sections editable from the admin settings panel (M7). */
-export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match', 'timecode', 'sacn', 'moments', 'oscOut'];
+export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match', 'timecode', 'sacn', 'moments', 'oscOut', 'externalSources'];
 
 function deepMerge(base, override) {
   if (override === undefined) return base;
@@ -132,6 +132,7 @@ export function pickEditableSettings(config) {
     sacn: serializeSacn(config.sacn),
     moments: { ...config.moments },
     oscOut: serializeOscOut(config.oscOut),
+    externalSources: serializeExternalSources(config.externalSources),
   };
 }
 
@@ -177,6 +178,10 @@ export function createConfigRuntime({ config, configPath = './config/config.json
       throw new Error('No editable settings in request');
     }
 
+    const previousSources = Array.isArray(config.externalSources)
+      ? config.externalSources.map((src) => ({ ...src }))
+      : [];
+
     for (const section of Object.keys(limited)) {
       config[section] = deepMerge(config[section], limited[section]);
     }
@@ -190,6 +195,24 @@ export function createConfigRuntime({ config, configPath = './config/config.json
           port: Number(d?.port),
         }))
         : [];
+    }
+
+    // Source list is replaced as a whole. Unspecified staleMs / expectedDecks
+    // stay with the previous row that has the same id.
+    if (limited.externalSources !== undefined) {
+      const incoming = Array.isArray(limited.externalSources) ? limited.externalSources : [];
+      config.externalSources = incoming.map((src) => {
+        const id = typeof src?.id === 'string' ? src.id.trim() : '';
+        const prior = previousSources.find((row) => row.id === id);
+        return {
+          id,
+          label: typeof src?.label === 'string' ? src.label.trim() : '',
+          type: 'deck-bridge-udp',
+          listenPort: Number(src?.listenPort),
+          staleMs: Number.isFinite(src?.staleMs) ? src.staleMs : (prior?.staleMs ?? 3000),
+          expectedDecks: Number.isInteger(src?.expectedDecks) ? src.expectedDecks : (prior?.expectedDecks ?? 2),
+        };
+      });
     }
 
     validateConfig(config);

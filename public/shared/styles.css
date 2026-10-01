@@ -2332,7 +2332,8 @@ select.settings-input option {
   align-items: center;
 }
 
-.oscout-dest-remove {
+.oscout-dest-remove,
+.program-source-remove {
   padding: 0.4rem 0.7rem;
   font: inherit;
   font-size: 0.82rem;
@@ -2344,9 +2345,50 @@ select.settings-input option {
   white-space: nowrap;
 }
 
-.oscout-dest-remove:hover {
+.oscout-dest-remove:hover,
+.program-source-remove:hover {
   border-color: var(--warn);
   color: var(--warn);
+}
+
+.program-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.program-source-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 7rem auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.program-source-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.program-source-status-line {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.program-source-status-line--live {
+  color: var(--ok);
+}
+
+.program-source-status-line--stale,
+.program-source-status-line--offline {
+  color: var(--warn);
+}
+
+@media (max-width: 40rem) {
+  .program-source-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
 }
 
 .oscout-addresses {

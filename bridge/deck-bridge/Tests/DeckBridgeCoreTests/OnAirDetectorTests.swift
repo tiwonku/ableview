@@ -143,6 +143,20 @@ final class OnAirDetectorTests: XCTestCase {
         XCTAssertFalse(decoded.decks[1].onAir)
     }
 
+    func testReportBuilder_pausedDeckIsNotOnAir() throws {
+        let report = ReportBuilder.build(
+            sourceId: "djay-d",
+            appRunning: true,
+            crossfaderRaw: "0%",
+            deck1: DeckInfo(title: "Song A", isPlaying: false, lineVolume: "100%"),
+            deck2: DeckInfo(),
+            onAir1: true,
+            onAir2: false
+        )
+        XCTAssertFalse(report.decks[0].playing)
+        XCTAssertFalse(report.decks[0].onAir)
+    }
+
     func testReportBuilder_appNotRunning_emptyDecks() throws {
         let report = ReportBuilder.build(
             sourceId: "djay-d",

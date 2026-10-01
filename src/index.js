@@ -180,6 +180,13 @@ async function main() {
         log.error({ err: err.message }, 'osc clock output failed to restart');
       }
     }
+    if (sections.includes('externalSources')) {
+      try {
+        await program.start();
+      } catch (err) {
+        log.error({ err: err.message }, 'program ingest failed to restart — cue lane unchanged');
+      }
+    }
     if (sections.includes('sim')) viewServer.rebroadcastSimState();
   });
 

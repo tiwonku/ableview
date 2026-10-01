@@ -78,6 +78,16 @@ function normalizeSettings(raw) {
         ? raw.oscOut.destinations.map((d) => ({ host: d.host ?? '', port: d.port ?? 11010 }))
         : [],
     },
+    externalSources: Array.isArray(raw.externalSources)
+      ? raw.externalSources.map((src) => ({
+        id: src.id ?? '',
+        label: src.label ?? '',
+        type: 'deck-bridge-udp',
+        listenPort: src.listenPort ?? 9101,
+        staleMs: src.staleMs ?? 3000,
+        expectedDecks: src.expectedDecks ?? 2,
+      }))
+      : [],
   };
 }
 
@@ -408,6 +418,128 @@ function renderAbletonSessionBox(ingestStatus, simulated) {
   return box;
 }
 
+function programSignal(source) {
+  if (source?.live === true && source?.stale !== true) return { label: 'Live', kind: 'live' };
+  if (source?.stale === true) return { label: 'Stale', kind: 'stale' };
+  return { label: 'No signal', kind: 'offline' };
+}
+
+function programSeenLine(iso) {
+  if (!iso) return 'no packets yet';
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return 'no packets yet';
+  const sec = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (sec < 2) return 'packet just now';
+  if (sec < 60) return `last packet ${sec}s ago`;
+  return `last packet ${Math.round(sec / 60)}m ago`;
+}
+
+function renderProgramStatusBox(settings, programStatus) {
+  const box = el('div', 'program-source-status');
+  box.dataset.role = 'program-source-status';
+  const configured = Array.isArray(settings?.externalSources) ? settings.externalSources : [];
+  if (configured.length === 0) {
+    box.appendChild(el(
+      'p',
+      'settings-field-hint',
+      'No djay sources yet. Add one and save, then start the deck bridge on the performer Mac.',
+    ));
+    return box;
+  }
+  if (!programStatus) {
+    box.appendChild(el('p', 'settings-field-hint', 'Checking for deck-bridge packets…'));
+    return box;
+  }
+  const reported = Array.isArray(programStatus.sources) ? programStatus.sources : [];
+  for (const src of configured) {
+    const live = reported.find((row) => row.id === src.id) ?? null;
+    const signal = programSignal(live);
+    const line = el('p', `program-source-status-line program-source-status-line--${signal.kind}`);
+    line.textContent = `${src.label || src.id} · UDP ${src.listenPort} · ${signal.label} · ${programSeenLine(live?.lastSeenAt)}`;
+    box.appendChild(line);
+  }
+  return box;
+}
+
+function programSourceRow(source = { label: '', id: '', listenPort: 9101 }) {
+  const row = el('div', 'program-source-row');
+  const label = textInput('externalSourceLabel', source.label ?? '');
+  label.placeholder = 'D';
+  label.setAttribute('aria-label', 'Djay source label');
+  const id = textInput('externalSourceId', source.id ?? '');
+  id.placeholder = 'djay-d';
+  id.setAttribute('aria-label', 'Djay source id');
+  const port = numberInput('externalSourcePort', source.listenPort ?? 9101, { min: 1, max: 65535 });
+  port.setAttribute('aria-label', 'Djay listen port');
+  const remove = el('button', 'program-source-remove', 'Remove');
+  remove.type = 'button';
+  remove.addEventListener('click', () => {
+    row.remove();
+  });
+  row.appendChild(label);
+  row.appendChild(id);
+  row.appendChild(port);
+  row.appendChild(remove);
+  return row;
+}
+
+function nextProgramPort(list) {
+  const used = [...list.querySelectorAll('input[name="externalSourcePort"]')]
+    .map((input) => Number(input.value))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (used.length === 0) return 9101;
+  return Math.min(65535, Math.max(...used) + 1);
+}
+
+function renderProgramSourcesGroup(settings, programStatus) {
+  const group = el('fieldset', 'settings-group');
+  group.appendChild(el('legend', null, 'Djay sources'));
+  group.appendChild(renderProgramStatusBox(settings, programStatus));
+
+  const list = el('div', 'program-source-list');
+  list.dataset.role = 'program-sources';
+  const sources = Array.isArray(settings.externalSources) ? settings.externalSources : [];
+  for (const source of sources) list.appendChild(programSourceRow(source));
+  group.appendChild(list);
+
+  const addRow = el('div', 'settings-sync-row');
+  const addBtn = el('button', 'settings-sync', 'Add djay source');
+  addBtn.type = 'button';
+  addBtn.addEventListener('click', () => {
+    list.appendChild(programSourceRow({ label: '', id: '', listenPort: nextProgramPort(list) }));
+  });
+  addRow.appendChild(addBtn);
+  group.appendChild(addRow);
+
+  const hint = el('p', 'settings-sim-hint');
+  hint.textContent = 'One row per performer Mac running the deck bridge. Source id must match the bridge sourceId. Listen port is the UDP port on this computer; set the bridge targetHost to this machine and targetPort to that port. Live means a report arrived inside the stale window.';
+  group.appendChild(hint);
+  return group;
+}
+
+function externalSourcesFromForm(fd, current) {
+  const labels = fd.getAll('externalSourceLabel');
+  const ids = fd.getAll('externalSourceId');
+  const ports = fd.getAll('externalSourcePort');
+  const previous = Array.isArray(current?.externalSources) ? current.externalSources : [];
+  const sources = [];
+  const count = Math.max(labels.length, ids.length, ports.length);
+  for (let i = 0; i < count; i++) {
+    const label = String(labels[i] ?? '').trim();
+    const id = String(ids[i] ?? '').trim();
+    if (!label && !id) continue;
+    const prior = previous.find((row) => row.id === id);
+    sources.push({
+      id,
+      label,
+      listenPort: Number(ports[i]),
+      staleMs: prior?.staleMs ?? 3000,
+      expectedDecks: prior?.expectedDecks ?? 2,
+    });
+  }
+  return sources;
+}
+
 function destRow(dest = { host: '', port: 11010 }) {
   const row = el('div', 'oscout-dest-row');
   const host = textInput('oscOutHost', dest.host ?? '');
@@ -672,6 +804,7 @@ function settingsFromForm(form, current) {
       debounceMs: Number(fd.get('momentsDebounceMs')),
     },
     oscOut: oscOutFromForm(fd),
+    externalSources: externalSourcesFromForm(fd, current),
   };
 }
 
@@ -821,7 +954,7 @@ function renderSacnGroup(settings, sacnStatus, nics) {
   return group;
 }
 
-function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, oscOutStatus, nics, share, shareViewId, onShareViewChange }) {
+function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, oscOutStatus, programStatus, nics, share, shareViewId, onShareViewChange }) {
   root.innerHTML = '';
 
   const heading = el('h2', 'section-title', 'Settings');
@@ -1041,10 +1174,14 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   const clockRow = el('div', 'settings-row settings-row-single');
   clockRow.appendChild(renderOscOutGroup(settings, oscOutStatus));
 
+  const programRow = el('div', 'settings-row settings-row-single');
+  programRow.appendChild(renderProgramSourcesGroup(settings, programStatus));
+
   grid.appendChild(topRow);
   grid.appendChild(bottomRow);
   grid.appendChild(sacnRow);
   grid.appendChild(clockRow);
+  grid.appendChild(programRow);
   form.appendChild(grid);
 
   const actions = el('div', 'settings-actions');
@@ -1085,6 +1222,7 @@ export function mountSettingsPanel(rootSelector) {
   let timecodeStatus = null;
   let sacnStatus = null;
   let oscOutStatus = null;
+  let programStatus = null;
   let nics = [{ name: 'All interfaces', address: '0.0.0.0' }];
   let share = { port: 8080, views: [], origins: [] };
   let shareViewId = 'band';
@@ -1103,6 +1241,7 @@ export function mountSettingsPanel(rootSelector) {
       timecodeStatus,
       sacnStatus,
       oscOutStatus,
+      programStatus,
       nics,
       share,
       shareViewId,
@@ -1134,6 +1273,12 @@ export function mountSettingsPanel(rootSelector) {
     existing.replaceWith(next);
   }
 
+  function refreshProgramStatusBox() {
+    const existing = root.querySelector('[data-role="program-source-status"]');
+    if (!existing || !settings) return;
+    existing.replaceWith(renderProgramStatusBox(settings, programStatus));
+  }
+
   async function loadSheetStatus() {
     const res = await fetch('/api/sheets/status');
     if (res.ok) sheetStatus = await res.json();
@@ -1146,6 +1291,9 @@ export function mountSettingsPanel(rootSelector) {
     if (data?.timecode) timecodeStatus = data.timecode;
     if (data?.sacn) sacnStatus = data.sacn;
     if (data?.oscOut) oscOutStatus = data.oscOut;
+    if (data && Object.prototype.hasOwnProperty.call(data, 'program')) {
+      programStatus = data.program ?? { sources: [] };
+    }
   }
 
   async function loadNics() {
@@ -1221,6 +1369,15 @@ export function mountSettingsPanel(rootSelector) {
       render();
       return;
     }
+    if (patch.externalSources && !data.reloaded?.includes('externalSources')) {
+      status = {
+        ok: false,
+        message: 'Other settings saved, but djay sources were not applied. Restart AbleView, reload this page, and save again.',
+      };
+      await Promise.all([loadSheetStatus(), wait(400).then(() => loadHealthStatus())]);
+      render();
+      return;
+    }
     status = { ok: true, message: `Settings saved.${reloaded}` };
     await Promise.all([loadSheetStatus(), wait(400).then(() => loadHealthStatus())]);
     render();
@@ -1264,12 +1421,14 @@ export function mountSettingsPanel(rootSelector) {
     const prevIngest = JSON.stringify(ingestStatus);
     const prevTimecode = JSON.stringify(timecodeStatus);
     const prevSacn = JSON.stringify(sacnStatus);
+    const prevProgram = JSON.stringify(programStatus);
     loadHealthStatus()
       .then(() => {
         if (stopped) return;
         if (JSON.stringify(ingestStatus) !== prevIngest) refreshAbletonSessionBox();
         if (JSON.stringify(timecodeStatus) !== prevTimecode) refreshTimecodeSessionBox();
         if (JSON.stringify(sacnStatus) !== prevSacn) refreshSacnSessionBox();
+        if (JSON.stringify(programStatus) !== prevProgram) refreshProgramStatusBox();
       })
       .catch(() => {});
   }, 3000);

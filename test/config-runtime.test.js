@@ -30,10 +30,11 @@ function baseConfig(overrides = {}) {
   return { ...config, ...overrides };
 }
 
-test('pickEditableSettings returns ingest, sim, sheets, match, timecode, sacn, moments, and oscOut', () => {
+test('pickEditableSettings returns ingest, sim, sheets, match, timecode, sacn, moments, oscOut, and externalSources', () => {
   const config = baseConfig();
   const settings = pickEditableSettings(config);
-  assert.deepEqual(Object.keys(settings).sort(), ['ingest', 'match', 'moments', 'oscOut', 'sacn', 'sheets', 'sim', 'timecode']);
+  assert.deepEqual(Object.keys(settings).sort(), ['externalSources', 'ingest', 'match', 'moments', 'oscOut', 'sacn', 'sheets', 'sim', 'timecode']);
+  assert.deepEqual(settings.externalSources, []);
   assert.equal(settings.ingest.abletonHost, '127.0.0.1');
   assert.equal(settings.sim.enabled, false);
   assert.equal(settings.timecode.enabled, false);
@@ -92,6 +93,21 @@ test('createConfigRuntime persists patch and invokes reload handlers', async () 
   assert.equal(onDisk.match.includeArrangement, true);
 
   rmSync(dir, { recursive: true, force: true });
+});
+
+test('createConfigRuntime rejects a duplicate djay source id', async () => {
+  const config = baseConfig();
+  const runtime = createConfigRuntime({ config, log: silentLog });
+
+  await assert.rejects(
+    () => runtime.updateSettings({
+      externalSources: [
+        { id: 'djay-d', label: 'D', listenPort: 9101 },
+        { id: 'djay-d', label: 'Again', listenPort: 9103 },
+      ],
+    }),
+    /id must be unique/,
+  );
 });
 
 test('createConfigRuntime rejects invalid patch', async () => {
@@ -195,6 +211,38 @@ test('GET and PATCH /api/config/settings', async () => {
   assert.equal(oscReplace.status, 200);
   const oscReplaceBody = await oscReplace.json();
   assert.deepEqual(oscReplaceBody.settings.oscOut.destinations, [{ host: '10.0.0.8', port: 8000 }]);
+
+  const sourcesRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      externalSources: [
+        { id: 'djay-d', label: 'D', listenPort: 9101, staleMs: 4500 },
+        { id: 'tt-samples', label: 'Turntables', listenPort: 9102 },
+      ],
+    }),
+  });
+  assert.equal(sourcesRes.status, 200);
+  const sourcesBody = await sourcesRes.json();
+  assert.deepEqual(sourcesBody.reloaded, ['externalSources']);
+  assert.equal(sourcesBody.settings.externalSources[0].staleMs, 4500);
+  assert.equal(sourcesBody.settings.externalSources[1].type, 'deck-bridge-udp');
+  assert.equal(sourcesBody.settings.externalSources[1].expectedDecks, 2);
+
+  const sourcesReplace = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      externalSources: [
+        { id: 'djay-d', label: 'D main', listenPort: 9101 },
+      ],
+    }),
+  });
+  assert.equal(sourcesReplace.status, 200);
+  const sourcesReplaceBody = await sourcesReplace.json();
+  assert.equal(sourcesReplaceBody.settings.externalSources.length, 1);
+  assert.equal(sourcesReplaceBody.settings.externalSources[0].label, 'D main');
+  assert.equal(sourcesReplaceBody.settings.externalSources[0].staleMs, 4500);
 
   const sacnRes = await fetch(`http://127.0.0.1:${server.port}/api/config/settings`, {
     method: 'PATCH',

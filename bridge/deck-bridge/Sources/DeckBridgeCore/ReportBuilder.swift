@@ -54,7 +54,8 @@ public enum ReportBuilder {
             deckIndex: index,
             loaded: loaded,
             playing: info.isPlaying,
-            onAir: onAir,
+            // Mixer position alone is not on-air. A paused deck is silent.
+            onAir: onAir && info.isPlaying,
             bpm: AXValueParse.parseDouble(info.bpm),
             bpmPercent: AXValueParse.parseDouble(info.bpmPercent),
             key: emptyToNil(info.key),

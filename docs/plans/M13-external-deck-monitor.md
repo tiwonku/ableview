@@ -165,7 +165,7 @@ One datagram per report (or per deck if size limits bite — prefer one payload)
 - **`loaded`**: present when title visible in UI; `null` when deck empty.
 - **`playing`**: transport running (bridge applies debounce — see djay-pro-bridge ~700ms play
   detection).
-- **`onAir`**: computed on bridge from crossfader + per-deck line volume (§6.2).
+- **`onAir`**: crossfader weight and line volume (§6.2), and the deck must be playing. A paused deck is not on air.
 - **`sourceId`**: stable config id; must match `externalSources[].id` on show box.
 
 ### 4.2 Show box internal: `ProgramDeckState` (bus)
@@ -303,7 +303,7 @@ per deck.
 
 1. Normalize crossfader `0..1` (0 = full deck 1, 1 = full deck 2).
 2. Assign **weight** per deck from crossfader position (soft split near center).
-3. Deck is **on-air** if `weight >= threshold` **and** `lineVolume >= lineVolumeMin`.
+3. Deck is **on-air** if `weight >= threshold` **and** `lineVolume >= lineVolumeMin` **and** transport is playing. Pause clears on-air immediately.
 4. Apply **hysteresis** (e.g. 50–100ms hold) so minor crossfader motion does not flip UI/log.
 
 Document recommended Djay UI layout (jog view, timer visible) in deploy README — some AX fields

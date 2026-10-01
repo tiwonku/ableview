@@ -46,6 +46,19 @@ test('settings panel maps FX and static look channels independently', () => {
   assert.match(src, /sacn-preview-row/);
 });
 
+test('settings panel configures djay sources and shows packet status', () => {
+  const src = readFileSync(
+    fileURLToPath(new URL('../public/shared/admin-settings.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(src, /Djay sources/);
+  assert.match(src, /Add djay source/);
+  assert.match(src, /externalSourcesFromForm/);
+  assert.match(src, /hasOwnProperty\.call\(data, 'program'\)/);
+  assert.match(src, /No signal/);
+  assert.match(src, /no packets yet/);
+});
+
 test('settings panel can toggle arrangement matching', () => {
   const src = readFileSync(
     fileURLToPath(new URL('../public/shared/admin-settings.js', import.meta.url)),
