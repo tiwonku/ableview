@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# Install AbleView deck-bridge as a macOS LaunchAgent on a performer Mac (Djay Pro).
+#
+# Usage (from repo root or with --repo-dir):
+#   ./deploy/install-deck-bridge-macos.sh \
+#     [--repo-dir .] \
+#     [--install-dir ~/AbleView-deck-bridge] \
+#     [--config deploy/deck-bridge/config.example.json] \
+#     [--source-id djay-d]
+#
+# Prerequisites: Xcode Command Line Tools, Accessibility grant (see deploy/README.md).
+
+set -euo pipefail
+
+REPO_DIR=""
+INSTALL_DIR="${HOME}/AbleView-deck-bridge"
+CONFIG_SRC=""
+SOURCE_ID=""
+SKIP_BUILD=0
+
+usage() {
+  sed -n '2,12p' "$0"
+  exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --repo-dir) REPO_DIR="$2"; shift 2 ;;
+    --install-dir) INSTALL_DIR="$2"; shift 2 ;;
+    --config) CONFIG_SRC="$2"; shift 2 ;;
+    --source-id) SOURCE_ID="$2"; shift 2 ;;
+    --skip-build) SKIP_BUILD=1; shift ;;
+    -h|--help) usage ;;
+    *) echo "Unknown option: $1" >&2; usage ;;
+  esac
+done
+
+step() { printf '==> %s\n' "$1"; }
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -z "$REPO_DIR" ]]; then
+  REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+else
+  REPO_DIR="$(cd "$REPO_DIR" && pwd)"
+fi
+
+BRIDGE_DIR="${REPO_DIR}/bridge/deck-bridge"
+[[ -f "${BRIDGE_DIR}/Package.swift" ]] || {
+  echo "Missing bridge package at ${BRIDGE_DIR}" >&2
+  exit 1
+}
+
+if [[ -z "$CONFIG_SRC" ]]; then
+  CONFIG_SRC="${REPO_DIR}/deploy/deck-bridge/config.example.json"
+fi
+if [[ "$CONFIG_SRC" != /* ]]; then
+  CONFIG_SRC="${REPO_DIR}/${CONFIG_SRC}"
+fi
+[[ -f "$CONFIG_SRC" ]] || {
+  echo "Config not found: ${CONFIG_SRC}" >&2
+  exit 1
+}
+
+if [[ -z "$SOURCE_ID" ]]; then
+  SOURCE_ID="$(
+    /usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("sourceId",""))' "$CONFIG_SRC" 2>/dev/null \
+      || node -e "const c=require('fs').readFileSync(process.argv[1],'utf8'); console.log(JSON.parse(c).sourceId||'')" "$CONFIG_SRC" 2>/dev/null \
+      || true
+  )"
+fi
+SOURCE_ID="${SOURCE_ID:-djay-d}"
+LABEL="com.ableview.deck-bridge.${SOURCE_ID}"
+
+step "AbleView deck-bridge LaunchAgent install"
+step "Repo: ${REPO_DIR}"
+step "Install dir: ${INSTALL_DIR}"
+step "sourceId / label: ${SOURCE_ID} / ${LABEL}"
+
+if ! command -v swift >/dev/null 2>&1; then
+  echo "swift not found. Install Xcode Command Line Tools: xcode-select --install" >&2
+  exit 1
+fi
+
+mkdir -p "${INSTALL_DIR}/bin" "${INSTALL_DIR}/logs" "${INSTALL_DIR}/config"
+
+CONFIG_DEST="${INSTALL_DIR}/config/config.json"
+if [[ -f "$CONFIG_DEST" ]]; then
+  step "Keeping existing config: ${CONFIG_DEST}"
+else
+  step "Installing config from ${CONFIG_SRC}"
+  cp "$CONFIG_SRC" "$CONFIG_DEST"
+fi
+
+BINARY_PATH="${INSTALL_DIR}/bin/DeckBridge"
+if [[ "$SKIP_BUILD" -eq 0 ]]; then
+  step "Building release DeckBridge"
+  (
+    cd "$BRIDGE_DIR"
+    swift build -c release --product DeckBridge
+  )
+  BUILT="${BRIDGE_DIR}/.build/release/DeckBridge"
+  [[ -x "$BUILT" ]] || {
+    echo "Build did not produce ${BUILT}" >&2
+    exit 1
+  }
+  cp "$BUILT" "$BINARY_PATH"
+  chmod +x "$BINARY_PATH"
+else
+  [[ -x "$BINARY_PATH" ]] || {
+    echo "Missing binary ${BINARY_PATH} (omit --skip-build to compile)" >&2
+    exit 1
+  }
+fi
+
+PLIST_SRC="${REPO_DIR}/deploy/deck-bridge/com.ableview.deck-bridge.plist.example"
+PLIST_DEST="${HOME}/Library/LaunchAgents/${LABEL}.plist"
+[[ -f "$PLIST_SRC" ]] || {
+  echo "Missing ${PLIST_SRC}" >&2
+  exit 1
+}
+
+step "Installing LaunchAgent ${LABEL}"
+mkdir -p "${HOME}/Library/LaunchAgents"
+sed -e "s|{LABEL}|${LABEL}|g" \
+    -e "s|{BINARY_PATH}|${BINARY_PATH}|g" \
+    -e "s|{CONFIG_PATH}|${CONFIG_DEST}|g" \
+    -e "s|{INSTALL_DIR}|${INSTALL_DIR}|g" \
+    "$PLIST_SRC" > "$PLIST_DEST"
+
+UID_NUM="$(id -u)"
+DOMAIN="gui/${UID_NUM}"
+
+launchctl bootout "${DOMAIN}/${LABEL}" 2>/dev/null || launchctl unload "$PLIST_DEST" 2>/dev/null || true
+
+if launchctl bootstrap "$DOMAIN" "$PLIST_DEST" 2>/dev/null; then
+  :
+elif launchctl load "$PLIST_DEST"; then
+  :
+else
+  echo "Failed to load LaunchAgent" >&2
+  exit 1
+fi
+
+TARGET_PORT="$(
+  /usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("targetPort",9101))' "$CONFIG_DEST" 2>/dev/null \
+    || echo 9101
+)"
+TARGET_HOST="$(
+  /usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("targetHost","127.0.0.1"))' "$CONFIG_DEST" 2>/dev/null \
+    || echo "show-box-ip"
+)"
+
+echo ""
+echo "deck-bridge LaunchAgent installed."
+echo ""
+echo "REQUIRED — grant Accessibility (one-time):"
+echo "  1. Open System Settings → Privacy & Security → Accessibility"
+echo "  2. Click + and add:  ${BINARY_PATH}"
+echo "     (or enable it if it already appears after first launch)"
+echo "  3. Toggle ON. After rebuilds, toggle OFF then ON if reports stop."
+echo "  4. Open djay Pro (jog / deck view; keep timers visible for elapsed time)."
+echo ""
+echo "Verify UDP on the show box (listening for ${SOURCE_ID}):"
+echo "  nc -u -l ${TARGET_PORT}"
+echo "  (bridge sends to ${TARGET_HOST}:${TARGET_PORT} — edit config if needed)"
+echo ""
+echo "Edit targetHost/targetPort/sourceId:  ${CONFIG_DEST}"
+echo "  then: launchctl kickstart -k ${DOMAIN}/${LABEL}"
+echo ""
+echo "Logs:   ${INSTALL_DIR}/logs/deck-bridge.log"
+echo "Status: launchctl print ${DOMAIN}/${LABEL}"
+echo "Unload: launchctl bootout ${DOMAIN}/${LABEL} && rm ${PLIST_DEST}"
+echo ""
+echo "Full docs: ${REPO_DIR}/deploy/README.md  (section: Deck bridge)"

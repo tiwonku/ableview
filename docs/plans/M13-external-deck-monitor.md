@@ -497,7 +497,7 @@ Manual: two Macs on LAN, Djay load + crossfade, admin panel + JSONL tail.
 
 ## 15. Milestone completion checklist
 
-- [ ] M13a — macOS deck-bridge LaunchAgent
+- [x] M13a — macOS deck-bridge LaunchAgent
 - [ ] M13b — program UDP ingest + bus
 - [ ] M13c — admin Program Sources UI + WS
 - [ ] M13d — multi-source deploy docs + turntablist path

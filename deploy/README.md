@@ -298,6 +298,95 @@ Task Scheduler is workable but NSSM or systemd gives simpler crash restart behav
 
 ---
 
+## Deck bridge (Djay Pro performer Mac)
+
+M13a sidecar for live deck visibility. Runs on each **performer Mac** (not the show box),
+reads Algoriddim djay Pro via macOS Accessibility, and sends `DeckBridgeReport` JSON over
+UDP to AbleView. Show-box ingest arrives in M13b — until then, verify with `nc -u -l`.
+
+Source: [`bridge/deck-bridge/`](../bridge/deck-bridge/). Plan:
+[`docs/plans/M13-external-deck-monitor.md`](../docs/plans/M13-external-deck-monitor.md).
+
+### One-time install
+
+On the Djay Mac (Xcode Command Line Tools required):
+
+```bash
+cd /path/to/ableview
+chmod +x deploy/install-deck-bridge-macos.sh
+# Edit targetHost / targetPort / sourceId first if you prefer:
+#   cp deploy/deck-bridge/config.example.json /tmp/deck-bridge.json
+./deploy/install-deck-bridge-macos.sh \
+  --install-dir ~/AbleView-deck-bridge
+```
+
+This builds `DeckBridge`, copies it to `~/AbleView-deck-bridge/bin/`, writes
+`config/config.json` (from the example on first install), and loads LaunchAgent
+`com.ableview.deck-bridge.{sourceId}` (login + KeepAlive).
+
+Point `targetHost` / `targetPort` at the show box listen port that will match
+`externalSources[].listenPort` (M13b). Example: show box `192.168.1.50`, port `9101`,
+`sourceId` `djay-d`.
+
+### Accessibility permission (required)
+
+The bridge **cannot** read deck titles without Accessibility. Grant it once per binary path:
+
+1. Open **System Settings → Privacy & Security → Accessibility**.
+2. Click **+** and select `~/AbleView-deck-bridge/bin/DeckBridge` (or enable the entry
+   created on first launch).
+3. Toggle **ON**.
+4. If you rebuild/reinstall the binary and reports stop, toggle **OFF** then **ON** again
+   (macOS keys permission to the binary identity/path).
+
+When developing with `swift run DeckBridge`, grant Accessibility to **Terminal** (or your
+IDE terminal) instead of the installed binary.
+
+### Djay UI layout
+
+AX fields are **view-dependent**. For reliable title / artist / key / BPM / elapsed / line
+volume / crossfader:
+
+- Keep **two decks** visible (standard 2-deck layout).
+- Prefer **jog wheel** (or equivalent) view so elapsed/remaining timers appear.
+- Per-deck timer toggle (next to key) controls elapsed vs remaining — elapsed maps to
+  `elapsedDisplay` in the UDP report.
+
+When Djay is closed, the bridge stays running and reports `app.running: false` with empty
+`decks` — no crash loop.
+
+### Verify before show night
+
+On the show box (or any Mac that can receive UDP):
+
+```bash
+nc -u -l 9101
+```
+
+With Djay open and Accessibility granted, you should see JSON lines like
+`{"schemaVersion":1,"sourceId":"djay-d",...}` about every 100 ms.
+
+Logs on the performer Mac: `~/AbleView-deck-bridge/logs/deck-bridge.log`
+
+```bash
+launchctl print gui/$(id -u)/com.ableview.deck-bridge.djay-d
+```
+
+Unload:
+
+```bash
+launchctl bootout gui/$(id -u)/com.ableview.deck-bridge.djay-d
+rm ~/Library/LaunchAgents/com.ableview.deck-bridge.djay-d.plist
+```
+
+### Attribution
+
+AX reading patterns adapted from
+[djay-pro-bridge](https://github.com/kyleawayan/djay-pro-bridge) (MIT). See
+[`bridge/deck-bridge/THIRD_PARTY_NOTICES.md`](../bridge/deck-bridge/THIRD_PARTY_NOTICES.md).
+
+---
+
 ## Development machines
 
 Do **not** enable systemd, NSSM, LaunchAgent, or Task Scheduler startup tasks on the machine where you
@@ -309,4 +398,5 @@ npm start
 ```
 
 Leave `NODE_ENV` unset (or `development`). Production validation and service install are
-opt-in only on the dedicated show box.
+opt-in only on the dedicated show box. Do **not** install the deck-bridge LaunchAgent on a
+dev Mac unless you are testing M13 against a local Djay session.

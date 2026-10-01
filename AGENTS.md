@@ -102,19 +102,20 @@ AbletonOSC / Simulator  →  event bus  →  [matcher]  →  [view server]  → 
 | NowPlaying | `src/core/now-playing.js` | Ingest → matcher contract (§9.1). Both real listener and simulator emit this shape. |
 | Config | `src/config/index.js` | `.env` + `config/config.json` loader with validation. |
 | Ingest | `src/ingest/` | Source interface. Real: `abletonosc.js`. Sim: `simulator.js` + optional `sim/osc-emitter.js`. |
+| Sheets | `src/sheets/` | Google Sheets sync + disk cache (M2). |
+| Matcher | `src/match/` | Fuzzy clip → sheet row → `CuePayload` (M3). |
+| Server / views | `src/server/`, `public/` | HTTP + WebSocket operator views (M4–M5). |
 | OSC clock out | `src/outputs/osc.js` | Rebroadcasts Live tempo / beat / bar / transport to configured UDP destinations. |
 | Logger | `src/core/logger.js` | pino, structured JSON. |
 | Session log | `src/session-log/` | Append-only JSONL of `track_clip` + `match` events (M10). |
 | Setlist | `src/setlist/` | Named JSON setlists (`data/setlists/`) + `.active.json` sidecar; glance + pin, not a match source. |
+| Deck bridge | `bridge/deck-bridge/` | macOS AX → UDP JSON sidecar for Djay Pro (M13a). Not AbleView ingest. |
 
 ### Planned modules (not yet implemented)
 
 | Module | Path | Milestone |
 |---|---|---|
-| Sheets | `src/sheets/` | M2 |
-| Matcher | `src/match/` | M3 |
-| Server | `src/server/` | M4–M5 |
-| Views | `public/views/`, `public/shared/` | M4–M5 |
+| Program ingest | `src/program/` | M13b |
 
 ### Data contracts (keep stable — spec §9)
 
