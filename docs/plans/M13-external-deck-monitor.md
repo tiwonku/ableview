@@ -192,8 +192,7 @@ Emit `EVENTS.PROGRAM_DECK_STATE` when any source’s meaningful fingerprint chan
 
 ### 4.3 M10 extension: `event: "deck_on_air"` (JSONL)
 
-Append **only** when on-air identity changes while logging enabled (`sessionLog.logExternalOnAir
-=== true`):
+Append **only** when on-air identity changes while the session log is enabled:
 
 ```json
 {
@@ -258,10 +257,7 @@ Reuse M10 `resolveLogTimestamp(getTimecodeStatus())` envelope.
       "staleMs": 3000,
       "expectedDecks": 2
     }
-  ],
-  "sessionLog": {
-    "logExternalOnAir": true
-  }
+  ]
 }
 ```
 
@@ -340,7 +336,7 @@ Emit bus event when fingerprint changes. Session logger maintains separate
 | View server | `src/server/index.js` | WS push program state; admin health |
 | Session log | `src/session-log/index.js` | Optional `deck_on_air` handler (M13e) |
 | Admin UI | `public/shared/admin-program.js` | Program Sources panel |
-| Config | `src/config/index.js` | `externalSources`, `sessionLog.logExternalOnAir` |
+| Config | `src/config/index.js` | `externalSources`; `deck_on_air` follows the session log switch |
 
 ### 7.2 `createProgramIngest({ getConfig, bus, log })`
 
@@ -427,9 +423,7 @@ decks — no crash loop. When Djay opens, next poll resumes.
 
 ### M13e — Session log `deck_on_air` (extends M10)
 
-- Config `sessionLog.logExternalOnAir` (default `true` when external sources configured? **Default
-  `false`** until operator opts in — see OD-D5).
-- Subscribe to program state; append on on-air transitions only.
+- Subscribe to program state; append on on-air transitions only while the session log is enabled.
 - Tests in `test/session-log-deck-on-air.test.js`.
 - Update M10 plan §12 cross-reference.
 - **Accept:** load-to-deck B does not log; crossfade B on-air logs one line with Art-Net timestamp
@@ -469,7 +463,7 @@ Manual: two Macs on LAN, Djay load + crossfade, admin panel + JSONL tail.
 | OD-D2 | Report rate | **100ms** UDP send; AX poll ~8fps internally |
 | OD-D3 | Turntablist Mac software | **Assume Djay** until confirmed; document AbletonOSC remote as M13d alt |
 | OD-D4 | Operator visibility | **Admin-only** v1; optional `views.program` in follow-up |
-| OD-D5 | Default `logExternalOnAir` | **`false`** in example config; enable per show in settings |
+| OD-D5 | When to log on-air decks | **With the session log.** The Set/Admin Log switch includes `deck_on_air`. No separate settings checkbox. |
 | OD-D6 | Windows Djay | **Out of scope v1**; note SQLite polling (djay-connect) as future milestone |
 | OD-D7 | Match DJ titles to sheet | **No** in M13; program lane is display + on-air log only |
 
@@ -503,10 +497,10 @@ Manual: two Macs on LAN, Djay load + crossfade, admin panel + JSONL tail.
 - [x] M13a — macOS deck-bridge LaunchAgent
 - [x] M13b — program UDP ingest + bus
 - [x] M13c — admin Program Sources UI + WS
-- [ ] M13d — multi-source deploy docs + turntablist path
-- [ ] M13e — `deck_on_air` session log events
-- [ ] `ROADMAP.md` M13 marked done
-- [ ] `AGENTS.md` module table updated
+- [x] M13d — multi-source deploy docs + turntablist path
+- [x] M13e — `deck_on_air` session log events
+- [x] `ROADMAP.md` M13 marked done
+- [x] `AGENTS.md` module table updated
 
 ---
 
@@ -533,4 +527,4 @@ Manual: two Macs on LAN, Djay load + crossfade, admin panel + JSONL tail.
 **Session 4 — M13e**
 
 > Implement M13e per `docs/plans/M13-external-deck-monitor.md` §9 (M13e): `deck_on_air` JSONL
-> events, `sessionLog.logExternalOnAir`, tests. Run `npm test`. Do not commit unless asked.
+> events while the session log is enabled, tests. Run `npm test`. Do not commit unless asked.

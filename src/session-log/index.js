@@ -24,6 +24,7 @@ import {
   effectiveMomentKinds,
 } from './moments.js';
 import { createLiveColorGate } from './live-color.js';
+import { observeSourceOnAir, onAirTransitions } from './deck-on-air.js';
 
 export { SessionLogDisabledError } from './moments.js';
 export { generateAutoSessionName } from './auto-session-name.js';
@@ -106,8 +107,14 @@ export function createSessionLogger({
   let onNowPlaying = null;
   let onCuePayload = null;
   let onLiveColors = null;
+  let onProgramDeckState = null;
   let lastCueForColor = null;
   let liveColorGate = null;
+  let lastTempo = null;
+  let lastBeat = null;
+  /** sourceId → last on-air identities. Kept across enable/disable so a
+   *  later program event does not re-log a deck that never left the air. */
+  const lastOnAirBySource = new Map();
 
   function sessionConfig() {
     return getConfig().sessionLog ?? {};
@@ -198,7 +205,14 @@ export function createSessionLogger({
     return event?.source === SOURCES.SIMULATOR;
   }
 
+  function rememberTransport(event) {
+    if (!event) return;
+    if ('tempo' in event) lastTempo = event.tempo ?? null;
+    if ('beat' in event) lastBeat = event.beat ?? null;
+  }
+
   function handleNowPlaying(event) {
+    rememberTransport(event);
     if (!enabled) return;
 
     const scene = event.scene ?? null;
@@ -246,6 +260,7 @@ export function createSessionLogger({
   }
 
   function handleCuePayload(payload) {
+    rememberTransport(payload);
     lastCueForColor = {
       clipName: payload?.clipName ?? null,
       rowId: payload?.match?.rowId ?? null,
@@ -307,6 +322,44 @@ export function createSessionLogger({
   function handleLiveColors(status) {
     if (!enabled) return;
     liveColorGate?.handleStatus(status);
+  }
+
+  function handleProgramDeckState(state) {
+    const sources = Array.isArray(state?.sources) ? state.sources : [];
+    const pending = [];
+    for (const source of sources) {
+      const observed = observeSourceOnAir(source);
+      if (observed == null) continue;
+      const sourceId = source.id;
+      const previous = lastOnAirBySource.get(sourceId) ?? [];
+      const transitions = onAirTransitions(previous, observed);
+      lastOnAirBySource.set(sourceId, observed);
+      if (transitions.length > 0) pending.push(...transitions);
+    }
+
+    if (!enabled || pending.length === 0) return;
+
+    const envelope = timestampEnvelope();
+    const simulated = typeof getSimulated === 'function' ? getSimulated() === true : false;
+    for (const { deck, previousOnAir } of pending) {
+      const record = {
+        ...envelope,
+        event: 'deck_on_air',
+        sourceId: deck.sourceId,
+        sourceLabel: deck.sourceLabel,
+        deckIndex: deck.deckIndex,
+        title: deck.title,
+        artist: deck.artist,
+        bpm: deck.bpm,
+        key: deck.key,
+        tempo: lastTempo,
+        beat: lastBeat,
+        simulated,
+        sessionName,
+      };
+      if (previousOnAir) record.previousOnAir = previousOnAir;
+      appendRecord(record);
+    }
   }
 
   function disableLogging() {
@@ -490,9 +543,11 @@ export function createSessionLogger({
     onNowPlaying = (event) => handleNowPlaying(event);
     onCuePayload = (payload) => handleCuePayload(payload);
     onLiveColors = (status) => handleLiveColors(status);
+    onProgramDeckState = (state) => handleProgramDeckState(state);
     bus.on(EVENTS.NOW_PLAYING, onNowPlaying);
     bus.on(EVENTS.CUE_PAYLOAD, onCuePayload);
     bus.on(EVENTS.LIVE_COLORS, onLiveColors);
+    bus.on(EVENTS.PROGRAM_DECK_STATE, onProgramDeckState);
   }
 
   function stop() {
@@ -507,6 +562,10 @@ export function createSessionLogger({
     if (onLiveColors) {
       bus.off(EVENTS.LIVE_COLORS, onLiveColors);
       onLiveColors = null;
+    }
+    if (onProgramDeckState) {
+      bus.off(EVENTS.PROGRAM_DECK_STATE, onProgramDeckState);
+      onProgramDeckState = null;
     }
     liveColorGate?.stop();
     liveColorGate = null;
@@ -524,5 +583,6 @@ export function createSessionLogger({
     handleNowPlaying,
     handleCuePayload,
     handleLiveColors,
+    handleProgramDeckState,
   };
 }

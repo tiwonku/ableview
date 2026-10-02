@@ -698,9 +698,9 @@ Use `node:test`, `assert`, temp dir via `fs.mkdtempSync` under `os.tmpdir()`.
 
 ## 12. Future extensions (out of M10 scope)
 
-- **`event: deck_on_air`** — external DJ program sources (Djay Pro deck bridges on performer
-  Macs). Log **on-air transitions only** when `sessionLog.logExternalOnAir` is enabled. Build
-  plan: [`M13-external-deck-monitor.md`](./M13-external-deck-monitor.md) (M13e).
+- **`event: deck_on_air`** — shipped in M13e. External DJ program sources append on-air
+  transitions while the session log is enabled. Plan:
+  [`M13-external-deck-monitor.md`](./M13-external-deck-monitor.md).
 - **`event: sheet_edit`** lines when `PATCH /api/sheets/rows/:rowId` succeeds.
 - **CSV export** endpoint with fixed column list from config.
 - **`sessionLog.includeColumns`** — whitelist row fields to reduce PII/size.

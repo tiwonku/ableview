@@ -380,6 +380,56 @@ launchctl bootout gui/$(id -u)/com.ableview.deck-bridge.djay-d
 rm ~/Library/LaunchAgents/com.ableview.deck-bridge.djay-d.plist
 ```
 
+### Two sources
+
+The show-box example lists two listeners: `djay-d` on UDP **9101** and `tt-samples` on
+UDP **9102** (`config/config.example.json` → `externalSources`). Each performer Mac runs
+its own LaunchAgent. The bridge `sourceId` must match the show-box row `id`, and
+`targetPort` must match that row's `listenPort`.
+
+**Two Macs (show).** On D's Mac, install with `deploy/deck-bridge/config.example.json`
+(`djay-d`, port 9101). On the turntablist Mac, install with the second profile:
+
+```bash
+./deploy/install-deck-bridge-macos.sh \
+  --install-dir ~/AbleView-deck-bridge \
+  --config deploy/deck-bridge/config.tt-samples.example.json
+```
+
+Edit `targetHost` in each Mac's `~/AbleView-deck-bridge/config/config.json` to the show
+box address before the first install, or edit it after and kickstart the agent.
+Grant Accessibility on each Mac to that Mac's `DeckBridge` binary.
+
+**One Mac (dev).** Use a **separate install directory per source**. One directory holds
+one `config.json`, and the installer will not replace a config that is already there.
+Two copies of the binary means two Accessibility grants (macOS keys the permission to
+the path).
+
+```bash
+./deploy/install-deck-bridge-macos.sh \
+  --install-dir ~/AbleView-deck-bridge-d \
+  --config deploy/deck-bridge/config.example.json
+
+./deploy/install-deck-bridge-macos.sh \
+  --install-dir ~/AbleView-deck-bridge-tt \
+  --config deploy/deck-bridge/config.tt-samples.example.json
+```
+
+Agents: `com.ableview.deck-bridge.djay-d` and `com.ableview.deck-bridge.tt-samples`.
+
+### Turntablist Mac
+
+- **Djay Pro** — same bridge. Use the `tt-samples` profile above (or any other
+  `sourceId` / port pair you add under `externalSources`).
+- **Ableton for samples** — not a deck-bridge source. A future `abletonosc-remote` type
+  would watch that Live set read-only. v1 accepts only `type: "deck-bridge-udp"`. Leave
+  the show-box AbletonOSC listener on the master cue set; do not point a second Live
+  set at `ingest.oscListenPort`.
+- **Windows Djay** — out of scope. The bridge is macOS Accessibility only.
+
+On-air track changes are written to the session log while **Log** is on (Set or Admin).
+A load on the deck that is not on air does not write a line.
+
 ### Attribution
 
 AX reading patterns adapted from

@@ -512,7 +512,7 @@ function renderProgramSourcesGroup(settings, programStatus) {
   group.appendChild(addRow);
 
   const hint = el('p', 'settings-sim-hint');
-  hint.textContent = 'One row per performer Mac running the deck bridge. Source id must match the bridge sourceId. Listen port is the UDP port on this computer; set the bridge targetHost to this machine and targetPort to that port. Live means a report arrived inside the stale window.';
+  hint.textContent = 'One row per performer Mac running the deck bridge. Source id must match the bridge sourceId. Listen port is the UDP port on this computer; set the bridge targetHost to this machine and targetPort to that port. Live means a report arrived inside the stale window. While Log is on (Set or Admin), an on-air track change is written to that session file.';
   group.appendChild(hint);
   return group;
 }

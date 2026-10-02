@@ -20,6 +20,7 @@ Binary: `.build/release/DeckBridge`
 ```bash
 cp ../../deploy/deck-bridge/config.example.json /tmp/deck-bridge.json
 # edit targetHost / targetPort / sourceId
+# second source: deploy/deck-bridge/config.tt-samples.example.json (port 9102)
 swift run DeckBridge --config /tmp/deck-bridge.json
 ```
 

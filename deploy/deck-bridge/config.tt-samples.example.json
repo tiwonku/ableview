@@ -1,0 +1,11 @@
+{
+  "sourceId": "tt-samples",
+  "targetHost": "192.168.1.50",
+  "targetPort": 9102,
+  "reportIntervalMs": 100,
+  "onAir": {
+    "crossfaderThreshold": 0.08,
+    "lineVolumeMin": 0.05,
+    "hysteresisMs": 80
+  }
+}

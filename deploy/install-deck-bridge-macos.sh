@@ -8,6 +8,11 @@
 #     [--config deploy/deck-bridge/config.example.json] \
 #     [--source-id djay-d]
 #
+# Second source (turntablist Djay, or a second bridge on one dev Mac):
+#   ./deploy/install-deck-bridge-macos.sh \
+#     --install-dir ~/AbleView-deck-bridge-tt \
+#     --config deploy/deck-bridge/config.tt-samples.example.json
+#
 # Prerequisites: Xcode Command Line Tools, Accessibility grant (see deploy/README.md).
 
 set -euo pipefail
@@ -16,10 +21,11 @@ REPO_DIR=""
 INSTALL_DIR="${HOME}/AbleView-deck-bridge"
 CONFIG_SRC=""
 SOURCE_ID=""
+SOURCE_ID_FROM_FLAG=0
 SKIP_BUILD=0
 
 usage() {
-  sed -n '2,12p' "$0"
+  sed -n '2,16p' "$0"
   exit 1
 }
 
@@ -28,7 +34,7 @@ while [[ $# -gt 0 ]]; do
     --repo-dir) REPO_DIR="$2"; shift 2 ;;
     --install-dir) INSTALL_DIR="$2"; shift 2 ;;
     --config) CONFIG_SRC="$2"; shift 2 ;;
-    --source-id) SOURCE_ID="$2"; shift 2 ;;
+    --source-id) SOURCE_ID="$2"; SOURCE_ID_FROM_FLAG=1; shift 2 ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     -h|--help) usage ;;
     *) echo "Unknown option: $1" >&2; usage ;;
@@ -84,11 +90,37 @@ fi
 mkdir -p "${INSTALL_DIR}/bin" "${INSTALL_DIR}/logs" "${INSTALL_DIR}/config"
 
 CONFIG_DEST="${INSTALL_DIR}/config/config.json"
+CONFIG_FRESH=0
 if [[ -f "$CONFIG_DEST" ]]; then
   step "Keeping existing config: ${CONFIG_DEST}"
 else
   step "Installing config from ${CONFIG_SRC}"
   cp "$CONFIG_SRC" "$CONFIG_DEST"
+  CONFIG_FRESH=1
+fi
+
+if [[ "$SOURCE_ID_FROM_FLAG" -eq 1 && "$CONFIG_FRESH" -eq 1 ]]; then
+  /usr/bin/python3 - "$CONFIG_DEST" "$SOURCE_ID" <<'PY'
+import json, sys
+path, source_id = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as fh:
+    cfg = json.load(fh)
+cfg["sourceId"] = source_id
+with open(path, "w", encoding="utf-8") as fh:
+    json.dump(cfg, fh, indent=2)
+    fh.write("\n")
+PY
+fi
+
+if [[ "$SOURCE_ID_FROM_FLAG" -eq 1 && "$CONFIG_FRESH" -eq 0 ]]; then
+  EXISTING_ID="$(
+    /usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("sourceId",""))' "$CONFIG_DEST" 2>/dev/null \
+      || true
+  )"
+  if [[ -n "$EXISTING_ID" && "$EXISTING_ID" != "$SOURCE_ID" ]]; then
+    echo "Warning: ${CONFIG_DEST} sourceId is ${EXISTING_ID}; LaunchAgent label uses ${SOURCE_ID}." >&2
+    echo "Use a separate --install-dir per source so each bridge keeps its own config." >&2
+  fi
 fi
 
 BINARY_PATH="${INSTALL_DIR}/bin/DeckBridge"
