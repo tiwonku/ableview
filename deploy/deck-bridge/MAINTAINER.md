@@ -6,29 +6,29 @@ The helper runs on each performer Mac, not the show box. It reads djay Pro and s
 
 | Mac | Config | sourceId | Port |
 |---|---|---|---|
-| Dave (D) | `config.example.json` | `djay-d` | 9101 |
-| Turntables | `config.tt-samples.example.json` | `tt-samples` | 9102 |
+| Dave (default) | `config.example.json` | `tt-samples` | 9102 |
+| D | `config.djay-d.example.json` | `djay-d` | 9101 |
 
 `targetHost` in both examples is the show box `10.45.2.107`. Change it if that address changes, before the first install on that Mac. The installer will not overwrite a config that is already in the install folder.
 
-On the turntablist Mac:
+Dave's Mac is the default: run the installer with no `--config`. On D's Mac:
 
 ```bash
 ./deploy/deck-bridge/install-deck-bridge-macos.sh \
   --install-dir ~/AbleView-deck-bridge \
-  --config deploy/deck-bridge/config.tt-samples.example.json
+  --config deploy/deck-bridge/config.djay-d.example.json
 ```
 
 One Mac running both sources needs a separate install directory per source (macOS keys Accessibility to the binary path):
 
 ```bash
 ./deploy/deck-bridge/install-deck-bridge-macos.sh \
-  --install-dir ~/AbleView-deck-bridge-d \
+  --install-dir ~/AbleView-deck-bridge-tt \
   --config deploy/deck-bridge/config.example.json
 
 ./deploy/deck-bridge/install-deck-bridge-macos.sh \
-  --install-dir ~/AbleView-deck-bridge-tt \
-  --config deploy/deck-bridge/config.tt-samples.example.json
+  --install-dir ~/AbleView-deck-bridge-d \
+  --config deploy/deck-bridge/config.djay-d.example.json
 ```
 
 Each folder has its own `uninstall.sh`. `deploy/uninstall-macos.sh` removes the show-box agent (`com.ableview.server`), not these.

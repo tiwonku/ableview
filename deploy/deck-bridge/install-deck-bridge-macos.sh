@@ -6,12 +6,12 @@
 #     [--repo-dir .] \
 #     [--install-dir ~/AbleView-deck-bridge] \
 #     [--config deploy/deck-bridge/config.example.json] \
-#     [--source-id djay-d]
+#     [--source-id tt-samples]
 #
-# Second source (turntablist Djay, or a second bridge on one dev Mac):
+# Other Mac (D), or a second bridge on one dev Mac:
 #   ./deploy/deck-bridge/install-deck-bridge-macos.sh \
-#     --install-dir ~/AbleView-deck-bridge-tt \
-#     --config deploy/deck-bridge/config.tt-samples.example.json
+#     --install-dir ~/AbleView-deck-bridge-d \
+#     --config deploy/deck-bridge/config.djay-d.example.json
 #
 # Dave's steps: deploy/deck-bridge/README.md
 # Remove later: ~/AbleView-deck-bridge/uninstall.sh
@@ -76,7 +76,7 @@ if [[ -z "$SOURCE_ID" ]]; then
       || true
   )"
 fi
-SOURCE_ID="${SOURCE_ID:-djay-d}"
+SOURCE_ID="${SOURCE_ID:-tt-samples}"
 LABEL="com.ableview.deck-bridge.${SOURCE_ID}"
 
 step "AbleView deck-bridge LaunchAgent install"
@@ -186,8 +186,8 @@ else
 fi
 
 TARGET_PORT="$(
-  /usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("targetPort",9101))' "$CONFIG_DEST" 2>/dev/null \
-    || echo 9101
+  /usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("targetPort",9102))' "$CONFIG_DEST" 2>/dev/null \
+    || echo 9102
 )"
 TARGET_HOST="$(
   /usr/bin/python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("targetHost","127.0.0.1"))' "$CONFIG_DEST" 2>/dev/null \

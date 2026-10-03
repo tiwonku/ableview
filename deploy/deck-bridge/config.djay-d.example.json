@@ -1,7 +1,7 @@
 {
-  "sourceId": "tt-samples",
+  "sourceId": "djay-d",
   "targetHost": "10.45.2.107",
-  "targetPort": 9102,
+  "targetPort": 9101,
   "reportIntervalMs": 100,
   "onAir": {
     "crossfaderThreshold": 0.08,

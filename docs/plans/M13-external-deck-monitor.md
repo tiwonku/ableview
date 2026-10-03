@@ -272,9 +272,9 @@ Reuse M10 `resolveLogTimestamp(getTimecodeStatus())` envelope.
 
 ```json
 {
-  "sourceId": "djay-d",
+  "sourceId": "tt-samples",
   "targetHost": "10.45.2.107",
-  "targetPort": 9101,
+  "targetPort": 9102,
   "reportIntervalMs": 100,
   "onAir": {
     "crossfaderThreshold": 0.08,

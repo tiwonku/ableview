@@ -57,7 +57,7 @@ if [[ -z "$SOURCE_ID" && -f "${INSTALL_DIR}/config/config.json" ]]; then
       "${INSTALL_DIR}/config/config.json" 2>/dev/null || true
   )"
 fi
-SOURCE_ID="${SOURCE_ID:-djay-d}"
+SOURCE_ID="${SOURCE_ID:-tt-samples}"
 
 if [[ ! "$SOURCE_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "Refusing sourceId ${SOURCE_ID} (expected letters, numbers, dot, underscore, or hyphen)." >&2

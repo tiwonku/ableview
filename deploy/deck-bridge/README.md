@@ -21,7 +21,7 @@ Show computer address: `10.45.2.107`
 
    Use the real path if it is not on the Desktop.
 
-4. Open the config and check that `targetHost` is `10.45.2.107`. Leave `sourceId` as `djay-d` and `targetPort` as `9101`. Save.
+4. Open the config and check that `targetHost` is `10.45.2.107`. Leave `sourceId` as `tt-samples` and `targetPort` as `9102`. Save.
 
    ```bash
    open -e deploy/deck-bridge/config.example.json

@@ -20,14 +20,14 @@ Binary: `.build/release/DeckBridge`
 ```bash
 cp ../../deploy/deck-bridge/config.example.json /tmp/deck-bridge.json
 # edit targetHost / targetPort / sourceId
-# second source: deploy/deck-bridge/config.tt-samples.example.json (port 9102)
+# other Mac: deploy/deck-bridge/config.djay-d.example.json (port 9101)
 swift run DeckBridge --config /tmp/deck-bridge.json
 ```
 
 On the show box (or locally):
 
 ```bash
-nc -u -l 9101
+nc -u -l 9102
 ```
 
 ## Dump AX tree (debug)
