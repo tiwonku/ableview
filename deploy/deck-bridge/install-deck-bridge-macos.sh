@@ -2,18 +2,20 @@
 # Install AbleView deck-bridge as a macOS LaunchAgent on a performer Mac (Djay Pro).
 #
 # Usage (from repo root or with --repo-dir):
-#   ./deploy/install-deck-bridge-macos.sh \
+#   ./deploy/deck-bridge/install-deck-bridge-macos.sh \
 #     [--repo-dir .] \
 #     [--install-dir ~/AbleView-deck-bridge] \
 #     [--config deploy/deck-bridge/config.example.json] \
 #     [--source-id djay-d]
 #
 # Second source (turntablist Djay, or a second bridge on one dev Mac):
-#   ./deploy/install-deck-bridge-macos.sh \
+#   ./deploy/deck-bridge/install-deck-bridge-macos.sh \
 #     --install-dir ~/AbleView-deck-bridge-tt \
 #     --config deploy/deck-bridge/config.tt-samples.example.json
 #
-# Prerequisites: Xcode Command Line Tools, Accessibility grant (see deploy/README.md).
+# Dave's steps: deploy/deck-bridge/README.md
+# Remove later: ~/AbleView-deck-bridge/uninstall.sh
+#   or ./deploy/deck-bridge/uninstall-deck-bridge-macos.sh --install-dir <same dir>
 
 set -euo pipefail
 
@@ -25,7 +27,7 @@ SOURCE_ID_FROM_FLAG=0
 SKIP_BUILD=0
 
 usage() {
-  sed -n '2,16p' "$0"
+  sed -n '2,18p' "$0"
   exit 1
 }
 
@@ -45,7 +47,7 @@ step() { printf '==> %s\n' "$1"; }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ -z "$REPO_DIR" ]]; then
-  REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+  REPO_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 else
   REPO_DIR="$(cd "$REPO_DIR" && pwd)"
 fi
@@ -57,7 +59,7 @@ BRIDGE_DIR="${REPO_DIR}/bridge/deck-bridge"
 }
 
 if [[ -z "$CONFIG_SRC" ]]; then
-  CONFIG_SRC="${REPO_DIR}/deploy/deck-bridge/config.example.json"
+  CONFIG_SRC="${SCRIPT_DIR}/config.example.json"
 fi
 if [[ "$CONFIG_SRC" != /* ]]; then
   CONFIG_SRC="${REPO_DIR}/${CONFIG_SRC}"
@@ -144,12 +146,20 @@ else
   }
 fi
 
-PLIST_SRC="${REPO_DIR}/deploy/deck-bridge/com.ableview.deck-bridge.plist.example"
+PLIST_SRC="${SCRIPT_DIR}/com.ableview.deck-bridge.plist.example"
 PLIST_DEST="${HOME}/Library/LaunchAgents/${LABEL}.plist"
 [[ -f "$PLIST_SRC" ]] || {
   echo "Missing ${PLIST_SRC}" >&2
   exit 1
 }
+
+step "Installing uninstall script"
+cp "${SCRIPT_DIR}/uninstall-deck-bridge-macos.sh" "${INSTALL_DIR}/uninstall.sh"
+chmod +x "${INSTALL_DIR}/uninstall.sh"
+cat > "${INSTALL_DIR}/.deck-bridge-install" <<EOF
+sourceId=${SOURCE_ID}
+label=${LABEL}
+EOF
 
 step "Installing LaunchAgent ${LABEL}"
 mkdir -p "${HOME}/Library/LaunchAgents"
@@ -163,6 +173,8 @@ UID_NUM="$(id -u)"
 DOMAIN="gui/${UID_NUM}"
 
 launchctl bootout "${DOMAIN}/${LABEL}" 2>/dev/null || launchctl unload "$PLIST_DEST" 2>/dev/null || true
+# A previous uninstall disables the label. Re-enable or bootstrap will refuse to load it.
+launchctl enable "${DOMAIN}/${LABEL}" 2>/dev/null || true
 
 if launchctl bootstrap "$DOMAIN" "$PLIST_DEST" 2>/dev/null; then
   :
@@ -201,6 +213,9 @@ echo "  then: launchctl kickstart -k ${DOMAIN}/${LABEL}"
 echo ""
 echo "Logs:   ${INSTALL_DIR}/logs/deck-bridge.log"
 echo "Status: launchctl print ${DOMAIN}/${LABEL}"
-echo "Unload: launchctl bootout ${DOMAIN}/${LABEL} && rm ${PLIST_DEST}"
 echo ""
-echo "Full docs: ${REPO_DIR}/deploy/README.md  (section: Deck bridge)"
+echo "Remove completely (login item, program, config, logs):"
+echo "  ${INSTALL_DIR}/uninstall.sh"
+echo "Then delete DeckBridge under Privacy & Security → Accessibility (and Local Network if listed)."
+echo ""
+echo "Full docs: ${REPO_DIR}/deploy/deck-bridge/README.md"

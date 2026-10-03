@@ -273,7 +273,7 @@ Reuse M10 `resolveLogTimestamp(getTimecodeStatus())` envelope.
 ```json
 {
   "sourceId": "djay-d",
-  "targetHost": "192.168.1.50",
+  "targetHost": "10.45.2.107",
   "targetPort": 9101,
   "reportIntervalMs": 100,
   "onAir": {
@@ -283,7 +283,7 @@ Reuse M10 `resolveLogTimestamp(getTimecodeStatus())` envelope.
 }
 ```
 
-Install via **`deploy/install-deck-bridge-macos.sh`** → LaunchAgent
+Install via **`deploy/deck-bridge/install-deck-bridge-macos.sh`** → LaunchAgent
 `com.ableview.deck-bridge.{sourceId}`.
 
 ---
@@ -330,7 +330,7 @@ Emit bus event when fingerprint changes. Session logger maintains separate
 | Module | Path | Role |
 |---|---|---|
 | Deck bridge (Swift) | `bridge/deck-bridge/` | macOS AX reader + UDP sender; fork/adapt djay-pro-bridge |
-| Bridge installer | `deploy/install-deck-bridge-macos.sh` | LaunchAgent + Accessibility instructions |
+| Bridge installer | `deploy/deck-bridge/install-deck-bridge-macos.sh` | LaunchAgent + Accessibility instructions |
 | Program ingest | `src/program/` | UDP listeners, validate, aggregate, stale sweep |
 | Bus | `src/core/bus.js` | Add `EVENTS.PROGRAM_DECK_STATE` |
 | View server | `src/server/index.js` | WS push program state; admin health |
@@ -394,7 +394,7 @@ decks — no crash loop. When Djay opens, next poll resumes.
 - Swift package under `bridge/deck-bridge/` (Reader core from djay-pro-bridge pattern).
 - UDP JSON reports to configurable host/port.
 - On-air computation + play debounce.
-- `deploy/install-deck-bridge-macos.sh` + `config.example.json` + README section.
+- `deploy/deck-bridge/install-deck-bridge-macos.sh` + `config.example.json` + README section.
 - **Accept:** bridge runs as LaunchAgent; with Djay open, `nc -u -l` on show box receives reports;
   Accessibility grant documented.
 

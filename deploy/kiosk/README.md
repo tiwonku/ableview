@@ -40,3 +40,5 @@ can close the app-mode window. Do not use Edge `--kiosk` — it blocks in-app Ex
 On the mini PC, double-click `Uninstall-AbleView.cmd`. That removes the desktop and Startup
 shortcuts, the launcher, and the kiosk Edge profile (`%LOCALAPPDATA%\AbleViewKiosk`). It
 does not change sleep settings or uninstall Edge.
+
+`ableview-kiosk.cmd` in this folder is a manual Edge launch if you are not using the installers above.

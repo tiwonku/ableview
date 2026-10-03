@@ -181,7 +181,7 @@ Manual fallback on the NUC connected to the operator panel:
    "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --user-data-dir="%LOCALAPPDATA%\AbleViewKiosk" --start-fullscreen --start-maximized --app="http://__SHOW_BOX_IP__:8080/views/band?kiosk=1" --no-first-run --no-default-browser-check --disable-features=Translate
    ```
 
-   `--user-data-dir` keeps this off the everyday Edge profile. If Edge is already running without that flag, `--app=` is often treated as a normal window and in-app Exit cannot close it. Close all Edge windows once before the first launch from this shortcut. `deploy/ableview-kiosk.cmd` wraps the same flags.
+   `--user-data-dir` keeps this off the everyday Edge profile. If Edge is already running without that flag, `--app=` is often treated as a normal window and in-app Exit cannot close it. Close all Edge windows once before the first launch from this shortcut. `deploy/kiosk/ableview-kiosk.cmd` wraps the same flags.
 
    Avoid `--kiosk` / `--edge-kiosk-type=fullscreen` on operator NUCs: that hides Windows chrome but **blocks** in-app Exit (`window.close()` is ignored). `--start-fullscreen` is F11-style fullscreen on the `--app=` window and still allows Exit. If a panel still shows the taskbar, tap anywhere once — kiosk mode retries the Fullscreen API on the first click.
 

@@ -4,7 +4,7 @@ macOS sidecar that reads Algoriddim **djay Pro** deck state via Accessibility an
 sends `DeckBridgeReport` JSON over UDP to the AbleView show box.
 
 Part of **M13** — see [`docs/plans/M13-external-deck-monitor.md`](../../docs/plans/M13-external-deck-monitor.md).
-Install and Accessibility steps: [`deploy/README.md`](../../deploy/README.md#deck-bridge-djay-pro-performer-mac).
+Dave's install and removal: [`deploy/deck-bridge/README.md`](../../deploy/deck-bridge/README.md). After install, `~/AbleView-deck-bridge/uninstall.sh` removes the login item and the install folder. Show-box notes: [`deploy/deck-bridge/MAINTAINER.md`](../../deploy/deck-bridge/MAINTAINER.md).
 
 ## Build
 

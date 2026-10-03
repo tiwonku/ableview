@@ -158,7 +158,7 @@ On a Windows operator panel, create a desktop shortcut whose **Target** is:
 
 Replace `<SHOW_BOX_IP>` with the show box IP on the operator VLAN, and `/views/band` with `/views/visuals` or `/views/lighting` as needed. Copy the shortcut into the Startup folder (`shell:startup`) for auto-launch.
 
-`--user-data-dir` is required so this is its own Edge profile. Without it, an already-running Edge often swallows `--app=` as a normal window, and hold-to-**Exit** cannot close it. Close every everyday Edge window once, then launch from this shortcut. `deploy/ableview-kiosk.cmd` wraps the same flags if you prefer a `.cmd` shortcut.
+`--user-data-dir` is required so this is its own Edge profile. Without it, an already-running Edge often swallows `--app=` as a normal window, and hold-to-**Exit** cannot close it. Close every everyday Edge window once, then launch from this shortcut. `deploy/kiosk/ableview-kiosk.cmd` wraps the same flags if you prefer a `.cmd` shortcut.
 
 `?kiosk=1` shows **Fullscreen**, **Reload**, and hold-to-**Exit**. The view requests fullscreen on load (and again on the first tap if the browser blocked it). Do not use Edge `--kiosk` — it blocks Exit.
 

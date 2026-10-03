@@ -284,7 +284,7 @@ config/
   scenarios/           # sim scenario files
 data/               # sheet cache gitignored; session JSONL and named setlists may be committed
 secrets/            # service account key (gitignored)
-deploy/             # systemd unit
+deploy/             # show box (root files), kiosk/, deck-bridge/
 test/               # node:test suite
 ```
 
