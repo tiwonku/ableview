@@ -51,6 +51,12 @@ test('validateConfig allows a dope module without a column', () => {
 
   cfg.views.band.fields = [{ type: 'dope', source: 'tempo' }];
   assert.throws(() => validateConfig(cfg), /cannot set source on a dope module/);
+
+  cfg.views.band.fields = [{ type: 'dope', members: ['Nik', ''] }];
+  assert.throws(() => validateConfig(cfg), /members must be an array of names/);
+
+  cfg.views.band.fields = [{ type: 'dope', members: ['Nik', 'Griff'] }];
+  assert.equal(validateConfig(cfg), cfg);
 });
 
 test('validateConfig rejects unknown field source and source+column', () => {

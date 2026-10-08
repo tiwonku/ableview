@@ -447,6 +447,14 @@ export function validateConfig(config) {
       if (field?.type === 'dope') {
         if (field.column) errors.push(`${path} cannot set column on a dope module`);
         if (field.source) errors.push(`${path} cannot set source on a dope module`);
+        if (field.members != null) {
+          const namesOk = Array.isArray(field.members) && field.members.every((name) => {
+            if (typeof name !== 'string') return false;
+            const trimmed = name.trim();
+            return trimmed.length > 0 && trimmed.length <= 64;
+          });
+          if (!namesOk) errors.push(`${path}.members must be an array of names (1–64 characters)`);
+        }
         continue;
       }
       if (field?.source === 'tempo') {

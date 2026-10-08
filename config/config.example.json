@@ -173,7 +173,8 @@
         },
         {
           "type": "dope",
-          "label": "DOPE"
+          "label": "DOPE",
+          "members": ["Keys", "Bass", "Drums"]
         }
       ]
     },

@@ -91,10 +91,63 @@ export async function pressMoment(feedback, payload, post = postMoment) {
 let liveGetWho = null;
 let sharedDopeButton = null;
 let sharedDopeModule = null;
+let modulePressWho = () => currentMomentWho();
+let choosingDopeMember = false;
+
+export const DOPE_MEMBER_STORAGE_KEY = 'ableview.dopeMember';
 
 function dopeModuleLabel(field) {
   const label = String(field?.label ?? '').trim();
   return label || 'DOPE';
+}
+
+/** Names offered by a dope field. Blank and over-long entries are dropped. */
+export function dopeMemberNames(field) {
+  if (!Array.isArray(field?.members)) return [];
+  const seen = new Set();
+  const names = [];
+  for (const raw of field.members) {
+    const name = String(raw ?? '').replace(/[\r\n\0]/g, '').trim();
+    if (!name || name.length > 64 || seen.has(name)) continue;
+    seen.add(name);
+    names.push(name);
+  }
+  return names;
+}
+
+function memberStore(storage) {
+  if (storage !== undefined) return storage;
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function readStoredDopeMember(members, storage) {
+  const names = Array.isArray(members) ? members : [];
+  const store = memberStore(storage);
+  if (!store || !names.length) return null;
+  let value = null;
+  try {
+    value = store.getItem(DOPE_MEMBER_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+  if (typeof value !== 'string') return null;
+  const name = value.trim();
+  return names.includes(name) ? name : null;
+}
+
+export function writeStoredDopeMember(name, storage) {
+  const store = memberStore(storage);
+  if (!store) return false;
+  try {
+    store.setItem(DOPE_MEMBER_STORAGE_KEY, name);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function setMomentWhoGetter(getWho) {
@@ -105,7 +158,11 @@ export function currentMomentWho() {
   return resolveWho(liveGetWho);
 }
 
-export function createDopeButton({ getWho, className = 'view-edit-btn view-edit-btn--dope' } = {}) {
+export function createDopeButton({
+  getWho,
+  className = 'view-edit-btn view-edit-btn--dope',
+  resolveWho: resolvePressWho = null,
+} = {}) {
   if (getWho != null) liveGetWho = getWho;
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -116,7 +173,8 @@ export function createDopeButton({ getWho, className = 'view-edit-btn view-edit-
   const feedback = bindMomentFeedback(btn);
   btn.addEventListener('click', () => {
     if (btn.disabled) return;
-    pressMoment(feedback, { kind: 'dope', who: currentMomentWho() });
+    const who = typeof resolvePressWho === 'function' ? resolvePressWho() : currentMomentWho();
+    pressMoment(feedback, { kind: 'dope', who });
   });
   return btn;
 }
@@ -131,18 +189,66 @@ export function prependDopeButton(parent, getWho) {
   return sharedDopeButton;
 }
 
+function renderMemberPicker(members, onPick) {
+  const list = document.createElement('div');
+  list.className = 'dope-members';
+  list.setAttribute('role', 'group');
+  list.setAttribute('aria-label', 'Choose who this is');
+  for (const name of members) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dope-member-pick';
+    btn.textContent = name;
+    btn.addEventListener('click', () => onPick(name));
+    list.appendChild(btn);
+  }
+  return list;
+}
+
 /** Large view-field presser. Separate from the small config-row button. */
 export function mountDopeModule(parent, field, getWho) {
   if (!parent || (typeof getWho !== 'function' && getWho == null)) return null;
   liveGetWho = getWho;
+  const members = dopeMemberNames(field);
+  const stored = readStoredDopeMember(members);
+  modulePressWho = () => readStoredDopeMember(members) || resolveWho(getWho);
+
+  parent.replaceChildren();
+  const showPicker = members.length > 0 && (choosingDopeMember || !stored);
+  if (showPicker) {
+    parent.appendChild(renderMemberPicker(members, (name) => {
+      writeStoredDopeMember(name);
+      choosingDopeMember = false;
+      mountDopeModule(parent, field, getWho);
+    }));
+    return null;
+  }
+
+  if (stored) {
+    const change = document.createElement('button');
+    change.type = 'button';
+    change.className = 'dope-member';
+    change.textContent = stored;
+    change.title = 'Choose a different band member';
+    change.setAttribute('aria-label', `This client is ${stored}. Choose someone else`);
+    change.addEventListener('click', () => {
+      choosingDopeMember = true;
+      mountDopeModule(parent, field, getWho);
+    });
+    parent.appendChild(change);
+  }
+
   let btn = sharedDopeModule;
   if (!btn || (btn.isConnected && btn.parentElement !== parent)) {
-    btn = createDopeButton({ className: 'dope-press' });
+    btn = createDopeButton({
+      className: 'dope-press',
+      resolveWho: () => modulePressWho(),
+    });
     btn.dataset.role = 'moment-dope-module';
     if (!sharedDopeModule || !sharedDopeModule.isConnected) sharedDopeModule = btn;
   }
   btn.textContent = dopeModuleLabel(field);
-  btn.title = 'Mark a dope moment';
+  btn.title = stored ? `Mark a dope moment as ${stored}` : 'Mark a dope moment';
   if (btn.parentElement !== parent) parent.appendChild(btn);
   return btn;
 }

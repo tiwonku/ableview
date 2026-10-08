@@ -8,6 +8,10 @@ import {
   postMoment,
   pressMoment,
   setMomentWhoGetter,
+  dopeMemberNames,
+  readStoredDopeMember,
+  writeStoredDopeMember,
+  DOPE_MEMBER_STORAGE_KEY,
 } from '../public/shared/moment-controls.js';
 
 function mockEl() {
@@ -88,6 +92,20 @@ test('currentMomentWho reads a live getter without wrapping itself', () => {
   assert.equal(currentMomentWho(), 'visuals');
   setMomentWhoGetter(null);
   assert.equal(currentMomentWho(), null);
+});
+
+test('stored dope member is kept only when it is still in the list', () => {
+  const mem = new Map();
+  const storage = {
+    getItem: (key) => (mem.has(key) ? mem.get(key) : null),
+    setItem: (key, value) => { mem.set(key, value); },
+  };
+  assert.deepEqual(dopeMemberNames({ members: [' Nik ', '', 'Nik', 'Griff'] }), ['Nik', 'Griff']);
+  assert.equal(readStoredDopeMember(['Nik', 'Griff'], storage), null);
+  assert.equal(writeStoredDopeMember('Nik', storage), true);
+  assert.equal(storage.getItem(DOPE_MEMBER_STORAGE_KEY), 'Nik');
+  assert.equal(readStoredDopeMember(['Nik', 'Griff'], storage), 'Nik');
+  assert.equal(readStoredDopeMember(['Griff'], storage), null);
 });
 
 test('pressMoment sets pending then the response state', async () => {
