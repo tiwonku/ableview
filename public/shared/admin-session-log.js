@@ -132,8 +132,11 @@ function plural(count, noun) {
 export function formatSessionLogStatusLine(status) {
   const enabled = status?.enabled === true;
   const name = status?.sessionName ? `${status.sessionName}.jsonl` : null;
+  const captureLabel = formatCaptureStatus(status?.capture);
   if (!enabled) {
-    return name ? `Logging off · ${name}` : 'Logging off';
+    const parts = [name ? `Logging off · ${name}` : 'Logging off'];
+    if (captureLabel) parts.push(captureLabel);
+    return parts.join(' · ');
   }
   const parts = [name || 'Logging on'];
   if (status.lineCount != null) parts.push(plural(status.lineCount, 'line'));
@@ -142,7 +145,15 @@ export function formatSessionLogStatusLine(status) {
     parts.push(who ? `${plural(status.momentCount, 'moment')} · ${who}` : plural(status.momentCount, 'moment'));
   }
   if (status.lastLoggedAt) parts.push(`last ${formatShortTime(status.lastLoggedAt)}`);
+  if (captureLabel) parts.push(captureLabel);
   return parts.join(' · ');
+}
+
+function formatCaptureStatus(capture) {
+  if (!capture?.enabled) return null;
+  if (capture.lastError) return `site: ${capture.lastError}`;
+  if (capture.pending > 0) return `site ${capture.pending} queued`;
+  return 'site';
 }
 
 /** Keep a typed draft; only follow the server name if the field was still showing the last committed value. */
@@ -209,6 +220,7 @@ export function mountSessionLogPanel(selector, { getWho = () => 'setlist' } = {}
   let built = false;
   let lastCommittedName = null;
   let toggle = null;
+  let siteToggle = null;
   let nameInput = null;
   let applyBtn = null;
   let statusLine = null;
@@ -248,6 +260,16 @@ export function mountSessionLogPanel(selector, { getWho = () => 'setlist' } = {}
     toggleLabel.appendChild(document.createTextNode('Log'));
     shell.appendChild(toggleLabel);
 
+    const siteLabel = el('label', 'set-log-toggle');
+    siteToggle = el('input');
+    siteToggle.type = 'checkbox';
+    siteToggle.id = 'sessionLogCapture';
+    siteToggle.className = 'settings-checkbox';
+    siteToggle.title = 'Send this session log to the show website';
+    siteLabel.appendChild(siteToggle);
+    siteLabel.appendChild(document.createTextNode('Site'));
+    shell.appendChild(siteLabel);
+
     nameInput = el('input', 'settings-input set-log-name');
     nameInput.type = 'text';
     nameInput.id = 'sessionLogName';
@@ -272,6 +294,16 @@ export function mountSessionLogPanel(selector, { getWho = () => 'setlist' } = {}
         showBanner(shell, null);
       } catch (err) {
         toggle.checked = !toggle.checked;
+        showBanner(shell, err.message);
+      }
+    });
+
+    siteToggle.addEventListener('change', async () => {
+      try {
+        applyStatus(await patchSessionLog({ captureEnabled: siteToggle.checked }));
+        showBanner(shell, null);
+      } catch (err) {
+        siteToggle.checked = !siteToggle.checked;
         showBanner(shell, err.message);
       }
     });
@@ -301,6 +333,7 @@ export function mountSessionLogPanel(selector, { getWho = () => 'setlist' } = {}
     }
 
     if (toggle) toggle.checked = status?.enabled === true;
+    if (siteToggle) siteToggle.checked = status?.capture?.enabled === true;
     if (nameInput) {
       nameInput.value = nextSessionNameInputValue({
         serverName: status?.sessionName,
@@ -343,6 +376,7 @@ export function mountSessionLogPanel(selector, { getWho = () => 'setlist' } = {}
       lastMoment: sessionLog.lastMoment !== undefined
         ? sessionLog.lastMoment
         : (status?.lastMoment ?? null),
+      capture: sessionLog.capture !== undefined ? sessionLog.capture : (status?.capture ?? null),
     });
   }
 

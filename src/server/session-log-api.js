@@ -11,9 +11,14 @@ export function registerSessionLogRoutes(app, { sessionLog, log }) {
       const status = sessionLog.applyPatch({
         enabled: body.enabled,
         sessionName: body.sessionName,
+        captureEnabled: body.captureEnabled,
       });
       log.info(
-        { enabled: status.enabled, sessionName: status.sessionName },
+        {
+          enabled: status.enabled,
+          sessionName: status.sessionName,
+          captureEnabled: status.capture?.enabled === true,
+        },
         'session log updated',
       );
       return reply.send(status);

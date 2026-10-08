@@ -30,7 +30,7 @@ function testConfig(sessionDir) {
   };
 }
 
-async function createTestServer(sessionDir) {
+async function createTestServer(sessionDir, { capture } = {}) {
   const bus = createBus();
   const config = testConfig(sessionDir);
   const sessionLog = createSessionLogger({
@@ -39,6 +39,7 @@ async function createTestServer(sessionDir) {
     getTimecodeStatus: () => ({ enabled: false }),
     getSimulated: () => false,
     log: silentLog,
+    capture,
   });
   sessionLog.start();
 
@@ -161,6 +162,53 @@ test('PATCH sessionName rotates to new file', async () => {
 
   assert.ok(existsSync(join(dir, 'segment-a.jsonl')));
   assert.ok(existsSync(join(dir, 'segment-b.jsonl')));
+
+  await stopTestServer(ctx);
+});
+
+test('PATCH captureEnabled requires website credentials and hides the secret', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ableview-session-api-'));
+  const missing = await createTestServer(dir);
+  const denied = await fetch(`http://127.0.0.1:${missing.server.port}/api/session-log`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ captureEnabled: true }),
+  });
+  assert.equal(denied.status, 400);
+  const deniedBody = await denied.json();
+  assert.match(deniedBody.error, /SHOW_CAPTURE_URL/);
+  await stopTestServer(missing);
+
+  const { createShowCapture } = await import('../src/session-log/capture.js');
+  const capture = createShowCapture({
+    getCredentials: () => ({ url: 'https://show.test/api/show-capture', secret: 'tour-secret' }),
+    log: silentLog,
+    ackPath: join(dir, '.capture-ack.json'),
+    intervalMs: 0,
+    fetchImpl: async () => {
+      throw new Error('capture fetch ran during the settings toggle');
+    },
+  });
+  const ctx = await createTestServer(dir, { capture });
+  const enabled = await fetch(`http://127.0.0.1:${ctx.server.port}/api/session-log`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ captureEnabled: true }),
+  });
+  assert.equal(enabled.status, 200);
+  const body = await enabled.json();
+  assert.equal(body.capture.enabled, true);
+  assert.equal(body.capture.configured, true);
+  assert.equal(JSON.stringify(body).includes('tour-secret'), false);
+
+  const off = await fetch(`http://127.0.0.1:${ctx.server.port}/api/session-log`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ captureEnabled: false }),
+  });
+  assert.equal(off.status, 200);
+  const offBody = await off.json();
+  assert.equal(offBody.capture.enabled, false);
 
   await stopTestServer(ctx);
 });

@@ -25,6 +25,7 @@ import {
 } from './moments.js';
 import { createLiveColorGate } from './live-color.js';
 import { observeSourceOnAir, onAirTransitions } from './deck-on-air.js';
+import { createShowCapture } from './capture.js';
 
 export { SessionLogDisabledError } from './moments.js';
 export { generateAutoSessionName } from './auto-session-name.js';
@@ -45,35 +46,27 @@ function writeSidecar(sidecarPath, data) {
   writeFileSync(sidecarPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 }
 
-function countLinesInFile(filePath) {
+function readSessionStats(filePath) {
+  const stats = { lines: 0, maxSeq: 0, moments: 0 };
   try {
-    if (!existsSync(filePath)) return 0;
+    if (!existsSync(filePath)) return stats;
     const content = readFileSync(filePath, 'utf8');
-    if (!content) return 0;
-    return content.split('\n').filter((line) => line.trim()).length;
-  } catch {
-    return 0;
-  }
-}
-
-function countMomentsInFile(filePath) {
-  try {
-    if (!existsSync(filePath)) return 0;
-    const content = readFileSync(filePath, 'utf8');
-    if (!content) return 0;
-    let count = 0;
+    if (!content) return stats;
     for (const line of content.split('\n')) {
       if (!line.trim()) continue;
+      stats.lines += 1;
       try {
-        if (JSON.parse(line).event === 'moment') count += 1;
+        const record = JSON.parse(line);
+        if (record.event === 'moment') stats.moments += 1;
+        if (Number.isInteger(record.seq) && record.seq > stats.maxSeq) stats.maxSeq = record.seq;
       } catch {
-        // skip malformed lines
+        // a torn line still occupies a slot so the next seq stays above it
       }
     }
-    return count;
   } catch {
-    return 0;
+    return { lines: 0, maxSeq: 0, moments: 0 };
   }
+  return stats;
 }
 
 export function createSessionLogger({
@@ -84,7 +77,14 @@ export function createSessionLogger({
   log,
   cwd = process.cwd(),
   onSessionLogChange,
+  capture,
 }) {
+  const showCapture = capture ?? createShowCapture({
+    getCredentials: () => getConfig().showCapture ?? {},
+    log,
+    ackPath: () => resolve(cwd, sessionConfig().directory ?? './data/sessions', '.capture-ack.json'),
+  });
+  showCapture.setOnChange?.(() => notifySessionLogChange());
   let enabled = false;
   let sessionName = null;
   let lineCount = 0;
@@ -156,6 +156,7 @@ export function createSessionLogger({
       lineCount,
       lastLoggedAt,
       launchSummary,
+      captureEnabled: showCapture.isEnabled() === true,
     });
   }
 
@@ -176,9 +177,21 @@ export function createSessionLogger({
       momentCount = 0;
       startedAt = new Date().toISOString();
     } else {
-      lineCount = countLinesInFile(file);
-      momentCount = countMomentsInFile(file);
+      const stats = readSessionStats(file);
+      lineCount = Math.max(stats.lines, stats.maxSeq);
+      momentCount = stats.moments;
       startedAt = startedAt ?? new Date().toISOString();
+    }
+  }
+
+  function currentSessionFile() {
+    if (absolutePath && existsSync(absolutePath)) return absolutePath;
+    if (!sessionName) return null;
+    try {
+      const { file } = sessionFilePath(sessionConfig().directory ?? './data/sessions', sessionName, cwd);
+      return existsSync(file) ? file : null;
+    } catch {
+      return null;
     }
   }
 
@@ -191,9 +204,12 @@ export function createSessionLogger({
 
   function appendRecord(record) {
     if (!enabled || !absolutePath) return;
+    const seq = lineCount + 1;
+    const stamped = { seq, lineId: String(seq), ...record, seq, lineId: String(seq) };
     try {
-      appendFileSync(absolutePath, `${JSON.stringify(record)}\n`, 'utf8');
-      lineCount += 1;
+      appendFileSync(absolutePath, `${JSON.stringify(stamped)}\n`, 'utf8');
+      lineCount = seq;
+      showCapture.enqueue(stamped);
       persistSidecar();
     } catch (err) {
       log.error({ err: err.message, file: absolutePath }, 'session log write error');
@@ -478,6 +494,7 @@ export function createSessionLogger({
       lastLoggedAt: enabled ? lastLoggedAt : null,
       momentCount: enabled ? momentCount : 0,
       launchSummary: enabled ? { ...launchSummary } : emptyLaunchSummary(),
+      capture: showCapture.getStatus(),
       config: {
         directory: cfg.directory ?? './data/sessions',
         autoStart: cfg.autoStart === true,
@@ -487,43 +504,79 @@ export function createSessionLogger({
     };
   }
 
-  function applyPatch({ enabled: nextEnabled, sessionName: nextName } = {}) {
+  function applyCaptureEnabled(captureEnabled) {
+    if (captureEnabled === true) {
+      const result = showCapture.enable();
+      if (!result.ok) throw new Error(result.error);
+      const file = currentSessionFile();
+      if (file && sessionName) showCapture.catchUp(file, sessionName);
+    } else {
+      showCapture.disable();
+    }
+    persistSidecar();
+    notifySessionLogChange();
+  }
+
+  function applyPatch({ enabled: nextEnabled, sessionName: nextName, captureEnabled } = {}) {
     if (nextEnabled === false) {
       if (nextName !== undefined) {
         sessionName = sanitizeSessionName(nextName);
       }
       disableLogging();
-      return getStatus();
+    } else {
+      const shouldEnable = nextEnabled === true || (nextName !== undefined && nextEnabled === undefined);
+      if (shouldEnable) {
+        const name = nextName !== undefined
+          ? sanitizeSessionName(nextName)
+          : (sessionName ?? sanitizeSessionName(sessionConfig().defaultSessionName ?? 'test'));
+        enableLogging(name);
+      } else if (nextName !== undefined) {
+        sessionName = sanitizeSessionName(nextName);
+        persistSidecar();
+        notifySessionLogChange();
+      }
     }
 
-    const shouldEnable = nextEnabled === true || (nextName !== undefined && nextEnabled === undefined);
-    if (shouldEnable) {
-      const name = nextName !== undefined
-        ? sanitizeSessionName(nextName)
-        : (sessionName ?? sanitizeSessionName(sessionConfig().defaultSessionName ?? 'test'));
-      enableLogging(name);
-      return getStatus();
-    }
-
-    if (nextName !== undefined) {
-      sessionName = sanitizeSessionName(nextName);
-      persistSidecar();
-      notifySessionLogChange();
+    if (captureEnabled === true || captureEnabled === false) {
+      applyCaptureEnabled(captureEnabled);
     }
 
     return getStatus();
+  }
+
+  function resumeCapture(sidecar) {
+    if (sidecar?.captureEnabled !== true) return;
+    const result = showCapture.enable();
+    if (!result.ok) {
+      log.warn({ err: result.error }, 'show capture stayed off');
+      persistSidecar();
+      return;
+    }
+    const name = sidecar.sessionName ? sanitizeSessionName(sidecar.sessionName) : sessionName;
+    if (!name) return;
+    if (!enabled) sessionName = name;
+    try {
+      const { file } = sessionFilePath(sessionConfig().directory ?? './data/sessions', name, cwd);
+      if (existsSync(file)) showCapture.catchUp(file, name);
+    } catch (err) {
+      log.error({ err: err.message }, 'show capture catch-up failed');
+    }
+    persistSidecar();
   }
 
   function start() {
     const cfg = sessionConfig();
     mkdirSync(resolve(cwd, cfg.directory ?? './data/sessions'), { recursive: true });
 
+    showCapture.start();
+
     const sidecar = readSidecar(sidecarPath());
     if (sidecar?.enabled === true && sidecar.sessionName) {
       sessionName = sanitizeSessionName(sidecar.sessionName);
       openStream(sessionName);
       enabled = true;
-      lineCount = sidecar.lineCount ?? lineCount;
+      const sidecarCount = Number.isInteger(sidecar.lineCount) ? sidecar.lineCount : 0;
+      lineCount = Math.max(lineCount, sidecarCount);
       startedAt = sidecar.startedAt ?? startedAt;
       lastLoggedAt = sidecar.lastLoggedAt ?? null;
       launchSummary = sidecar.launchSummary ?? emptyLaunchSummary();
@@ -536,6 +589,8 @@ export function createSessionLogger({
       sessionName = sanitizeSessionName(cfg.defaultSessionName ?? 'test');
       persistSidecar();
     }
+
+    resumeCapture(sidecar);
 
     liveColorGate = createLiveColorGate({
       getLogConfig: () => getConfig().sacn?.log,
@@ -571,6 +626,7 @@ export function createSessionLogger({
     }
     liveColorGate?.stop();
     liveColorGate = null;
+    showCapture.stop();
     disableLogging();
   }
 

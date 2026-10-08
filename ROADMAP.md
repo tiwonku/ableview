@@ -46,6 +46,7 @@ post-v2026.
 | **GrandMA live colors (sACN)** | Receive 8-bit RGB over sACN. Two independently mapped fixture triples: live FX (default U191, 500–508) and static look (default U191, 491–499), each with its own universe. Color cards split NOW into Look (left) and FX (right); admin labels SHEET / NOW. Flash and the session log use the static look plus `live_color` `hold`/`move` spans while FX is chasing. Settings dual preview + per-bus universe and start channels. | ✅ done |
 | **Flash look** | Lighting/Visuals clip-head **Flash** copies live GrandMA RGB onto the matched cue row (`RGB_1`/`RGB_2`/`RGB_3`). Confirm overlay (sheet vs GrandMA); write all 3 or tap one slot. Short/wide layout for Xeneon Edge. | ✅ done |
 | **Admin dashboard** | 16:9 board mode on Admin (`Dashboard` / `Detail` toggle). One palette, art, keys, role notes, session decks — not a collage of operator views. `?mode=dashboard` or kiosk defaults to the board; preference in `localStorage`. | ✅ done |
+| **Show capture** | Optional live copy of the session JSONL to the show website. `seq` / `lineId` are per log title. Disk write stays on the log path; HTTP drains a queue. Set-view **Site** checkbox. `SHOW_CAPTURE_URL` and `SHOW_CAPTURE_SECRET` in `.env`. | ✅ done |
 
 ---
 

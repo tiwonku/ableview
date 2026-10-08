@@ -15,6 +15,7 @@ data/*
 !data/sessions/
 !data/sessions/.gitkeep
 data/sessions/.active.json
+data/sessions/.capture-ack.json
 data/sessions/test.jsonl
 
 # Named setlists (sidecar is runtime-only; JSON files may be committed)

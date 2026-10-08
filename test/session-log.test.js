@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createBus, EVENTS } from '../src/core/bus.js';
@@ -39,6 +39,7 @@ function tempLogger(overrides = {}) {
     getSimulated: () => config.sim.enabled === true,
     log: silentLog,
     cwd: process.cwd(),
+    capture: overrides.capture,
   });
 
   return { logger, bus, config, dir };
@@ -257,4 +258,63 @@ test('autoStartWhenSim enables logging on start', () => {
   logger.start();
   assert.equal(logger.getStatus().enabled, true);
   logger.stop();
+});
+
+test('seq starts at 1 for a log title and continues after restart', () => {
+  const { logger, bus, dir, config } = tempLogger();
+  logger.start();
+  logger.applyPatch({ enabled: true, sessionName: 'cap-night' });
+
+  bus.emit(EVENTS.CUE_PAYLOAD, makeCuePayload({
+    clipName: 'Song A',
+    match: makeMatchResult({ matched: false, confidence: 0 }),
+    syncedAt: null,
+    stale: false,
+  }));
+
+  const first = readLines(sessionFile(dir, 'cap-night'));
+  assert.equal(first.length, 1);
+  assert.equal(first[0].seq, 1);
+  assert.equal(first[0].lineId, '1');
+
+  const sidecarPath = join(dir, '.active.json');
+  const sidecar = JSON.parse(readFileSync(sidecarPath, 'utf8'));
+  sidecar.lineCount = 0;
+  writeFileSync(sidecarPath, JSON.stringify(sidecar));
+
+  const nextBus = createBus();
+  const resumed = createSessionLogger({
+    bus: nextBus,
+    getConfig: () => config,
+    getTimecodeStatus: () => ({ enabled: false }),
+    getSimulated: () => false,
+    log: silentLog,
+  });
+  resumed.start();
+
+  nextBus.emit(EVENTS.CUE_PAYLOAD, makeCuePayload({
+    clipName: 'Song B',
+    match: makeMatchResult({ matched: false, confidence: 0 }),
+    syncedAt: null,
+    stale: false,
+  }));
+
+  const lines = readLines(sessionFile(dir, 'cap-night'));
+  assert.equal(lines.length, 2);
+  assert.equal(lines[1].seq, 2);
+  assert.equal(lines[1].lineId, '2');
+
+  resumed.applyPatch({ sessionName: 'cap-night-2' });
+  nextBus.emit(EVENTS.CUE_PAYLOAD, makeCuePayload({
+    clipName: 'Song C',
+    match: makeMatchResult({ matched: false, confidence: 0 }),
+    syncedAt: null,
+    stale: false,
+  }));
+  const rotated = readLines(sessionFile(dir, 'cap-night-2'));
+  assert.equal(rotated[0].seq, 1);
+  assert.equal(rotated[0].lineId, '1');
+
+  logger.stop();
+  resumed.stop();
 });

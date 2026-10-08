@@ -77,6 +77,23 @@ test('formatSessionLogStatusLine is a compact one-liner', () => {
     }),
     'show-night.jsonl · 42 lines · 3 moments · keys',
   );
+  assert.equal(
+    formatSessionLogStatusLine({
+      enabled: true,
+      sessionName: 'show-night',
+      lineCount: 4,
+      capture: { enabled: true, pending: 2, lastError: null },
+    }),
+    'show-night.jsonl · 4 lines · site 2 queued',
+  );
+  assert.equal(
+    formatSessionLogStatusLine({
+      enabled: false,
+      sessionName: 'rehearsal',
+      capture: { enabled: true, pending: 0, lastError: 'website rejected the capture secret' },
+    }),
+    'Logging off · rehearsal.jsonl · site: website rejected the capture secret',
+  );
 });
 
 test('ensureSessionLogHost reuses an existing session-log node', () => {

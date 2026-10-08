@@ -529,6 +529,10 @@ export function loadConfig({ configPath = './config/config.json', envPath = '.en
     googleServiceAccountKeyPath: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH ?? null,
     sheetId: process.env.SHEET_ID ?? null,
   };
+  config.showCapture = {
+    url: String(process.env.SHOW_CAPTURE_URL ?? '').trim(),
+    secret: String(process.env.SHOW_CAPTURE_SECRET ?? '').trim(),
+  };
   config.server.httpPort = Number(process.env.HTTP_PORT ?? 8080);
 
   validateConfig(config);
