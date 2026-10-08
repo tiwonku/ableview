@@ -5447,6 +5447,56 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
   min-height: 0;
 }
 
+.admin-dope-slot {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem 0.75rem;
+  margin-bottom: var(--dash-gap);
+  padding: 0.28rem 0.7rem 0.32rem;
+  border: 1px solid rgba(62, 207, 142, 0.72);
+  border-radius: 0.45rem;
+  background: rgba(62, 207, 142, 0.14);
+  color: #e9fff4;
+  line-height: 1.05;
+  overflow: hidden;
+}
+
+.admin-dope-slot-kind {
+  font-size: clamp(1.35rem, 3.6dvh, 2.15rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ok);
+}
+
+.admin-dope-slot-count,
+.admin-dope-slot-who,
+.admin-dope-slot-time {
+  font-size: clamp(1.05rem, 2.6dvh, 1.55rem);
+  font-weight: 650;
+}
+
+.admin-dope-slot-time {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.admin-dope-slot--pulse {
+  animation: admin-dope-pulse 700ms ease-out;
+}
+
+@keyframes admin-dope-pulse {
+  0% { background: rgba(62, 207, 142, 0.62); }
+  100% { background: rgba(62, 207, 142, 0.14); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-dope-slot--pulse {
+    animation: none;
+  }
+}
+
 .admin-dashboard-tokens {
   display: flex;
   flex-wrap: wrap;

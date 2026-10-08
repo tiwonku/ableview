@@ -161,6 +161,8 @@ test('getMomentsStatus reflects last moment and count', () => {
   assert.equal(status.momentCount, 2);
   assert.equal(status.lastMoment.kind, 'dope');
   assert.equal(status.lastMoment.who, 'keys');
+  assert.match(status.lastMoment.timestamp, /^\d{2}:\d{2}:\d{2}[:;]\d{2}$/);
+  assert.equal(typeof status.lastMoment.timestampSource, 'string');
   logger.stop();
 });
 

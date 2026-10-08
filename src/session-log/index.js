@@ -430,6 +430,8 @@ export function createSessionLogger({
 
     lastMoment = {
       loggedAt: envelope.loggedAt,
+      timestamp: envelope.timestamp,
+      timestampSource: envelope.timestampSource,
       kind,
       who,
       note,

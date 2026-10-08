@@ -70,6 +70,7 @@ import {
   syncFlashLookButton,
 } from './flash-look-overlay.js';
 import { mountBreathPage, mountBreathPreview } from './breath-render.js';
+import { DOPE_FLASH_MS, createDopeFlashTracker, paintAdminDopeSlot } from './admin-dope-flash.js';
 
 const RECONNECT_MS = 1500;
 const ALIAS_SEARCH_DEBOUNCE_MS = 180;
@@ -150,6 +151,9 @@ export function connectView({
   let prevLiveColors = null;
   let liveColorColumns = { ...DEFAULT_LIVE_COLOR_COLUMNS };
   let lastSessionLog = null;
+  const dopeFlash = createDopeFlashTracker();
+  let dopePulse = false;
+  let dopeTimer = null;
   let lastUpdate = null;
   let connected = false;
   let stopped = false;
@@ -201,9 +205,27 @@ export function connectView({
     setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
   }
 
+  function syncDopeFlash() {
+    if (dopeTimer) {
+      clearTimeout(dopeTimer);
+      dopeTimer = null;
+    }
+    const snap = dopeFlash.snapshot();
+    const fresh = Boolean(snap) && snap.remainingMs > DOPE_FLASH_MS - 1500;
+    if (!fresh) dopePulse = false;
+    const painted = paintAdminDopeSlot(root, snap, { pulse: dopePulse && fresh });
+    if (painted) dopePulse = false;
+    const wait = dopeFlash.nextChangeMs();
+    if (wait != null) {
+      dopeTimer = setTimeout(syncDopeFlash, Math.max(wait, 16));
+    }
+  }
+
   function applySessionLogState(sessionLog) {
     lastSessionLog = sessionLog ?? null;
+    if (dopeFlash.ingest(sessionLog?.lastMoment ?? null).added) dopePulse = true;
     setConnectionState(connected, lastUpdate, lastPayload, serverSimulated, lastSessionLog);
+    syncDopeFlash();
   }
 
   function scheduleReconnect() {
@@ -1349,6 +1371,7 @@ export function connectView({
       if (nav) renderSetNav(nav, setNavCtx());
     }
     } finally {
+      syncDopeFlash();
       repositionSessionLogMount();
       const restoreFocus = () => {
         if (focusGen !== sessionLogFocusGen) return;
@@ -1666,6 +1689,8 @@ export function connectView({
       stopDashBreath();
       window.removeEventListener('popstate', onPopState);
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (dopeTimer) clearTimeout(dopeTimer);
+      dopeTimer = null;
       ws?.close();
     },
   };

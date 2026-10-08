@@ -230,6 +230,7 @@ test('WS client receives sessionLog on init and after moment auto-start', async 
   assert.equal(sessionMsg.sessionLog.enabled, true);
   assert.equal(sessionMsg.sessionLog.momentCount, 1);
   assert.equal(sessionMsg.sessionLog.lastMoment?.who, null);
+  assert.match(sessionMsg.sessionLog.lastMoment?.timestamp ?? '', /^\d{2}:\d{2}:\d{2}/);
   assert.match(sessionMsg.sessionLog.sessionName, /^\d{4}-\d{2}-\d{2}_\d{6}$/);
 
   ws.close();
