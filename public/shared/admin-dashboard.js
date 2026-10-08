@@ -146,7 +146,7 @@ export function flattenOperatorFields(operatorViews) {
 
 /** @returns {'skip' | 'token' | 'color' | 'image' | 'note' | 'camelot'} */
 export function dashboardFieldKind(field) {
-  if (!field || field.source === 'tempo') return 'skip';
+  if (!field || field.source === 'tempo' || field.type === 'dope') return 'skip';
   if (field.type === 'camelot') return 'camelot';
   if (field.type === 'color') return 'color';
   if (field.type === 'image') return 'image';

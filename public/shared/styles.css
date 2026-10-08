@@ -1558,6 +1558,72 @@ body.layout-operator .clip-name--pinned {
   color: #fff !important;
 }
 
+.dope-module {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dope-press {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 4.5rem;
+  margin: 0;
+  padding: 0.35rem 1rem;
+  border: 0;
+  border-radius: 0.85rem;
+  background: linear-gradient(180deg, #ffe566 0%, #f0a202 100%);
+  color: #1c1404;
+  font: inherit;
+  font-weight: 800;
+  font-size: clamp(2rem, 8vw, 4.5rem);
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 0.35rem 0 #b87400;
+}
+
+.dope-press:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.dope-press:active:not(:disabled) {
+  transform: translateY(0.18rem);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 0.12rem 0 #b87400;
+}
+
+.dope-press:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.dope-press:disabled {
+  cursor: wait;
+  filter: none;
+  transform: none;
+}
+
+.dope-press.moment-feedback--pending,
+.dope-press.moment-feedback--success,
+.dope-press.moment-feedback--warning,
+.dope-press.moment-feedback--error {
+  box-shadow: none;
+  transform: none;
+  filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dope-press:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 .last-fields-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2846,6 +2912,28 @@ body.layout-operator .no-match-panel--last-fields .view-fields-wrap {
 }
 
 /* The fields area is the only scroll region — scroll is a fallback when the viewport is too small; color rows stay compact so short fields remain visible. Rows are content-sized so nothing is ever clipped; spare vertical space is shared by the grid's default align-content: stretch. */
+body.layout-operator .fields-row:has(.dope-module) {
+  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
+}
+
+body.layout-operator .fields-row > .dope-module,
+body.layout-operator .fields-strip > .dope-module {
+  display: flex;
+  flex: 1 1 min(100%, 16rem);
+  min-width: 0;
+  min-height: 0;
+}
+
+body.layout-operator .dope-press {
+  min-height: 0;
+  overflow: hidden;
+  font-size: clamp(1.35rem, 18cqw, 5.5rem);
+  letter-spacing: 0.08em;
+  container-type: size;
+}
+
 body.layout-operator .view-fields-wrap {
   display: flex;
   flex-direction: column;

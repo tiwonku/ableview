@@ -30,6 +30,7 @@ const exampleViews = {
       { column: 'Key', display: 'token' },
       { column: 'Key', type: 'camelot', label: 'Harmony' },
       { source: 'tempo', label: 'Tempo', display: 'token' },
+      { type: 'dope', label: 'DOPE' },
     ],
   },
   visuals: {
@@ -124,11 +125,12 @@ test('stored admin board mode round-trips', () => {
 test('collectOperatorViews skips system views and keeps config order', () => {
   const list = collectOperatorViews(exampleViews);
   assert.deepEqual(list.map((v) => v.id), ['band', 'visuals', 'lighting']);
-  assert.equal(list[0].fields.length, 3);
+  assert.equal(list[0].fields.length, 4);
 });
 
 test('dashboard zones dedupe colors and skip tempo', () => {
   assert.equal(dashboardFieldKind({ source: 'tempo' }), 'skip');
+  assert.equal(dashboardFieldKind({ type: 'dope', label: 'DOPE' }), 'skip');
   assert.equal(dashboardFieldKind({ column: 'Key' }), 'token');
   assert.equal(dashboardFieldKind({ column: 'Key', type: 'camelot' }), 'camelot');
   assert.equal(dashboardFieldKind({ column: 'Lasers' }), 'note');

@@ -20,6 +20,11 @@ export function isCamelotField(field) {
   return field?.type === 'camelot';
 }
 
+/** Moment presser. Not a sheet column and not part of the cue layout count. */
+export function isDopeField(field) {
+  return field?.type === 'dope';
+}
+
 /** Format Ableton tempo for operator field tokens (number only; label is separate). */
 export function formatTempoFieldValue(tempo) {
   if (tempo == null || Number.isNaN(Number(tempo))) return null;
@@ -77,8 +82,9 @@ export const ROW_MAX_FIELDS = 3;
 
 /** @returns {'hero' | 'strip'} */
 export function resolveFieldsLayoutMode(fields) {
-  const hasColor = fields.some((f) => f.type === 'color');
-  if (fields.length <= 3 && !hasColor) return 'hero';
+  const layoutFields = (fields ?? []).filter((field) => !isDopeField(field));
+  const hasColor = layoutFields.some((f) => f.type === 'color');
+  if (layoutFields.length <= 3 && !hasColor) return 'hero';
   return 'strip';
 }
 
@@ -108,21 +114,30 @@ export function groupFieldsForLayout(fields, payload) {
       continue;
     }
 
-    const display = resolveFieldDisplay(field, getFieldValue(field, payload));
-    if (display === 'note') {
-      rows.push({ type: 'note', field });
-      i++;
-      continue;
+    if (!isDopeField(field)) {
+      const display = resolveFieldDisplay(field, getFieldValue(field, payload));
+      if (display === 'note') {
+        rows.push({ type: 'note', field });
+        i++;
+        continue;
+      }
     }
 
     const items = [];
+    let counted = 0;
     while (i < fields.length && fields[i].type !== 'color' && fields[i].type !== 'image') {
+      if (isDopeField(fields[i])) {
+        items.push({ field: fields[i], display: 'dope' });
+        i++;
+        continue;
+      }
+      if (counted >= ROW_MAX_FIELDS) break;
       const nextField = fields[i];
       const nextDisplay = resolveFieldDisplay(nextField, getFieldValue(nextField, payload));
       if (nextDisplay === 'note') break;
       items.push({ field: nextField, display: nextDisplay });
       i++;
-      if (items.length >= ROW_MAX_FIELDS) break;
+      counted++;
     }
     rows.push({ type: 'row', items });
   }

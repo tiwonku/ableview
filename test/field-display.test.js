@@ -9,6 +9,7 @@ import {
   formatTempoFieldValue,
   isLiveField,
   isCamelotField,
+  isDopeField,
 } from '../public/shared/field-display.js';
 
 test('resolveFieldDisplay respects explicit display', () => {
@@ -40,6 +41,22 @@ test('resolveFieldsLayoutMode uses hero for small non-color views', () => {
     ]),
     'hero',
   );
+});
+
+test('a dope module shares the hero row and does not change layout mode', () => {
+  const fields = [
+    { column: 'Key', display: 'token' },
+    { column: 'Key', type: 'camelot', label: 'Harmony' },
+    { source: 'tempo', label: 'Tempo' },
+    { type: 'dope', label: 'DOPE' },
+  ];
+  assert.equal(isDopeField(fields[3]), true);
+  assert.equal(resolveFieldsLayoutMode(fields), 'hero');
+  const rows = groupFieldsForLayout(fields, { row: { Key: 'Gm' }, tempo: 105 });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].type, 'row');
+  assert.equal(rows[0].items.length, 4);
+  assert.equal(rows[0].items[3].display, 'dope');
 });
 
 test('resolveFieldsLayoutMode uses strip for color or many fields', () => {

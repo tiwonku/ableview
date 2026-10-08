@@ -38,6 +38,21 @@ test('validateConfig allows source tempo fields without column', () => {
   assert.equal(validateConfig(cfg), cfg);
 });
 
+test('validateConfig allows a dope module without a column', () => {
+  const cfg = baseConfig();
+  cfg.views.band.fields = [
+    { column: 'Key' },
+    { type: 'dope', label: 'DOPE' },
+  ];
+  assert.equal(validateConfig(cfg), cfg);
+
+  cfg.views.band.fields = [{ type: 'dope', column: 'Key' }];
+  assert.throws(() => validateConfig(cfg), /cannot set column on a dope module/);
+
+  cfg.views.band.fields = [{ type: 'dope', source: 'tempo' }];
+  assert.throws(() => validateConfig(cfg), /cannot set source on a dope module/);
+});
+
 test('validateConfig rejects unknown field source and source+column', () => {
   const cfg = baseConfig();
   cfg.views.band.fields = [{ source: 'beat' }];

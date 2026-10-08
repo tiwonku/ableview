@@ -444,6 +444,11 @@ export function validateConfig(config) {
     }
     for (const [i, field] of (view.fields ?? []).entries()) {
       const path = `views.${viewId}.fields[${i}]`;
+      if (field?.type === 'dope') {
+        if (field.column) errors.push(`${path} cannot set column on a dope module`);
+        if (field.source) errors.push(`${path} cannot set source on a dope module`);
+        continue;
+      }
       if (field?.source === 'tempo') {
         if (field.column) errors.push(`${path} cannot set both source and column`);
         continue;
@@ -452,7 +457,7 @@ export function validateConfig(config) {
         errors.push(`${path}.source must be "tempo" (got "${field.source}")`);
         continue;
       }
-      if (!field?.column) errors.push(`${path}.column is required (or use source: "tempo")`);
+      if (!field?.column) errors.push(`${path}.column is required (or use source: "tempo" or type: "dope")`);
     }
   }
 

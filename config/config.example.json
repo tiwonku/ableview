@@ -170,6 +170,10 @@
           "source": "tempo",
           "label": "Tempo",
           "display": "token"
+        },
+        {
+          "type": "dope",
+          "label": "DOPE"
         }
       ]
     },

@@ -90,6 +90,12 @@ export async function pressMoment(feedback, payload, post = postMoment) {
 
 let liveGetWho = null;
 let sharedDopeButton = null;
+let sharedDopeModule = null;
+
+function dopeModuleLabel(field) {
+  const label = String(field?.label ?? '').trim();
+  return label || 'DOPE';
+}
 
 export function setMomentWhoGetter(getWho) {
   liveGetWho = getWho;
@@ -123,6 +129,22 @@ export function prependDopeButton(parent, getWho) {
   }
   parent.insertBefore(sharedDopeButton, parent.firstChild);
   return sharedDopeButton;
+}
+
+/** Large view-field presser. Separate from the small config-row button. */
+export function mountDopeModule(parent, field, getWho) {
+  if (!parent || (typeof getWho !== 'function' && getWho == null)) return null;
+  liveGetWho = getWho;
+  let btn = sharedDopeModule;
+  if (!btn || (btn.isConnected && btn.parentElement !== parent)) {
+    btn = createDopeButton({ className: 'dope-press' });
+    btn.dataset.role = 'moment-dope-module';
+    if (!sharedDopeModule || !sharedDopeModule.isConnected) sharedDopeModule = btn;
+  }
+  btn.textContent = dopeModuleLabel(field);
+  btn.title = 'Mark a dope moment';
+  if (btn.parentElement !== parent) parent.appendChild(btn);
+  return btn;
 }
 
 export function mountSetNoteRow(host, { getWho } = {}) {

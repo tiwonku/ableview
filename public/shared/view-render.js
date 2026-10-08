@@ -12,6 +12,7 @@ import {
   groupFieldsForLayout,
   resolveFieldsLayoutMode,
   isCamelotField,
+  isDopeField,
 } from './field-display.js';
 import { renderCamelotField } from './camelot-render.js';
 import {
@@ -37,7 +38,7 @@ import {
   resolveCuePane,
   lastPanePayload,
 } from './playing-clips-strip.js';
-import { prependDopeButton } from './moment-controls.js';
+import { mountDopeModule, prependDopeButton } from './moment-controls.js';
 import { copyTextToClipboard } from './clipboard.js';
 import { buildDashboardZones } from './admin-dashboard.js';
 import { mountProgramPanel } from './admin-program.js';
@@ -351,7 +352,6 @@ export function renderView(root, {
     onCuePaneChange,
     onClearPin: pinned && !busy ? onClearPin : undefined,
     onStartPin: matched && !busy ? onStartPin : undefined,
-    getMomentWho,
     onStartFlashLook: !busy ? onStartFlashLook : undefined,
     flashLookReady,
     flashLookTitle,
@@ -418,9 +418,10 @@ export function renderView(root, {
         onPickColor: editable && onStartEdit
           ? (column) => onStartEdit(column)
           : undefined,
+        getMomentWho,
       }));
     } else if (showLastFields) {
-      root.appendChild(renderLastMatchedFields(fields, payload, { onPinLast, onStartPin }));
+      root.appendChild(renderLastMatchedFields(fields, payload, { onPinLast, onStartPin, getMomentWho }));
     }
   }
 
@@ -478,7 +479,7 @@ function renderViewClipHead(parent, payload, matchColumn = null, {
   });
 }
 
-function renderLastMatchedFields(fields, payload, { onPinLast, onStartPin } = {}) {
+function renderLastMatchedFields(fields, payload, { onPinLast, onStartPin, getMomentWho = null } = {}) {
   const panel = document.createElement('div');
   panel.className = 'no-match-panel no-match-panel--last-fields';
   panel.setAttribute('aria-label', 'Last matched cue');
@@ -504,7 +505,7 @@ function renderLastMatchedFields(fields, payload, { onPinLast, onStartPin } = {}
     }
     panel.appendChild(actions);
   }
-  panel.appendChild(renderFieldsGrid(fields, lastPanePayload(payload)));
+  panel.appendChild(renderFieldsGrid(fields, lastPanePayload(payload), { getMomentWho }));
   return panel;
 }
 
@@ -557,7 +558,6 @@ function renderViewEditActions({
   onCuePaneChange,
   onClearPin,
   onStartPin,
-  getMomentWho = null,
   onStartFlashLook,
   flashLookReady = false,
   flashLookTitle = '',
@@ -569,17 +569,15 @@ function renderViewEditActions({
   const showToggle = !editSession && Boolean(cuePane) && typeof onCuePaneChange === 'function';
   const showClear = !editSession && typeof onClearPin === 'function';
   const showChange = !editSession && typeof onStartPin === 'function';
-  const showDope = getMomentWho != null;
   const showFlash = !editSession
     && matched
     && editable
     && typeof onStartFlashLook === 'function'
     && flashableColorColumns(fields, liveColorColumns).length > 0;
-  if (!showSave && !showEdit && !showToggle && !showClear && !showChange && !showDope && !showFlash) return null;
+  if (!showSave && !showEdit && !showToggle && !showClear && !showChange && !showFlash) return null;
 
   const actions = document.createElement('div');
   actions.className = 'view-edit-actions';
-  if (showDope) prependDopeButton(actions, getMomentWho);
 
   if (showSave) {
     const cancelBtn = document.createElement('button');
@@ -642,7 +640,14 @@ function renderViewEditActions({
   return actions;
 }
 
-function renderFieldsGrid(fields, payload, { onPickColor } = {}) {
+function renderDopeModule(field, getMomentWho) {
+  const host = document.createElement('div');
+  host.className = 'dope-module';
+  if (getMomentWho != null) mountDopeModule(host, field, getMomentWho);
+  return host;
+}
+
+function renderFieldsGrid(fields, payload, { onPickColor, getMomentWho = null } = {}) {
   const fieldsWrap = document.createElement('div');
   fieldsWrap.className = 'view-fields-wrap';
 
@@ -653,7 +658,9 @@ function renderFieldsGrid(fields, payload, { onPickColor } = {}) {
   if (layoutMode === 'strip') {
     grid.style.setProperty('--strip-cols', String(fields.length));
     for (const field of fields) {
-      if (field.type === 'color') {
+      if (isDopeField(field)) {
+        grid.appendChild(renderDopeModule(field, getMomentWho));
+      } else if (field.type === 'color') {
         grid.appendChild(renderColorField(field, payload, { onPickColor }));
       } else if (field.type === 'image') {
         grid.appendChild(renderImageField(field, payload));
@@ -675,7 +682,9 @@ function renderFieldsGrid(fields, payload, { onPickColor } = {}) {
         const rowEl = document.createElement('div');
         rowEl.className = 'fields-row';
         for (const item of row.items) {
-          if (isCamelotField(item.field)) {
+          if (isDopeField(item.field)) {
+            rowEl.appendChild(renderDopeModule(item.field, getMomentWho));
+          } else if (isCamelotField(item.field)) {
             rowEl.appendChild(renderCamelotField(item.field, payload));
           } else {
             rowEl.appendChild(renderTextField(item.field, payload, item.display));
