@@ -97,8 +97,11 @@ test('no-match mounts a fixed desk strip and leaves the clip grid to fill', () =
   const render = readFileSync(fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)), 'utf8');
   const css = readFileSync(fileURLToPath(new URL('../public/shared/styles.css', import.meta.url)), 'utf8');
   assert.match(render, /renderDeskColorStrip\(liveColorColumns\)/);
+  assert.match(render, /className = 'live-bar'/);
   assert.match(css, /\.desk-color-strip\s*\{[^}]*flex:\s*0 0 auto/);
   assert.match(css, /\.desk-color-strip\[hidden\][\s\S]*display:\s*none\s*!important/);
+  assert.match(css, /\.live-bar\s*\{[^}]*flex:\s*0 0 auto/);
+  assert.match(css, /body\.layout-operator \.live-bar\s*\{[^}]*flex:\s*0 0 auto/);
   assert.match(css, /body\.layout-operator \.playing-clips-strip\s*\{[^}]*flex:\s*1 1 auto/);
   assert.match(css, /body\.layout-operator \.desk-color-strip\s*\{[^}]*flex:\s*0 0 auto/);
 });

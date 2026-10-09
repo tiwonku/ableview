@@ -1014,6 +1014,110 @@ body.layout-operator .clip-name--pinned {
   flex-shrink: 0;
 }
 
+/* No-match live bar. Content-sized so the deck grid keeps the page. */
+.live-bar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.65rem 1rem;
+  min-width: 0;
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.live-bar:not(:has(.live-bar-tempo:not([hidden]), .live-bar-dope, .desk-color-strip:not([hidden]))) {
+  display: none;
+}
+
+.live-bar-tempo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+  padding-right: 0.15rem;
+  line-height: 1;
+}
+
+.live-bar-tempo[hidden] {
+  display: none !important;
+}
+
+.live-bar-tempo-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: clamp(2.4rem, 6dvh, 3.6rem);
+  letter-spacing: -0.03em;
+}
+
+.live-bar-tempo-unit {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.live-bar .desk-color-strip {
+  flex: 1 1 auto;
+  align-self: center;
+  margin: 0;
+  min-width: 0;
+}
+
+.live-bar .color-swatch--live {
+  width: clamp(3.25rem, 7vw, 5rem);
+  height: clamp(2.6rem, 5.5dvh, 4rem);
+  max-height: 4rem;
+  border-radius: 0.4rem;
+}
+
+.live-bar-dope {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.live-bar .dope-module,
+.live-bar .dope-members {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: stretch;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  gap: 0.4rem;
+}
+
+.live-bar .dope-member-pick,
+.live-bar .dope-member,
+.live-bar .dope-press {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: auto;
+  height: auto;
+  min-height: 3.25rem;
+  min-width: 0;
+}
+
+.live-bar .dope-member-pick,
+.live-bar .dope-member {
+  padding: 0.4rem 0.9rem;
+  font-size: clamp(0.95rem, 2.2dvh, 1.25rem);
+}
+
+.live-bar .dope-press {
+  min-width: 7.5rem;
+  padding: 0.4rem 1.15rem;
+  font-size: clamp(1.15rem, 3dvh, 1.85rem);
+  letter-spacing: 0.1em;
+}
+
 .color-copy-kind {
   flex-shrink: 0;
   min-width: 2rem;
@@ -2805,20 +2909,6 @@ body.layout-operator .no-match--clips {
   margin: 0;
 }
 
-body.layout-operator .no-match--clips:has(+ .dope-modules-only),
-body.layout-operator .no-match-panel.no-match--clips:has(+ .dope-modules-only) {
-  flex: 0 1 auto;
-  max-height: 46%;
-  overflow: auto;
-}
-
-body.layout-operator .dope-modules-only {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-}
-
 body.layout-operator .no-match-panel.no-match--clips {
   flex: 1 1 auto;
 }
@@ -2837,6 +2927,28 @@ body.layout-operator .desk-color-strip .color-swatch--live {
   width: clamp(2.75rem, 7vw, 4.25rem);
   height: clamp(1.55rem, 3.2dvh, 2.15rem);
   max-height: 2.15rem;
+}
+
+body.layout-operator .live-bar {
+  flex: 0 0 auto;
+  margin-bottom: var(--op-gap);
+}
+
+body.layout-operator .live-bar .desk-color-strip {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+}
+
+body.layout-operator .live-bar .desk-color-strip .color-swatch--live {
+  width: clamp(3.4rem, 8vw, 5.25rem);
+  height: clamp(2.75rem, 6dvh, 4rem);
+  max-height: 4rem;
+}
+
+body.layout-operator .live-bar .dope-press {
+  min-height: 3.25rem;
+  font-size: clamp(1.15rem, 3dvh, 1.85rem);
+  letter-spacing: 0.1em;
 }
 
 body.layout-operator .playing-clips-strip {

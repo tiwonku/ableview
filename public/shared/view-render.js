@@ -220,6 +220,72 @@ function renderHeroRow(parent, heroText, payload, {
   parent.appendChild(row);
 }
 
+/**
+ * Fixed no-match chrome: tempo, GrandMA colors, and this view's DOPE presser.
+ * Height is content-sized (`flex: 0 0 auto`). Nothing in the bar grows into the decks.
+ */
+function renderLiveBar({ payload, fields, getMomentWho, liveColorColumns }) {
+  const bar = document.createElement('div');
+  bar.className = 'live-bar';
+  bar.dataset.role = 'live-bar';
+
+  const tempoText = formatStatusTempo(payload?.tempo);
+  if (tempoText) {
+    const tempo = document.createElement('div');
+    tempo.className = 'live-bar-tempo';
+    tempo.dataset.role = 'live-bar-tempo';
+    const value = document.createElement('span');
+    value.className = 'live-bar-tempo-value';
+    value.dataset.role = 'live-bar-tempo-value';
+    value.textContent = tempoText;
+    const unit = document.createElement('span');
+    unit.className = 'live-bar-tempo-unit';
+    unit.textContent = 'BPM';
+    tempo.appendChild(value);
+    tempo.appendChild(unit);
+    const spoken = formatTempo(payload.tempo);
+    tempo.title = `Ableton tempo: ${spoken}`;
+    tempo.setAttribute('aria-label', `Ableton tempo ${spoken}`);
+    bar.appendChild(tempo);
+  }
+
+  const deskStrip = renderDeskColorStrip(liveColorColumns);
+  if (deskStrip) bar.appendChild(deskStrip);
+
+  const dopeFields = (fields ?? []).filter((field) => isDopeField(field));
+  if (dopeFields.length && getMomentWho != null) {
+    const dope = document.createElement('div');
+    dope.className = 'live-bar-dope';
+    for (const field of dopeFields) {
+      const host = document.createElement('div');
+      host.className = 'dope-module live-bar-dope-module';
+      mountDopeModule(host, field, getMomentWho);
+      dope.appendChild(host);
+    }
+    bar.appendChild(dope);
+  }
+
+  if (!bar.childElementCount) return null;
+  return bar;
+}
+
+function paintLiveBarTempo(payload) {
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return;
+  const tempo = document.querySelector('[data-role="live-bar-tempo"]');
+  if (!tempo) return;
+  const text = formatStatusTempo(payload?.tempo);
+  const value = tempo.querySelector('[data-role="live-bar-tempo-value"]');
+  if (!text) {
+    tempo.hidden = true;
+    return;
+  }
+  tempo.hidden = false;
+  if (value) value.textContent = text;
+  const spoken = formatTempo(payload.tempo);
+  tempo.title = `Ableton tempo: ${spoken}`;
+  tempo.setAttribute('aria-label', `Ableton tempo ${spoken}`);
+}
+
 function renderNoMatchPanel(root, {
   payload,
   editable,
@@ -230,6 +296,8 @@ function renderNoMatchPanel(root, {
   onStartPin,
   onPinLast,
   onPinRow,
+  fields = null,
+  getMomentWho = null,
   liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
 }) {
   const playing = hasPlayingClips(payload);
@@ -254,8 +322,8 @@ function renderNoMatchPanel(root, {
     noMatch.appendChild(message);
   }
 
-  const deskStrip = renderDeskColorStrip(liveColorColumns);
-  if (deskStrip) noMatch.appendChild(deskStrip);
+  const liveBar = renderLiveBar({ payload, fields, getMomentWho, liveColorColumns });
+  if (liveBar) noMatch.appendChild(liveBar);
 
   if (playing) {
     renderPlayingClipsStrip(noMatch, payload, {
@@ -376,6 +444,8 @@ export function renderView(root, {
       onStartPin,
       onPinLast,
       onPinRow,
+      fields,
+      getMomentWho,
       liveColorColumns,
     });
   }
@@ -393,7 +463,6 @@ export function renderView(root, {
     ...(aliasColumn ? { [aliasColumn]: aliasColumn } : {}),
   };
 
-  let showedCueFields = false;
   if (pinSession && pinPanel) {
     renderPinPanel(root, pinPanel);
   } else if (aliasSession && aliasPanel) {
@@ -413,23 +482,15 @@ export function renderView(root, {
       saveState,
       saveError,
     });
-  } else if (!busy && fields?.length) {
-    if (matched) {
-      root.appendChild(renderFieldsGrid(fields, payload, {
-        onPickColor: editable && onStartEdit
-          ? (column) => onStartEdit(column)
-          : undefined,
-        getMomentWho,
-      }));
-      showedCueFields = true;
-    } else if (showLastFields) {
-      root.appendChild(renderLastMatchedFields(fields, payload, { onPinLast, onStartPin, getMomentWho }));
-      showedCueFields = true;
-    }
-  }
-  if (!showedCueFields && !busy) {
-    const dope = renderStandaloneDopeModules(fields, getMomentWho);
-    if (dope) root.appendChild(dope);
+  } else if (!busy && fields?.length && matched) {
+    root.appendChild(renderFieldsGrid(fields, payload, {
+      onPickColor: editable && onStartEdit
+        ? (column) => onStartEdit(column)
+        : undefined,
+      getMomentWho,
+    }));
+  } else if (!busy && fields?.length && showLastFields) {
+    root.appendChild(renderLastMatchedFields(fields, payload, { onPinLast, onStartPin, getMomentWho }));
   }
 
   updateStatusBar({ connected, lastUpdate, payload });
@@ -652,16 +713,6 @@ function renderDopeModule(field, getMomentWho) {
   host.className = 'dope-module';
   if (getMomentWho != null) mountDopeModule(host, field, getMomentWho);
   return host;
-}
-
-/** Cue fields stay hidden without a confident match. The presser does not. */
-function renderStandaloneDopeModules(fields, getMomentWho) {
-  const dopeFields = (fields ?? []).filter((field) => isDopeField(field));
-  if (!dopeFields.length || getMomentWho == null) return null;
-  const wrap = document.createElement('div');
-  wrap.className = 'view-fields-wrap dope-modules-only';
-  for (const field of dopeFields) wrap.appendChild(renderDopeModule(field, getMomentWho));
-  return wrap;
 }
 
 function renderFieldsGrid(fields, payload, { onPickColor, getMomentWho = null } = {}) {
@@ -939,6 +990,7 @@ function resolveConnectionState(connected, payload, simulated) {
 }
 
 function updateStatusBar({ connected, lastUpdate, payload, simulated = null, sessionLog = null }) {
+  paintLiveBarTempo(payload);
   const bar = document.getElementById('status-bar');
   if (!bar) return;
 
