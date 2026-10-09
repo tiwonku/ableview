@@ -403,8 +403,12 @@ export async function createViewServer({
       if (timecodeBroadcastTimer) clearTimeout(timecodeBroadcastTimer);
       if (liveColorsBroadcastTimer) clearTimeout(liveColorsBroadcastTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
-      for (const ws of clients.keys()) ws.close();
-      await new Promise((resolve) => wss.close(resolve));
+      for (const ws of clients.keys()) {
+        try { ws.terminate(); } catch { /* socket already gone */ }
+      }
+      clients.clear();
+      try { app.server?.closeAllConnections?.(); } catch { /* listener already closed */ }
+      await new Promise((resolve) => wss.close(() => resolve()));
       await app.close();
     },
   };

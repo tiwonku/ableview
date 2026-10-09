@@ -29,6 +29,13 @@ export function extrasToStop(rows, keepPort = DEFAULT_KEEP_HTTP_PORT) {
     .filter((row) => row && !row.keep);
 }
 
+/** Live show processes (the keep port). Explicit restart only — never stop-extras. */
+export function liveToRestart(rows, keepPort = DEFAULT_KEEP_HTTP_PORT) {
+  return (rows ?? [])
+    .map((row) => classifyNodeProcess(row, keepPort))
+    .filter((row) => row && row.kind === 'live' && row.keep);
+}
+
 export function formatProcLine(proc) {
   const ports = proc.listenPorts.length ? proc.listenPorts.join(',') : '—';
   const role = proc.keep ? 'keep' : 'extra';

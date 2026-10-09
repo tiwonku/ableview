@@ -4,6 +4,7 @@ import {
   classifyNodeProcess,
   extrasToStop,
   formatProcLine,
+  liveToRestart,
 } from '../src/ops/ableview-procs.js';
 
 test('classifyNodeProcess keeps live :8080 and marks sims extra', () => {
@@ -45,4 +46,15 @@ test('extrasToStop returns only leftover AbleView processes', () => {
   ]);
   assert.deepEqual(extras.map((p) => p.pid), [11, 12]);
   assert.match(formatProcLine(extras[0]), /11\t:8094\tsim\textra/);
+});
+
+test('liveToRestart selects the show process and leaves sims alone', () => {
+  const rows = [
+    { pid: 10, commandLine: 'node src/index.js', listenPorts: [8080] },
+    { pid: 14, commandLine: 'node src\\index.js', listenPorts: [] },
+    { pid: 11, commandLine: 'node src/index.js --sim', listenPorts: [8094] },
+    { pid: 15, commandLine: 'node src/index.js --sim', listenPorts: [8080] },
+  ];
+  assert.deepEqual(liveToRestart(rows).map((p) => p.pid), [10, 14]);
+  assert.deepEqual(extrasToStop(rows).map((p) => p.pid), [11, 15]);
 });

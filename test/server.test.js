@@ -620,3 +620,16 @@ test('admin init and program events stay off operator sockets', async () => {
     await server.stop();
   }
 });
+
+test('stop returns while an operator socket is still open', { timeout: 5000 }, async () => {
+  const bus = createBus();
+  const server = await createViewServer({ config: testConfig(), bus, log: silentLog });
+  const { ws } = await openSocket(`ws://127.0.0.1:${server.port}/ws?view=band`);
+  const started = Date.now();
+  try {
+    await server.stop();
+    assert.ok(Date.now() - started < 1000, 'stop waited on the open socket');
+  } finally {
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.terminate();
+  }
+});

@@ -12,6 +12,7 @@ import { createOscOutput } from './outputs/osc.js';
 import { createSessionLogger } from './session-log/index.js';
 import { createSetlistStore } from './setlist/index.js';
 import { createProgramIngest } from './program/index.js';
+import { createShutdown } from './ops/shutdown.js';
 
 const log = createLogger({ app: 'ableview' });
 
@@ -229,7 +230,7 @@ async function main() {
   }
   log.info({ source: ingest.source.name, simulated: ingest.simulated, httpPort: viewServer.port }, 'AbleView started');
 
-  const shutdown = async (signal) => {
+  const shutdown = createShutdown(async (signal) => {
     log.info({ signal }, 'shutting down');
     sessionLog.stop();
     setlist.stop();
@@ -240,10 +241,12 @@ async function main() {
     ingest.stop();
     sheets.stop();
     await viewServer.stop();
-    process.exit(0);
-  };
+  }, {
+    onForce: (reason) => log.warn({ reason }, 'shutdown forced'),
+  });
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  process.on('SIGBREAK', shutdown);
 }
 
 main().catch((err) => {
