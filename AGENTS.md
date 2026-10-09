@@ -18,6 +18,14 @@ It runs unattended on show nights on a dedicated box (Windows NUC or Raspberry P
 
 ---
 
+## Show box — do not restart
+
+This checkout runs on the **show box**. The live AbleView process (HTTP **:8080**, `npm start` / `node src/index.js`) is the board operators are watching.
+
+**Do not stop, kill, or restart that process, and do not start a replacement, unless the user explicitly asks or gives permission.** A config or code change on disk is not permission. `npm run stop-extras` may still clear leftover non-8080 sims; it must not touch :8080.
+
+---
+
 ## Agent workflow (recommended)
 
 ### Before you code
@@ -31,7 +39,7 @@ It runs unattended on show nights on a dedicated box (Windows NUC or Raspberry P
 - **One milestone per session/commit.** Milestones are independently testable; don't batch M2–M5 into one change.
 - **Use the simulator first.** `npm run sim` exercises the full chain without Ableton or Google. Only validate against real AbletonOSC after the sim path works.
 - **Keep diffs focused.** This project favors minimal, boring dependencies and small modules over abstraction.
-- **Do not leave extra HTTP instances running.** Agent-started `HTTP_PORT=809x npm run sim` has no Cursor terminal later and will steal OSC from the show box. Preferred sender is **:8080**. Before starting a non-8080 sim, and before finishing a session that started one, run `npm run procs` / `npm run stop-extras`.
+- **Do not leave extra HTTP instances running.** Agent-started `HTTP_PORT=809x npm run sim` has no Cursor terminal later and will steal OSC from the show box. Before starting a non-8080 sim, and before finishing a session that started one, run `npm run procs` / `npm run stop-extras`. Never stop or restart the live **:8080** process unless the user explicitly asks — see **Show box** above.
 
 ### Before you finish
 

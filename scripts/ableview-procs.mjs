@@ -6,6 +6,9 @@
  *   npm run stop-extras
  *
  * Keep port is HTTP_PORT from the environment, default 8080.
+ *
+ * This machine is the show box. Do not stop or restart the process on the
+ * keep port unless the user explicitly asks. See AGENTS.md "Show box".
  */
 import { execFileSync } from 'node:child_process';
 import {

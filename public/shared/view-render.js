@@ -393,6 +393,7 @@ export function renderView(root, {
     ...(aliasColumn ? { [aliasColumn]: aliasColumn } : {}),
   };
 
+  let showedCueFields = false;
   if (pinSession && pinPanel) {
     renderPinPanel(root, pinPanel);
   } else if (aliasSession && aliasPanel) {
@@ -420,9 +421,15 @@ export function renderView(root, {
           : undefined,
         getMomentWho,
       }));
+      showedCueFields = true;
     } else if (showLastFields) {
       root.appendChild(renderLastMatchedFields(fields, payload, { onPinLast, onStartPin, getMomentWho }));
+      showedCueFields = true;
     }
+  }
+  if (!showedCueFields && !busy) {
+    const dope = renderStandaloneDopeModules(fields, getMomentWho);
+    if (dope) root.appendChild(dope);
   }
 
   updateStatusBar({ connected, lastUpdate, payload });
@@ -645,6 +652,16 @@ function renderDopeModule(field, getMomentWho) {
   host.className = 'dope-module';
   if (getMomentWho != null) mountDopeModule(host, field, getMomentWho);
   return host;
+}
+
+/** Cue fields stay hidden without a confident match. The presser does not. */
+function renderStandaloneDopeModules(fields, getMomentWho) {
+  const dopeFields = (fields ?? []).filter((field) => isDopeField(field));
+  if (!dopeFields.length || getMomentWho == null) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'view-fields-wrap dope-modules-only';
+  for (const field of dopeFields) wrap.appendChild(renderDopeModule(field, getMomentWho));
+  return wrap;
 }
 
 function renderFieldsGrid(fields, payload, { onPickColor, getMomentWho = null } = {}) {

@@ -2805,6 +2805,20 @@ body.layout-operator .no-match--clips {
   margin: 0;
 }
 
+body.layout-operator .no-match--clips:has(+ .dope-modules-only),
+body.layout-operator .no-match-panel.no-match--clips:has(+ .dope-modules-only) {
+  flex: 0 1 auto;
+  max-height: 46%;
+  overflow: auto;
+}
+
+body.layout-operator .dope-modules-only {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
 body.layout-operator .no-match-panel.no-match--clips {
   flex: 1 1 auto;
 }
