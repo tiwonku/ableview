@@ -4,6 +4,7 @@ import {
   classifyNodeProcess,
   extrasToStop,
   formatProcLine,
+  listenPortsByPidFromNetstat,
   liveToRestart,
 } from '../src/ops/ableview-procs.js';
 
@@ -57,4 +58,19 @@ test('liveToRestart selects the show process and leaves sims alone', () => {
   ];
   assert.deepEqual(liveToRestart(rows).map((p) => p.pid), [10, 14]);
   assert.deepEqual(extrasToStop(rows).map((p) => p.pid), [11, 15]);
+});
+
+test('listenPortsByPidFromNetstat keeps LISTENING rows and ignores established sockets', () => {
+  const text = [
+    '  TCP    0.0.0.0:8080           0.0.0.0:0              LISTENING       683712',
+    '  TCP    10.45.2.107:8080       10.45.2.107:58198      ESTABLISHED     683712',
+    '  TCP    [::]:8080              [::]:0                 LISTENING       683712',
+    '  TCP    0.0.0.0:8094           0.0.0.0:0              LISTENING       111',
+    '  TCP    0.0.0.0:80             0.0.0.0:0              LISTENING       4',
+  ].join('\n');
+  const byPid = listenPortsByPidFromNetstat(text);
+  assert.deepEqual(byPid.get(683712), [8080]);
+  assert.deepEqual(byPid.get(111), [8094]);
+  assert.equal(byPid.has(4), true);
+  assert.equal(listenPortsByPidFromNetstat('').size, 0);
 });

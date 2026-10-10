@@ -36,6 +36,24 @@ export function liveToRestart(rows, keepPort = DEFAULT_KEEP_HTTP_PORT) {
     .filter((row) => row && row.kind === 'live' && row.keep);
 }
 
+/** Map owning PID → listening TCP ports from `netstat -ano` output. */
+export function listenPortsByPidFromNetstat(text) {
+  const byPid = new Map();
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    if (!/\bLISTENING\b/i.test(line)) continue;
+    const parts = line.trim().split(/\s+/);
+    if (parts.length < 5 || parts[0] !== 'TCP') continue;
+    const local = parts[1];
+    const port = Number(local.slice(local.lastIndexOf(':') + 1));
+    const pid = Number(parts[parts.length - 1]);
+    if (!Number.isInteger(port) || port <= 0 || !Number.isInteger(pid) || pid <= 0) continue;
+    const list = byPid.get(pid) ?? [];
+    if (!list.includes(port)) list.push(port);
+    byPid.set(pid, list);
+  }
+  return byPid;
+}
+
 export function formatProcLine(proc) {
   const ports = proc.listenPorts.length ? proc.listenPorts.join(',') : '—';
   const role = proc.keep ? 'keep' : 'extra';

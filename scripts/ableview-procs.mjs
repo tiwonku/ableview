@@ -21,6 +21,7 @@ import {
   classifyNodeProcess,
   extrasToStop,
   formatProcLine,
+  listenPortsByPidFromNetstat,
   liveToRestart,
 } from '../src/ops/ableview-procs.js';
 
@@ -36,28 +37,26 @@ function parseJson(raw) {
   return Array.isArray(data) ? data : [data];
 }
 
+function readNetstat() {
+  try {
+    return execFileSync('netstat', ['-ano', '-p', 'TCP'], {
+      encoding: 'utf8',
+      timeout: 5000,
+      windowsHide: true,
+    });
+  } catch {
+    return '';
+  }
+}
+
 function listWindows() {
   const procs = parseJson(execFileSync('powershell.exe', [
     '-NoProfile',
     '-Command',
     'Get-CimInstance Win32_Process -Filter "Name = \'node.exe\'" | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress',
-  ], { encoding: 'utf8' }));
+  ], { encoding: 'utf8', timeout: 15000, windowsHide: true }));
 
-  const listens = parseJson(execFileSync('powershell.exe', [
-    '-NoProfile',
-    '-Command',
-    'Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Select-Object LocalPort,OwningProcess | ConvertTo-Json -Compress',
-  ], { encoding: 'utf8' }));
-
-  const portsByPid = new Map();
-  for (const row of listens) {
-    const pid = Number(row.OwningProcess);
-    const port = Number(row.LocalPort);
-    if (!Number.isInteger(pid) || !Number.isInteger(port)) continue;
-    const list = portsByPid.get(pid) ?? [];
-    list.push(port);
-    portsByPid.set(pid, list);
-  }
+  const portsByPid = listenPortsByPidFromNetstat(readNetstat());
 
   return procs.map((row) => ({
     pid: row.ProcessId,
@@ -101,15 +100,14 @@ function portListening(port) {
   const safePort = Number(port);
   if (!Number.isInteger(safePort) || safePort <= 0) return false;
   if (process.platform === 'win32') {
-    const listens = parseJson(execFileSync('powershell.exe', [
-      '-NoProfile',
-      '-Command',
-      `Get-NetTCPConnection -LocalPort ${safePort} -State Listen -ErrorAction SilentlyContinue | Select-Object LocalPort,OwningProcess | ConvertTo-Json -Compress`,
-    ], { encoding: 'utf8' }));
-    return listens.length > 0;
+    const portsByPid = listenPortsByPidFromNetstat(readNetstat());
+    for (const ports of portsByPid.values()) {
+      if (ports.includes(safePort)) return true;
+    }
+    return false;
   }
   try {
-    const ss = execFileSync('ss', ['-ltn', `sport = :${safePort}`], { encoding: 'utf8' });
+    const ss = execFileSync('ss', ['-ltn', `sport = :${safePort}`], { encoding: 'utf8', timeout: 5000 });
     return ss.split('\n').some((line) => line.includes(`:${safePort}`));
   } catch {
     return false;
@@ -141,7 +139,60 @@ function startForeground() {
   });
 }
 
+function listeningPids(port) {
+  const pids = [];
+  const byPid = listenPortsByPidFromNetstat(readNetstat());
+  for (const [pid, ports] of byPid) {
+    if (ports.includes(port)) pids.push(pid);
+  }
+  return pids;
+}
+
+function imageName(pid) {
+  try {
+    const out = execFileSync('tasklist', ['/FI', `PID eq ${Number(pid)}`, '/FO', 'CSV', '/NH'], {
+      encoding: 'utf8',
+      timeout: 3000,
+      windowsHide: true,
+    });
+    const match = String(out).match(/"([^"]+)"/);
+    return match ? match[1] : '';
+  } catch {
+    return '';
+  }
+}
+
+async function restartWindows() {
+  for (const pid of listeningPids(keepPort)) {
+    if (pid === process.pid || pid <= 4) continue;
+    const image = imageName(pid);
+    if (image && !/^node\.exe$/i.test(image)) {
+      console.error(`:${keepPort} is held by ${image} (${pid}) — AbleView not started`);
+      process.exit(1);
+    }
+    try {
+      process.kill(pid, 'SIGKILL');
+      console.log(`stopped ${pid} (live :${keepPort})`);
+    } catch (err) {
+      if (err.code === 'ESRCH') continue;
+      console.error(`failed to stop ${pid}: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  if (!(await waitUntilPortFree(keepPort))) {
+    console.error(`:${keepPort} still in use — AbleView not started`);
+    process.exit(1);
+  }
+  startForeground();
+}
+
 async function restartLive() {
+  if (process.platform === 'win32') {
+    await restartWindows();
+    return;
+  }
+
   const targets = liveToRestart(listRaw(), keepPort)
     .filter((proc) => proc.pid !== process.pid);
 
