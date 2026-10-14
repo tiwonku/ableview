@@ -14,7 +14,7 @@ Build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claud
 | M6 | Hardening | ✅ done |
 | M7 | Admin settings GUI | ✅ done |
 | M8 | Sheet row editor | ✅ done |
-| M9 | Waveform + playhead (offline cache + OSC playhead) | 📋 planned — [`docs/plans/M9-waveform-playhead.md`](./docs/plans/M9-waveform-playhead.md) |
+| M9 | Waveform + playhead (offline cache + OSC playhead; bestMatch winner when matched, every watched deck when unmatched) | 📋 planned — [`docs/plans/M9-waveform-playhead.md`](./docs/plans/M9-waveform-playhead.md) |
 | M10 | Session cue log (JSONL: watched-track clips + sheet matches, Art-Net timestamps, settings UI) | ✅ done |
 | M11 | Show-box launchers — Windows + macOS parity (optional Inno; extends M6) | 📋 planned — [`docs/plans/M11-show-box-launchers.md`](./docs/plans/M11-show-box-launchers.md) |
 | M12 | Multi-operator edit coordination (presence, revision, conflict warnings) | 📋 planned — [`docs/plans/M12-multi-operator-edit-coordination.md`](./docs/plans/M12-multi-operator-edit-coordination.md) |
@@ -71,7 +71,8 @@ From spec §11 — design leaves extension points; no code ships for these yet:
 - **OSC clip/cue rebroadcast** — emit matched clip triggers to lighting consoles (GrandMA3, etc.)
   from the internal event bus. Clock (tempo / beat / bar / transport) already ships as `oscOut`.
 - **Waveform + playhead** — planned as **M9**: offline PNG/manifest from `.als` + project
-  audio; realtime playhead via read-only `playing_position`. Build plan:
+  audio; read-only `playing_position` per watched deck. Matched views show the winning
+  clip only; unmatched views show a wave on each playing-clip chip. Build plan:
   [`docs/plans/M9-waveform-playhead.md`](./docs/plans/M9-waveform-playhead.md).
 - **Write-back to Ableton** — will not be built; NFR-1 is permanent.
 
