@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>AbleView — Logged sets</title>
+  <link rel="stylesheet" href="/shared/styles.css">
+</head>
+<body class="layout-sets">
+  <header class="status-bar sets-bar">
+    <a id="sets-set-link" class="sets-crumb" href="/views/setlist">Set</a>
+    <span class="status-sep" aria-hidden="true">/</span>
+    <a id="sets-index-link" class="sets-crumb" href="/views/sets">Logged sets</a>
+    <span id="sets-current" class="sets-current" hidden></span>
+  </header>
+  <main id="app" class="sets-main"></main>
+  <script type="module">
+    import { mountSetsPage } from '/shared/sets-page.js';
+    mountSetsPage(document.getElementById('app'));
+  </script>
+</body>
+</html>

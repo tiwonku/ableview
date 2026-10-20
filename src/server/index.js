@@ -7,6 +7,7 @@ import { registerConfigRoutes } from './config-api.js';
 import { registerSheetsRoutes } from './sheets-api.js';
 import { registerSimRoutes } from './sim-api.js';
 import { registerSessionLogRoutes } from './session-log-api.js';
+import { registerSessionArchiveRoutes } from './sessions-api.js';
 import { registerMomentsRoutes, buildSessionLogBroadcast } from './moments-api.js';
 import { registerMatchRoutes } from './match-api.js';
 import { registerSetlistRoutes } from './setlist-api.js';
@@ -260,6 +261,7 @@ export async function createViewServer({
 
   if (sessionLog) {
     registerSessionLogRoutes(app, { sessionLog, log });
+    registerSessionArchiveRoutes(app, { sessionLog, log });
     registerMomentsRoutes(app, { sessionLog, log });
     sessionLog.setOnSessionLogChange?.(broadcastSessionLog);
   }

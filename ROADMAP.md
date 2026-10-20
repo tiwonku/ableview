@@ -47,6 +47,7 @@ post-v2026.
 | **Flash look** | Lighting/Visuals clip-head **Flash** copies live GrandMA RGB onto the matched cue row (`RGB_1`/`RGB_2`/`RGB_3`). Confirm overlay (sheet vs GrandMA); write all 3 or tap one slot. Short/wide layout for Xeneon Edge. | ✅ done |
 | **Admin dashboard** | 16:9 board mode on Admin (`Dashboard` / `Detail` toggle). One palette, art, keys, role notes, session decks — not a collage of operator views. `?mode=dashboard` or kiosk defaults to the board; preference in `localStorage`. | ✅ done |
 | **Show capture** | Optional live copy of the session JSONL to the show website. `seq` / `lineId` are per log title. Disk write stays on the log path; HTTP drains a queue. Set-view **Site** checkbox. `SHOW_CAPTURE_URL` and `SHOW_CAPTURE_SECRET` in `.env`. | ✅ done |
+| **Logged sets + EDL** | `/views/sets` lists session logs (link from the Set log bar, not a nav tab). One set exports a Resolve timeline-marker EDL: songs from collapsed `match` rows, dopes, optional notes, session-clock stamps. | ✅ done |
 
 ---
 

@@ -2,6 +2,7 @@
 
 import { subscribeSessionLog } from './session-log-live.js';
 import { mountSetNoteRow } from './moment-controls.js';
+import { withKioskQuery } from './kiosk-controls.js';
 
 const SESSION_LOG_PARK_ID = 'session-log-park';
 
@@ -287,6 +288,11 @@ export function mountSessionLogPanel(selector, { getWho = () => 'setlist' } = {}
     statusLine = el('p', 'set-log-status', formatSessionLogStatusLine(status));
     statusLine.dataset.role = 'session-log-status';
     shell.appendChild(statusLine);
+
+    const setsLink = el('a', 'set-log-sets', 'Logged sets');
+    setsLink.href = withKioskQuery('/views/sets');
+    setsLink.title = 'Sets already in the session log';
+    shell.appendChild(setsLink);
 
     toggle.addEventListener('change', async () => {
       try {
