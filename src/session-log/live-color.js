@@ -61,6 +61,7 @@ export function createLiveColorGate({
     const payload = {
       phase: 'hold',
       universe: latestMeta?.universe ?? null,
+      sourceName: latestMeta?.sourceName ?? null,
     };
     if (colors) {
       payload.colors = cloneSlotColors(colors);
@@ -78,6 +79,7 @@ export function createLiveColorGate({
     onRecord?.({
       phase: 'move',
       universe: latestMeta?.universe ?? null,
+      sourceName: latestMeta?.sourceName ?? null,
     });
     return true;
   }
@@ -162,7 +164,10 @@ export function createLiveColorGate({
     hasLookBus = hasSlotColors(status.staticColors);
     latestLook = cloneSlotColors(lookSource);
     latestFx = cloneSlotColors(status.colors);
-    latestMeta = { universe: status.universe ?? null };
+    latestMeta = {
+      universe: status.universe ?? null,
+      sourceName: status.sourceName ?? null,
+    };
 
     const lookDelta = maxChannelDelta(lastPacketLook, latestLook);
     const fxDelta = maxChannelDelta(lastPacketFx, latestFx);

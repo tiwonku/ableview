@@ -26,6 +26,7 @@ import {
 import { createLiveColorGate } from './live-color.js';
 import { observeSourceOnAir, onAirTransitions } from './deck-on-air.js';
 import { createShowCapture } from './capture.js';
+import { COLOR_SIM_SOURCE_NAME } from '../sacn/loopback.js';
 
 export { SessionLogDisabledError } from './moments.js';
 export { generateAutoSessionName } from './auto-session-name.js';
@@ -350,10 +351,12 @@ export function createSessionLogger({
     lastMatchKey = mk;
   }
 
-  function appendLiveColorRecord({ phase, colors, universe }) {
+  function appendLiveColorRecord({ phase, colors, universe, sourceName }) {
     if (!enabled) return;
     const envelope = timestampEnvelope();
-    const simulated = typeof getSimulated === 'function' ? getSimulated() === true : false;
+    const abletonSim = typeof getSimulated === 'function' && getSimulated() === true;
+    const colorSim = getConfig().sacn?.sim?.enabled === true
+      || sourceName === COLOR_SIM_SOURCE_NAME;
     const record = {
       ...envelope,
       event: 'live_color',
@@ -361,10 +364,11 @@ export function createSessionLogger({
       universe,
       clipName: lastCueForColor?.clipName ?? null,
       rowId: lastCueForColor?.rowId ?? null,
-      simulated,
+      simulated: abletonSim || colorSim,
       sessionName,
     };
     if (colors) record.colors = colors;
+    if (sourceName) record.sourceName = sourceName;
     appendRecord(record);
   }
 
@@ -601,6 +605,36 @@ export function createSessionLogger({
     return getStatus();
   }
 
+  function simPipelineWanted() {
+    const cfg = sessionConfig();
+    if (cfg.autoStartWhenSim === false) return false;
+    const config = getConfig();
+    return config.sim?.enabled === true || config.sacn?.sim?.enabled === true;
+  }
+
+  function ensureSimWebsiteCopy() {
+    if (!simPipelineWanted() || !enabled) return;
+    if (showCapture.isEnabled?.() === true) return;
+    const result = showCapture.enable();
+    if (!result?.ok) {
+      log?.warn?.({ err: result?.error }, 'sim session is logging locally; website copy stayed off');
+      return;
+    }
+    const file = currentSessionFile();
+    if (file && sessionName) showCapture.catchUp(file, sessionName);
+    persistSidecar();
+    log?.info?.({ sessionName }, 'sim session copying to the website');
+  }
+
+  function syncSimPipeline() {
+    if (!simPipelineWanted()) return getStatus();
+    if (!enabled) {
+      enableLogging(sessionConfig().defaultSessionName ?? 'test', { notify: false });
+    }
+    ensureSimWebsiteCopy();
+    return getStatus();
+  }
+
   function resumeCapture(sidecar) {
     if (sidecar?.captureEnabled !== true) return;
     const result = showCapture.enable();
@@ -640,7 +674,7 @@ export function createSessionLogger({
       log.info({ sessionName, restored: true }, 'session log restored from sidecar');
     } else if (cfg.autoStart === true) {
       enableLogging(cfg.defaultSessionName ?? 'test', { notify: false });
-    } else if (cfg.autoStartWhenSim !== false && getConfig().sim?.enabled === true) {
+    } else if (simPipelineWanted()) {
       enableLogging(cfg.defaultSessionName ?? 'test', { notify: false });
     } else {
       sessionName = sanitizeSessionName(cfg.defaultSessionName ?? 'test');
@@ -648,6 +682,7 @@ export function createSessionLogger({
     }
 
     resumeCapture(sidecar);
+    ensureSimWebsiteCopy();
 
     liveColorGate = createLiveColorGate({
       getLogConfig: () => getConfig().sacn?.log,
@@ -700,5 +735,6 @@ export function createSessionLogger({
     handleCuePayload,
     handleLiveColors,
     handleProgramDeckState,
+    syncSimPipeline,
   };
 }

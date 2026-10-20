@@ -105,3 +105,16 @@ test('no-match mounts a fixed desk strip and leaves the clip grid to fill', () =
   assert.match(css, /body\.layout-operator \.playing-clips-strip\s*\{[^}]*flex:\s*1 1 auto/);
   assert.match(css, /body\.layout-operator \.desk-color-strip\s*\{[^}]*flex:\s*0 0 auto/);
 });
+
+test('color views keep GrandMA in the top strip, not the sheet cards', () => {
+  const render = readFileSync(fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)), 'utf8');
+  const colorField = render.slice(
+    render.indexOf('function renderColorField'),
+    render.indexOf('function makeCopyButton'),
+  );
+  assert.match(render, /deskBar\.classList\.add\('live-bar--desk'\)/);
+  assert.match(render, /includeLiveBar: !colorView/);
+  assert.match(render, /embedLive: true/);
+  assert.match(colorField, /embedLive && column\) card\.appendChild\(renderLiveColorHost\(column\)\)/);
+  assert.equal(colorField.match(/renderLiveColorHost/g).length, 2);
+});

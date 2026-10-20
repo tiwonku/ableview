@@ -9,6 +9,7 @@ import { makeNowPlaying, SOURCES } from '../src/core/now-playing.js';
 import { makeCuePayload, makeMatchResult } from '../src/core/cue-payload.js';
 import { DEFAULTS } from '../src/config/index.js';
 import { createSessionLogger } from '../src/session-log/index.js';
+import { COLOR_SIM_SOURCE_NAME } from '../src/sacn/loopback.js';
 import { sanitizeSessionName } from '../src/session-log/sanitize.js';
 import { resolveLogTimestamp } from '../src/session-log/timestamp.js';
 import { diffTracks, trackStateKey } from '../src/session-log/tracks.js';
@@ -317,4 +318,142 @@ test('seq starts at 1 for a log title and continues after restart', () => {
 
   logger.stop();
   resumed.stop();
+});
+
+function mockCapture() {
+  const queued = [];
+  let enabled = false;
+  return {
+    queued,
+    setOnChange() {},
+    start() {},
+    stop() {},
+    enable() {
+      enabled = true;
+      return { ok: true };
+    },
+    disable() {
+      enabled = false;
+    },
+    isEnabled() {
+      return enabled;
+    },
+    enqueue(record) {
+      queued.push(record);
+    },
+    catchUp() {
+      return 0;
+    },
+    getStatus() {
+      return { enabled, configured: true, pending: queued.length, lastError: null };
+    },
+    forget() {},
+  };
+}
+
+test('Ableton sim clips are logged as simulated and queued for the website', () => {
+  const capture = mockCapture();
+  const dir = mkdtempSync(join(tmpdir(), 'ableview-session-log-'));
+  const config = {
+    ...DEFAULTS,
+    sim: { ...DEFAULTS.sim, enabled: true },
+    sessionLog: {
+      directory: dir,
+      autoStart: false,
+      autoStartWhenSim: true,
+      defaultSessionName: 'rehearsal',
+    },
+  };
+  const bus = createBus();
+  const logger = createSessionLogger({
+    bus,
+    getConfig: () => config,
+    getTimecodeStatus: () => ({ enabled: false }),
+    getSimulated: () => true,
+    log: silentLog,
+    capture,
+  });
+  logger.start();
+
+  bus.emit(EVENTS.NOW_PLAYING, makeNowPlaying({
+    source: SOURCES.SIMULATOR,
+    authoritativeClip: 'Song A',
+    tempo: 100,
+    tracks: [
+      { trackIndex: 0, trackName: 'Cue', clipName: 'Song A', slotIndex: 1 },
+    ],
+  }));
+  bus.emit(EVENTS.CUE_PAYLOAD, makeCuePayload({
+    clipName: 'Song A',
+    match: makeMatchResult({ matched: true, confidence: 0.9, rowId: '4' }),
+    simulated: true,
+  }));
+
+  const lines = readLines(sessionFile(dir, 'rehearsal'));
+  assert.equal(lines.filter((line) => line.event === 'track_clip' && line.simulated === true).length, 1);
+  assert.equal(lines.filter((line) => line.event === 'match' && line.simulated === true).length, 1);
+  assert.equal(capture.isEnabled(), true);
+  assert.equal(capture.queued.filter((line) => line.simulated === true).length, 2);
+
+  logger.stop();
+});
+
+test('color sim holds are logged as simulated and queued for the website', async () => {
+  const capture = mockCapture();
+  const dir = mkdtempSync(join(tmpdir(), 'ableview-session-log-'));
+  const config = {
+    ...DEFAULTS,
+    sim: { ...DEFAULTS.sim, enabled: false },
+    sacn: {
+      ...DEFAULTS.sacn,
+      sim: { enabled: true },
+      log: { changeDelta: 4, settleMs: 20 },
+    },
+    sessionLog: {
+      directory: dir,
+      autoStart: false,
+      autoStartWhenSim: true,
+      defaultSessionName: 'rehearsal',
+    },
+  };
+  const bus = createBus();
+  const logger = createSessionLogger({
+    bus,
+    getConfig: () => config,
+    getTimecodeStatus: () => ({ enabled: false }),
+    getSimulated: () => false,
+    log: silentLog,
+    capture,
+  });
+  logger.start();
+
+  bus.emit(EVENTS.LIVE_COLORS, {
+    enabled: true,
+    live: true,
+    universe: 191,
+    sourceName: COLOR_SIM_SOURCE_NAME,
+    colors: {
+      main: { r: 255, g: 0, b: 80 },
+      secondary: { r: 80, g: 0, b: 255 },
+      accent: { r: 255, g: 220, b: 0 },
+    },
+    staticColors: {
+      main: { r: 255, g: 80, b: 0 },
+      secondary: { r: 0, g: 40, b: 255 },
+      accent: { r: 20, g: 200, b: 80 },
+    },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  const lines = readLines(sessionFile(dir, 'rehearsal'));
+  const color = lines.filter((line) => line.event === 'live_color');
+  assert.equal(color.length, 1);
+  assert.equal(color[0].phase, 'hold');
+  assert.equal(color[0].simulated, true);
+  assert.equal(color[0].sourceName, COLOR_SIM_SOURCE_NAME);
+  assert.deepEqual(color[0].colors.main, { r: 255, g: 80, b: 0 });
+  assert.equal(capture.isEnabled(), true);
+  assert.equal(capture.queued.filter((line) => line.event === 'live_color' && line.simulated === true).length, 1);
+
+  logger.stop();
 });

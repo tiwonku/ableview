@@ -140,7 +140,7 @@ export function renderLiveColorHost(column) {
   return live;
 }
 
-/** Compact GrandMA bar for the no-match clip board. Hidden until a bus has RGB. */
+/** Compact GrandMA bar. Hidden until a bus has RGB. */
 export function renderDeskColorStrip(columnMap = DEFAULT_LIVE_COLOR_COLUMNS) {
   const columns = liveStripColumns(columnMap);
   if (!columns.length) return null;

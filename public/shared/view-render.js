@@ -220,16 +220,31 @@ function renderHeroRow(parent, heroText, payload, {
   parent.appendChild(row);
 }
 
+function viewHasColorFields(fields) {
+  return (fields ?? []).some((field) => field?.type === 'color');
+}
+
 /**
- * Fixed no-match chrome: tempo, GrandMA colors, and this view's DOPE presser.
- * Height is content-sized (`flex: 0 0 auto`). Nothing in the bar grows into the decks.
+ * Content-sized chrome (`flex: 0 0 auto`): Ableton tempo, GrandMA colors, DOPE.
+ * Views with sheet color columns keep GrandMA in one bar under the clip name.
+ * On those views the bar is desk-only while cue fields are on screen, and picks up
+ * tempo and DOPE only on the unmatched clip board. Other views still get the full
+ * bar inside the no-match panel.
  */
-function renderLiveBar({ payload, fields, getMomentWho, liveColorColumns }) {
+function renderLiveBar({
+  payload,
+  fields,
+  getMomentWho,
+  liveColorColumns,
+  includeTempo = true,
+  includeDesk = true,
+  includeDope = true,
+}) {
   const bar = document.createElement('div');
   bar.className = 'live-bar';
   bar.dataset.role = 'live-bar';
 
-  const tempoText = formatStatusTempo(payload?.tempo);
+  const tempoText = includeTempo ? formatStatusTempo(payload?.tempo) : '';
   if (tempoText) {
     const tempo = document.createElement('div');
     tempo.className = 'live-bar-tempo';
@@ -249,10 +264,12 @@ function renderLiveBar({ payload, fields, getMomentWho, liveColorColumns }) {
     bar.appendChild(tempo);
   }
 
-  const deskStrip = renderDeskColorStrip(liveColorColumns);
-  if (deskStrip) bar.appendChild(deskStrip);
+  if (includeDesk) {
+    const deskStrip = renderDeskColorStrip(liveColorColumns);
+    if (deskStrip) bar.appendChild(deskStrip);
+  }
 
-  const dopeFields = (fields ?? []).filter((field) => isDopeField(field));
+  const dopeFields = includeDope ? (fields ?? []).filter((field) => isDopeField(field)) : [];
   if (dopeFields.length && getMomentWho != null) {
     const dope = document.createElement('div');
     dope.className = 'live-bar-dope';
@@ -299,6 +316,7 @@ function renderNoMatchPanel(root, {
   fields = null,
   getMomentWho = null,
   liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
+  includeLiveBar = true,
 }) {
   const playing = hasPlayingClips(payload);
   const noMatch = document.createElement('div');
@@ -322,8 +340,10 @@ function renderNoMatchPanel(root, {
     noMatch.appendChild(message);
   }
 
-  const liveBar = renderLiveBar({ payload, fields, getMomentWho, liveColorColumns });
-  if (liveBar) noMatch.appendChild(liveBar);
+  if (includeLiveBar) {
+    const liveBar = renderLiveBar({ payload, fields, getMomentWho, liveColorColumns });
+    if (liveBar) noMatch.appendChild(liveBar);
+  }
 
   if (playing) {
     renderPlayingClipsStrip(noMatch, payload, {
@@ -439,6 +459,25 @@ export function renderView(root, {
   const showNoMatch = payload && !matched && !busy
     && (hasPlayingClips(payload) || payload.clipName?.trim());
   const showLastFields = showNoMatch && pane === 'last';
+  const colorView = viewHasColorFields(fields);
+  // Tempo and DOPE already live in the field grid on match and Last.
+  // They ride the desk bar only while the playing-clip board is up.
+  const unmatchedBoard = showNoMatch && !showLastFields;
+
+  if (colorView) {
+    const deskBar = renderLiveBar({
+      payload,
+      fields,
+      getMomentWho,
+      liveColorColumns,
+      includeTempo: unmatchedBoard,
+      includeDope: unmatchedBoard,
+    });
+    if (deskBar) {
+      deskBar.classList.add('live-bar--desk');
+      root.appendChild(deskBar);
+    }
+  }
 
   if (showNoMatch && !showLastFields) {
     renderNoMatchPanel(root, {
@@ -454,6 +493,7 @@ export function renderView(root, {
       fields,
       getMomentWho,
       liveColorColumns,
+      includeLiveBar: !colorView,
     });
   }
 
@@ -820,12 +860,12 @@ function renderTextField(field, payload, displayHint, layoutMode = 'hero') {
   return card;
 }
 
-function renderColorGroup(fields, payload, { onPickColor } = {}) {
+function renderColorGroup(fields, payload, { onPickColor, embedLive = false } = {}) {
   const row = document.createElement('div');
   row.className = 'colors-row';
 
   for (const field of fields) {
-    row.appendChild(renderColorField(field, payload, { onPickColor }));
+    row.appendChild(renderColorField(field, payload, { onPickColor, embedLive }));
   }
   const cards = [...row.querySelectorAll(':scope > .field-color')];
   row.hidden = cards.length > 0 && cards.every((card) => card.hidden);
@@ -896,7 +936,7 @@ function renderImageField(field, payload) {
   return card;
 }
 
-function renderColorField(field, payload, { onPickColor } = {}) {
+function renderColorField(field, payload, { onPickColor, embedLive = false } = {}) {
   const column = field.column;
   const label = fieldLabel(field);
   const raw = payload.row?.[column];
@@ -924,7 +964,7 @@ function renderColorField(field, payload, { onPickColor } = {}) {
     empty.className = 'field-value empty';
     empty.textContent = '—';
     card.appendChild(empty);
-    if (column) card.appendChild(renderLiveColorHost(column));
+    if (embedLive && column) card.appendChild(renderLiveColorHost(column));
     return card;
   }
 
@@ -952,7 +992,7 @@ function renderColorField(field, payload, { onPickColor } = {}) {
   }
 
   card.appendChild(body);
-  if (column) card.appendChild(renderLiveColorHost(column));
+  if (embedLive && column) card.appendChild(renderLiveColorHost(column));
   return card;
 }
 
@@ -1474,7 +1514,7 @@ function renderDashboardLook(parent, zones, payload, {
       panel.appendChild(form);
       mast.appendChild(panel);
     } else {
-      const colors = renderColorGroup(zones.colors, payload, { onPickColor });
+      const colors = renderColorGroup(zones.colors, payload, { onPickColor, embedLive: true });
       mast.appendChild(colors);
       mast.hidden = colors.hidden;
     }

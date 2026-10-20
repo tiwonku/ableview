@@ -8,6 +8,7 @@ import { createMatcher } from './match/index.js';
 import { createViewServer } from './server/index.js';
 import { createTimecodeListener } from './timecode/index.js';
 import { createSacnListener } from './sacn/index.js';
+import { createSacnLoopback } from './sacn/loopback.js';
 import { createOscOutput } from './outputs/osc.js';
 import { createSessionLogger } from './session-log/index.js';
 import { createSetlistStore } from './setlist/index.js';
@@ -58,6 +59,11 @@ async function main() {
     getConfig,
     bus,
     log: log.child({ module: 'sacn' }),
+  });
+
+  const sacnLoopback = createSacnLoopback({
+    getConfig,
+    log: log.child({ module: 'sacn-sim' }),
   });
 
   const program = createProgramIngest({
@@ -158,6 +164,9 @@ async function main() {
         );
       }
     }
+    if (sections.includes('sim') || sections.includes('sacn')) {
+      sessionLog.syncSimPipeline();
+    }
     if (sections.includes('sacn')) {
       try {
         await sacn.start();
@@ -173,6 +182,7 @@ async function main() {
           'sACN listener failed to restart — pick the lighting NIC and confirm universe/port',
         );
       }
+      sacnLoopback.start();
     }
     if (sections.includes('oscOut')) {
       try {
@@ -223,6 +233,7 @@ async function main() {
       'sACN listener failed to start — pick the lighting NIC and confirm universe/port',
     );
   }
+  sacnLoopback.start();
   try {
     await program.start();
   } catch (err) {
@@ -236,6 +247,7 @@ async function main() {
     setlist.stop();
     oscOut.stop();
     timecode.stop();
+    sacnLoopback.stop();
     sacn.stop();
     program.stop();
     ingest.stop();

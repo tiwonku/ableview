@@ -1,4 +1,5 @@
-// E1.31 (sACN) data packet parse/build. Receive-only; no transmit in production.
+// E1.31 (sACN) data packet parse/build. Ingest is receive-only.
+// The color sim sends these packets to 127.0.0.1; nothing here targets a console.
 
 const ACN_PACKET_IDENTIFIER = Buffer.from('ASC-E1.17\0\0\0', 'ascii');
 const VECTOR_ROOT_E131_DATA = 0x00000004;

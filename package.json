@@ -8,6 +8,7 @@
     "start": "node src/index.js",
     "start:production": "node deploy/run-production.mjs",
     "sim": "node src/index.js --sim",
+    "sacn-sim": "node scripts/sacn-color-sim.mjs",
     "procs": "node scripts/ableview-procs.mjs",
     "stop-extras": "node scripts/ableview-procs.mjs stop-extras",
     "restart": "node scripts/ableview-procs.mjs restart",
