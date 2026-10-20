@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createBus } from '../src/core/bus.js';
+import { createBus, EVENTS } from '../src/core/bus.js';
+import { makeCuePayload, makeMatchResult } from '../src/core/cue-payload.js';
 import { createLogger } from '../src/core/logger.js';
 import { DEFAULTS } from '../src/config/index.js';
 import { createViewServer } from '../src/server/index.js';
@@ -41,7 +42,7 @@ async function createTestServer(sessionDir) {
     log: silentLog,
     sessionLog,
   });
-  return { server, sessionLog };
+  return { server, sessionLog, bus };
 }
 
 test('GET /api/sessions lists logs and skips normalized copies', async () => {
@@ -102,6 +103,71 @@ test('GET /api/sessions lists logs and skips normalized copies', async () => {
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.match(html, /Logged sets/);
+
+  const missingDelete = await fetch(`http://127.0.0.1:${ctx.server.port}/api/sessions/nope`, {
+    method: 'DELETE',
+  });
+  assert.equal(missingDelete.status, 404);
+
+  await ctx.server.stop();
+  ctx.sessionLog.stop();
+});
+
+test('DELETE /api/sessions removes the file and stops logging that name', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ableview-sets-delete-'));
+  writeFileSync(join(dir, 'keep.jsonl'), `${JSON.stringify({
+    timestamp: '18:00:00:00',
+    loggedAt: '2026-09-18T23:00:00.000Z',
+    event: 'moment',
+    kind: 'dope',
+    who: 'Phil',
+    note: null,
+  })}\n`);
+  const ctx = await createTestServer(dir);
+  const base = `http://127.0.0.1:${ctx.server.port}`;
+
+  const enable = await fetch(`${base}/api/session-log`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: true, sessionName: 'YD_N1' }),
+  });
+  assert.equal(enable.status, 200);
+
+  const cue = makeCuePayload({
+    clipName: 'Wake Up',
+    match: makeMatchResult({ matched: true, confidence: 1, rowId: '1', matchedValue: 'Wake Up' }),
+    syncedAt: '2026-09-19T02:10:00.000Z',
+    stale: false,
+  });
+  ctx.bus.emit(EVENTS.CUE_PAYLOAD, cue);
+  const file = join(dir, 'YD_N1.jsonl');
+  assert.equal(existsSync(file), true);
+
+  const deleted = await fetch(`${base}/api/sessions/YD_N1`, { method: 'DELETE' });
+  assert.equal(deleted.status, 200);
+  assert.deepEqual(await deleted.json(), { ok: true, name: 'YD_N1' });
+  assert.equal(existsSync(file), false);
+
+  const status = await fetch(`${base}/api/session-log`);
+  const body = await status.json();
+  assert.equal(body.enabled, false);
+
+  ctx.bus.emit(EVENTS.CUE_PAYLOAD, cue);
+  assert.equal(existsSync(file), false);
+
+  const again = await fetch(`${base}/api/session-log`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: true, sessionName: 'YD_N1' }),
+  });
+  assert.equal(again.status, 200);
+  ctx.bus.emit(EVENTS.CUE_PAYLOAD, cue);
+  const lines = readFileSync(file, 'utf8').trim().split('\n');
+  assert.equal(lines.length, 1);
+
+  const list = await fetch(`${base}/api/sessions`);
+  const names = (await list.json()).sessions.map((row) => row.name).sort();
+  assert.deepEqual(names, ['YD_N1', 'keep']);
 
   await ctx.server.stop();
   ctx.sessionLog.stop();

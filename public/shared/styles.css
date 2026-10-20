@@ -4989,17 +4989,35 @@ body.layout-session .session-main {
 }
 
 .sets-row {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   padding: 0.75rem 0.85rem;
   border: 1px solid var(--border);
   border-radius: 0.45rem;
   background: var(--surface);
-  color: inherit;
-  text-decoration: none;
 }
 
 .sets-row:hover {
   border-color: var(--accent);
+}
+
+.sets-row-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.sets-row-delete {
+  flex: 0 0 auto;
+}
+
+.sets-row-delete.is-armed,
+.sets-actions .is-armed {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
 }
 
 .sets-row-head {
@@ -5086,7 +5104,10 @@ body.layout-session .session-main {
   display: none;
 }
 
-.sets-edl .admin-editor-btn {
+.sets-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-top: 0.85rem;
 }
 

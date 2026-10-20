@@ -405,6 +405,16 @@ export function createShowCapture({
     log?.info?.('show capture off');
   }
 
+  function forget(name) {
+    loadAck();
+    pending.delete(name);
+    queuedIds.delete(name);
+    sessionStopped.delete(name);
+    if (ack.sessions?.[name] == null) return;
+    delete ack.sessions[name];
+    saveAck();
+  }
+
   function pendingCount() {
     let count = 0;
     for (const [name, lines] of pending) {
@@ -439,6 +449,7 @@ export function createShowCapture({
     enqueue,
     catchUp,
     flush,
+    forget,
     getStatus,
     setOnChange(handler) {
       onChange = handler ?? null;

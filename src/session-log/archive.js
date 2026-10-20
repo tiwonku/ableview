@@ -2,7 +2,7 @@
 // Match lines carry the whole cue row, so this scans fields instead of parsing each line.
 
 import { createReadStream } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
+import { readdir, stat, unlink } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { resolve } from 'node:path';
 import { sanitizeSessionName, sessionFilePath } from './sanitize.js';
@@ -283,5 +283,20 @@ export function createSessionArchive({ getDirectory, loggingName, cwd = process.
     };
   }
 
-  return { list, read };
+  async function remove(raw) {
+    const name = resolveName(raw);
+    const { file } = sessionFilePath(directory(), name, cwd);
+    try {
+      await unlink(file);
+    } catch (err) {
+      if (err.code === 'ENOENT') return null;
+      throw err;
+    }
+    for (const key of cache.keys()) {
+      if (key.startsWith(`${file}:`)) cache.delete(key);
+    }
+    return { name };
+  }
+
+  return { list, read, remove };
 }

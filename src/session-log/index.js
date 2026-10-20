@@ -386,6 +386,28 @@ export function createSessionLogger({
     notifySessionLogChange();
   }
 
+  /** Stop logging this name, drop its website ack, and forget the open file. */
+  function releaseDeletedSession(raw) {
+    const name = sanitizeSessionName(raw);
+    showCapture.forget?.(name);
+    if (sessionName !== name) return { name, loggingStopped: false };
+    const loggingStopped = enabled === true;
+    enabled = false;
+    closeStream();
+    absolutePath = null;
+    filePath = null;
+    lineCount = 0;
+    momentCount = 0;
+    startedAt = null;
+    lastLoggedAt = null;
+    lastMoment = null;
+    launchSummary = emptyLaunchSummary();
+    resetDedupeState();
+    persistSidecar();
+    notifySessionLogChange();
+    return { name, loggingStopped };
+  }
+
   function enableLogging(name, { notify = true } = {}) {
     const sanitized = sanitizeSessionName(name);
     const rotating = sessionName !== sanitized || !absolutePath;
@@ -636,6 +658,7 @@ export function createSessionLogger({
     getStatus,
     getMomentsStatus,
     applyPatch,
+    releaseDeletedSession,
     logMoment,
     setOnSessionLogChange,
     handleNowPlaying,

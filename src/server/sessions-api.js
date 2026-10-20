@@ -73,6 +73,26 @@ export function registerSessionArchiveRoutes(app, { sessionLog, log }) {
     }
   });
 
+  app.delete('/api/sessions/:name', async (req, reply) => {
+    let summary;
+    try {
+      summary = await archive.read(req.params.name);
+    } catch (err) {
+      return reply.code(400).send({ error: err.message });
+    }
+    if (!summary) return reply.code(404).send({ error: 'Set not found.' });
+    try {
+      sessionLog.releaseDeletedSession(summary.name);
+      const removed = await archive.remove(summary.name);
+      if (!removed) return reply.code(404).send({ error: 'Set not found.' });
+      log.info({ sessionName: removed.name }, 'session log deleted');
+      return reply.send({ ok: true, name: removed.name });
+    } catch (err) {
+      log.error({ err: err.message, sessionName: summary.name }, 'session log delete failed');
+      return reply.code(500).send({ error: 'Could not delete that log.' });
+    }
+  });
+
   app.get('/api/sessions/:name/edl', async (req, reply) => {
     let summary;
     try {

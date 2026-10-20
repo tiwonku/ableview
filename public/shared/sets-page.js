@@ -81,6 +81,54 @@ function wireCrumbs(name) {
   document.title = name ? `AbleView — ${name}` : 'AbleView — Logged sets';
 }
 
+const deleteDisarms = new Set();
+
+function disarmDeletes(except) {
+  for (const disarm of deleteDisarms) {
+    if (disarm !== except) disarm();
+  }
+}
+
+function ensureDeleteDisarm() {
+  if (ensureDeleteDisarm.bound) return;
+  ensureDeleteDisarm.bound = true;
+  document.addEventListener('click', () => disarmDeletes(null));
+}
+
+/** First click asks for confirmation. The second click deletes the log. */
+function bindDeleteButton(button, { name, onDone, onError }) {
+  ensureDeleteDisarm();
+  let armed = false;
+  function disarm() {
+    if (!armed || button.disabled) return;
+    armed = false;
+    button.textContent = 'Delete log';
+    button.classList.remove('is-armed');
+  }
+  deleteDisarms.add(disarm);
+  button.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    if (!armed) {
+      disarmDeletes(disarm);
+      armed = true;
+      button.textContent = 'Confirm delete';
+      button.classList.add('is-armed');
+      return;
+    }
+    button.disabled = true;
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Could not delete this log (${res.status})`);
+      onDone();
+    } catch (err) {
+      button.disabled = false;
+      disarm();
+      onError(err);
+    }
+  });
+}
+
 function renderList(root, sessions) {
   root.replaceChildren();
   const intro = el('p', 'sets-intro', 'Each logged session is one set. Open it to export a Resolve marker EDL.');
@@ -90,15 +138,37 @@ function renderList(root, sessions) {
     return;
   }
   const list = el('div', 'sets-list');
+  const error = el('p', 'sets-error');
+  error.hidden = true;
+  root.appendChild(error);
   for (const session of sessions) {
-    const link = el('a', 'sets-row');
+    const row = el('div', 'sets-row');
+    const link = el('a', 'sets-row-open');
     link.href = withKioskQuery(`/views/sets?name=${encodeURIComponent(session.name)}`);
     const head = el('div', 'sets-row-head');
     head.appendChild(el('span', 'sets-row-name', session.name));
     if (session.logging) head.appendChild(el('span', 'sets-pill', 'Logging'));
     link.appendChild(head);
     link.appendChild(el('p', 'sets-row-meta', `${rangeLabel(session)} · ${tally(session)}`));
-    list.appendChild(link);
+    const remove = el('button', 'admin-editor-btn admin-editor-btn--danger sets-row-delete', 'Delete log');
+    remove.type = 'button';
+    bindDeleteButton(remove, {
+      name: session.name,
+      onDone: () => {
+        row.remove();
+        if (!list.children.length) {
+          list.remove();
+          root.appendChild(el('p', 'sets-empty', 'No logged sets yet. Turn on Log from the Set page.'));
+        }
+      },
+      onError: (err) => {
+        error.hidden = false;
+        error.textContent = err.message;
+      },
+    });
+    row.appendChild(link);
+    row.appendChild(remove);
+    list.appendChild(row);
   }
   root.appendChild(list);
 }
@@ -212,9 +282,14 @@ function renderDetail(root, summary) {
   );
   panel.appendChild(hint);
 
+  const actions = el('div', 'sets-actions');
   const download = el('button', 'admin-editor-btn admin-editor-btn--primary', 'Download EDL');
   download.type = 'button';
-  panel.appendChild(download);
+  const remove = el('button', 'admin-editor-btn admin-editor-btn--danger', 'Delete log');
+  remove.type = 'button';
+  actions.appendChild(download);
+  actions.appendChild(remove);
+  panel.appendChild(actions);
   const saved = el('p', 'sets-saved');
   saved.setAttribute('role', 'status');
   panel.appendChild(saved);
@@ -325,6 +400,13 @@ function renderDetail(root, summary) {
     URL.revokeObjectURL(url);
     state.savedName = filename;
     saved.textContent = `Saved ${filename}.`;
+  });
+  bindDeleteButton(remove, {
+    name: summary.name,
+    onDone: () => location.assign(withKioskQuery('/views/sets')),
+    onError: (err) => {
+      saved.textContent = err.message;
+    },
   });
 
   refresh();
