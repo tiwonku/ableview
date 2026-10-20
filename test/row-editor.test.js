@@ -214,6 +214,11 @@ test('operator Edit sits in the clip-head row, not a separate bar', () => {
   assert.match(viewSrc, /view-edit-btn--edit/);
   assert.match(viewSrc, /getMomentWho/);
   assert.match(viewSrc, /prependDopeButton/);
+  const renderViewSrc = viewSrc.slice(
+    viewSrc.indexOf('export function renderView'),
+    viewSrc.indexOf('export function updateViewLiveChrome'),
+  );
+  assert.match(renderViewSrc, /prependDopeButton\(editActions, getMomentWho\)/);
   assert.doesNotMatch(viewSrc, /view-edit-bar/);
   assert.doesNotMatch(editorSrc, /view-edit-bar/);
 });

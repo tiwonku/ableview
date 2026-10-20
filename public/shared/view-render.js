@@ -408,7 +408,7 @@ export function renderView(root, {
   clipRow.appendChild(clipHead);
   renderViewClipHead(clipHead, payload, matchColumn, { busy, editSession, cuePane: pane ?? cuePane });
 
-  const editActions = renderViewEditActions({
+  let editActions = renderViewEditActions({
     editSession,
     matched,
     editable,
@@ -426,6 +426,13 @@ export function renderView(root, {
     fields,
     liveColorColumns,
   });
+  if (getMomentWho != null) {
+    if (!editActions) {
+      editActions = document.createElement('div');
+      editActions.className = 'view-edit-actions';
+    }
+    prependDopeButton(editActions, getMomentWho);
+  }
   if (editActions) clipRow.appendChild(editActions);
   root.appendChild(clipRow);
 
