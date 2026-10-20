@@ -141,6 +141,7 @@ test('debounce suppresses duplicate kind+who', () => {
   assert.throws(() => logger.logMoment({ kind: 'dope', who: 'keys' }), MomentDebouncedError);
   const lines = readLines(dir, 'show');
   assert.equal(lines.length, 1);
+  assert.deepEqual(logger.getMomentsStatus().dopeTally, [{ who: 'keys', count: 1 }]);
   logger.stop();
 });
 
@@ -198,6 +199,63 @@ test('dope still logs with a null note', () => {
   assert.equal(lines[0].kind, 'dope');
   assert.equal(lines[0].who, 'visuals');
   assert.equal(lines[0].note, null);
+  logger.stop();
+});
+
+test('dope tally counts who for this session and skips typed notes', () => {
+  const { logger, config } = tempLogger();
+  logger.start();
+  logger.applyPatch({ enabled: true, sessionName: 'show' });
+  logger.logMoment({ kind: 'dope', who: 'Bass' });
+  logger.logMoment({ kind: 'dope', who: 'Keys' });
+  logger.logMoment({ kind: 'dope', who: 'Keys' });
+  logger.logMoment({ kind: 'typed', who: 'setlist', note: 'crowd surge' });
+  logger.logMoment({ kind: 'dope' });
+
+  assert.deepEqual(logger.getMomentsStatus().dopeTally, [
+    { who: 'Keys', count: 2 },
+    { who: 'Bass', count: 1 },
+    { who: null, count: 1 },
+  ]);
+
+  logger.applyPatch({ enabled: false });
+  assert.deepEqual(logger.getMomentsStatus().dopeTally, []);
+  logger.applyPatch({ enabled: true, sessionName: 'show' });
+  assert.equal(logger.getMomentsStatus().dopeTally[0].who, 'Keys');
+  logger.stop();
+
+  const restored = createSessionLogger({
+    bus: createBus(),
+    getConfig: () => config,
+    getTimecodeStatus: () => ({ enabled: false }),
+    getSimulated: () => false,
+    log: silentLog,
+  });
+  restored.start();
+  restored.applyPatch({ enabled: true, sessionName: 'show' });
+  assert.deepEqual(restored.getMomentsStatus().dopeTally, [
+    { who: 'Keys', count: 2 },
+    { who: 'Bass', count: 1 },
+    { who: null, count: 1 },
+  ]);
+
+  restored.applyPatch({ enabled: true, sessionName: 'next' });
+  assert.deepEqual(restored.getMomentsStatus().dopeTally, []);
+  restored.logMoment({ kind: 'dope', who: 'Drums' });
+  assert.deepEqual(restored.getMomentsStatus().dopeTally, [{ who: 'Drums', count: 1 }]);
+  restored.stop();
+});
+
+test('equal dope counts stay in first-press order', () => {
+  const { logger } = tempLogger();
+  logger.start();
+  logger.applyPatch({ enabled: true, sessionName: 'show' });
+  logger.logMoment({ kind: 'dope', who: 'Bass' });
+  logger.logMoment({ kind: 'dope', who: 'Keys' });
+  assert.deepEqual(logger.getMomentsStatus().dopeTally, [
+    { who: 'Bass', count: 1 },
+    { who: 'Keys', count: 1 },
+  ]);
   logger.stop();
 });
 

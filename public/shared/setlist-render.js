@@ -478,6 +478,13 @@ function renderLiveCard(root, ctx, model) {
   });
   card.appendChild(top);
 
+  const tally = el('div', 'admin-dope-tally set-dope-tally');
+  tally.dataset.role = 'set-dope-tally';
+  tally.hidden = true;
+  tally.setAttribute('role', 'status');
+  tally.setAttribute('aria-live', 'polite');
+  card.appendChild(tally);
+
   const health = el('div', 'setlist-health');
   health.dataset.role = 'setlist-health';
   fillHealthChips(health, setHealthChips(payload, status, { simulated }), { onSyncSheet, syncing });

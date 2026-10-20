@@ -107,6 +107,54 @@ function removeNode(node) {
   else node.parentNode?.removeChild?.(node);
 }
 
+function revealMast(mast) {
+  if (!mast.hidden) return;
+  mast.hidden = false;
+  if (mast.dataset) mast.dataset.dopeUnhid = '1';
+}
+
+/** Hide a mast we opened only when both the flash and the set tally are gone. */
+function maybeConcealMast(mast) {
+  if (mast.dataset?.dopeUnhid !== '1') return;
+  if (mast.querySelector('.admin-dope-slot') || mast.querySelector('.admin-dope-tally')) return;
+  mast.hidden = true;
+  delete mast.dataset.dopeUnhid;
+}
+
+function tallyRows(tally) {
+  if (!Array.isArray(tally)) return [];
+  const rows = [];
+  for (const row of tally) {
+    const count = Number(row?.count);
+    if (!Number.isFinite(count) || count <= 0) continue;
+    rows.push({ who: row.who ?? null, count });
+  }
+  return rows;
+}
+
+export function dopeTallyName(who) {
+  const name = String(who ?? '').trim();
+  return name || 'unknown';
+}
+
+function nextSiblingOf(node) {
+  if (!node) return null;
+  if ('nextSibling' in node) return node.nextSibling ?? null;
+  const children = node.parentNode?.childNodes;
+  if (!children || typeof children.indexOf !== 'function') return null;
+  const index = children.indexOf(node);
+  return index >= 0 ? (children[index + 1] ?? null) : null;
+}
+
+function placeTally(mast, strip) {
+  const slot = mast.querySelector('.admin-dope-slot');
+  const desiredBefore = slot ? nextSiblingOf(slot) : mast.firstChild;
+  if (desiredBefore === strip) return;
+  if (strip.parentNode === mast) mast.removeChild(strip);
+  const before = slot ? nextSiblingOf(slot) : mast.firstChild;
+  mast.insertBefore(strip, before);
+}
+
 function clearChildren(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
@@ -132,17 +180,11 @@ export function paintAdminDopeSlot(root, snapshot, { pulse = false } = {}) {
 
   if (!snapshot) {
     removeNode(slot);
-    if (mast.dataset?.dopeUnhid === '1') {
-      mast.hidden = true;
-      delete mast.dataset.dopeUnhid;
-    }
+    maybeConcealMast(mast);
     return true;
   }
 
-  if (mast.hidden) {
-    mast.hidden = false;
-    if (mast.dataset) mast.dataset.dopeUnhid = '1';
-  }
+  revealMast(mast);
 
   const parts = dopeFlashParts(snapshot);
   if (!slot) {
@@ -166,5 +208,76 @@ export function paintAdminDopeSlot(root, snapshot, { pulse = false } = {}) {
     void slot.offsetWidth;
     slot.classList.add('admin-dope-slot--pulse');
   }
+  return true;
+}
+
+function fillDopeTally(strip, doc, rows, latestWho) {
+  const names = rows.map((row) => `${dopeTallyName(row.who)} ${row.count}`);
+  clearChildren(strip);
+  strip.setAttribute('aria-label', `Dope this set: ${names.join(', ')}`);
+  strip.appendChild(span(doc, 'admin-dope-tally-label', 'Dope'));
+  const markLatest = latestWho !== undefined;
+  for (const row of rows) {
+    const person = doc.createElement('span');
+    person.className = 'admin-dope-tally-person';
+    if (markLatest && row.who === latestWho) {
+      person.classList.add('admin-dope-tally-person--latest');
+    }
+    person.appendChild(span(doc, 'admin-dope-tally-who', dopeTallyName(row.who)));
+    person.appendChild(span(doc, 'admin-dope-tally-count', String(row.count)));
+    strip.appendChild(person);
+  }
+}
+
+/**
+ * Standing per-person dope count for the current session.
+ * Sits under the 30s flash on the admin dashboard mast.
+ */
+export function paintAdminDopeTally(root, tally, { latestWho } = {}) {
+  if (!root?.querySelector) return false;
+  const mast = root.querySelector('.admin-dashboard-mast');
+  if (!mast) return false;
+
+  const doc = mast.ownerDocument ?? root.ownerDocument ?? globalThis.document;
+  let strip = mast.querySelector('.admin-dope-tally');
+  const rows = tallyRows(tally);
+
+  if (!rows.length) {
+    removeNode(strip);
+    maybeConcealMast(mast);
+    return true;
+  }
+
+  revealMast(mast);
+  if (!strip) {
+    strip = doc.createElement('div');
+    strip.className = 'admin-dope-tally';
+    strip.dataset.role = 'admin-dope-tally';
+    strip.setAttribute('role', 'status');
+    strip.setAttribute('aria-live', 'polite');
+  }
+
+  fillDopeTally(strip, doc, rows, latestWho);
+  placeTally(mast, strip);
+  return true;
+}
+
+/** Same tally, inside the Set page live card. */
+export function paintSetDopeTally(root, tally, { latestWho } = {}) {
+  if (!root?.querySelector) return false;
+  const host = root.querySelector('.set-dope-tally');
+  if (!host) return false;
+
+  const doc = host.ownerDocument ?? root.ownerDocument ?? globalThis.document;
+  const rows = tallyRows(tally);
+  if (!rows.length) {
+    clearChildren(host);
+    host.hidden = true;
+    host.removeAttribute?.('aria-label');
+    return true;
+  }
+
+  host.hidden = false;
+  fillDopeTally(host, doc, rows, latestWho);
   return true;
 }

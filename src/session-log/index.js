@@ -46,8 +46,35 @@ function writeSidecar(sidecarPath, data) {
   writeFileSync(sidecarPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 }
 
+function emptyDopeTally() {
+  return { order: [], counts: new Map() };
+}
+
+function dopeWhoFromRecord(record) {
+  const who = record?.who;
+  if (typeof who !== 'string') return null;
+  const trimmed = who.trim();
+  return trimmed || null;
+}
+
+function addDopePress(tally, who) {
+  const key = who ?? '';
+  if (!tally.counts.has(key)) {
+    tally.counts.set(key, 0);
+    tally.order.push(who ?? null);
+  }
+  tally.counts.set(key, tally.counts.get(key) + 1);
+}
+
+function snapshotDopeTally(tally) {
+  return tally.order
+    .map((who) => ({ who, count: tally.counts.get(who ?? '') }))
+    .sort((a, b) => b.count - a.count);
+}
+
 function readSessionStats(filePath) {
-  const stats = { lines: 0, maxSeq: 0, moments: 0 };
+  const dopePresses = emptyDopeTally();
+  const stats = { lines: 0, maxSeq: 0, moments: 0, dopePresses };
   try {
     if (!existsSync(filePath)) return stats;
     const content = readFileSync(filePath, 'utf8');
@@ -57,14 +84,17 @@ function readSessionStats(filePath) {
       stats.lines += 1;
       try {
         const record = JSON.parse(line);
-        if (record.event === 'moment') stats.moments += 1;
+        if (record.event === 'moment') {
+          stats.moments += 1;
+          if (record.kind === 'dope') addDopePress(dopePresses, dopeWhoFromRecord(record));
+        }
         if (Number.isInteger(record.seq) && record.seq > stats.maxSeq) stats.maxSeq = record.seq;
       } catch {
         // a torn line still occupies a slot so the next seq stays above it
       }
     }
   } catch {
-    return { lines: 0, maxSeq: 0, moments: 0 };
+    return { lines: 0, maxSeq: 0, moments: 0, dopePresses: emptyDopeTally() };
   }
   return stats;
 }
@@ -100,6 +130,7 @@ export function createSessionLogger({
   let launchSummary = emptyLaunchSummary();
   let lastMoment = null;
   let momentCount = 0;
+  let dopePresses = emptyDopeTally();
   let lastMomentDebounceKey = null;
   let lastMomentDebounceAt = 0;
   let sessionLogChangeHandler = onSessionLogChange ?? null;
@@ -172,6 +203,7 @@ export function createSessionLogger({
     sessionName = name;
     filePath = relative;
     absolutePath = file;
+    dopePresses = emptyDopeTally();
     if (!existed) {
       lineCount = 0;
       momentCount = 0;
@@ -180,6 +212,7 @@ export function createSessionLogger({
       const stats = readSessionStats(file);
       lineCount = Math.max(stats.lines, stats.maxSeq);
       momentCount = stats.moments;
+      dopePresses = stats.dopePresses;
       startedAt = startedAt ?? new Date().toISOString();
     }
   }
@@ -465,6 +498,7 @@ export function createSessionLogger({
     };
     appendRecord(record);
     momentCount += 1;
+    if (kind === 'dope') addDopePress(dopePresses, who);
 
     lastMoment = {
       loggedAt: envelope.loggedAt,
@@ -499,6 +533,7 @@ export function createSessionLogger({
       sessionLogEnabled: status.enabled === true,
       sessionName: status.sessionName,
       momentCount: status.enabled ? momentCount : 0,
+      dopeTally: status.enabled ? snapshotDopeTally(dopePresses) : [],
       kinds: effectiveMomentKinds(cfg.kinds),
       lastMoment: lastMoment ? { ...lastMoment } : null,
     };

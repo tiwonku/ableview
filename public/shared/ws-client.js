@@ -70,7 +70,7 @@ import {
   syncFlashLookButton,
 } from './flash-look-overlay.js';
 import { mountBreathPage, mountBreathPreview } from './breath-render.js';
-import { DOPE_FLASH_MS, createDopeFlashTracker, paintAdminDopeSlot } from './admin-dope-flash.js';
+import { DOPE_FLASH_MS, createDopeFlashTracker, paintAdminDopeSlot, paintAdminDopeTally, paintSetDopeTally } from './admin-dope-flash.js';
 
 const RECONNECT_MS = 1500;
 const ALIAS_SEARCH_DEBOUNCE_MS = 180;
@@ -214,6 +214,12 @@ export function connectView({
     const fresh = Boolean(snap) && snap.remainingMs > DOPE_FLASH_MS - 1500;
     if (!fresh) dopePulse = false;
     const painted = paintAdminDopeSlot(root, snap, { pulse: dopePulse && fresh });
+    const lastMoment = lastSessionLog?.lastMoment;
+    const tallyOptions = {
+      latestWho: lastMoment?.kind === 'dope' ? (lastMoment.who ?? null) : undefined,
+    };
+    paintAdminDopeTally(root, lastSessionLog?.dopeTally, tallyOptions);
+    paintSetDopeTally(root, lastSessionLog?.dopeTally, tallyOptions);
     if (painted) dopePulse = false;
     const wait = dopeFlash.nextChangeMs();
     if (wait != null) {

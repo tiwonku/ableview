@@ -6016,6 +6016,54 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
   }
 }
 
+.admin-dope-tally {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.95rem;
+  margin-bottom: var(--dash-gap);
+  padding: 0.22rem 0.7rem 0.28rem;
+  border: 1px solid rgba(62, 207, 142, 0.4);
+  border-radius: 0.45rem;
+  background: rgba(62, 207, 142, 0.08);
+  color: #e9fff4;
+  line-height: 1.05;
+}
+
+.admin-dope-tally-label {
+  font-size: clamp(0.85rem, 2dvh, 1.15rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ok);
+}
+
+.admin-dope-tally-person {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: clamp(1.05rem, 2.6dvh, 1.55rem);
+  font-weight: 650;
+}
+
+.admin-dope-tally-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.admin-dope-tally-person--latest .admin-dope-tally-who {
+  color: var(--ok);
+}
+
+.set-dope-tally {
+  margin-top: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.set-dope-tally[hidden] {
+  display: none;
+}
+
 .admin-dashboard-tokens {
   display: flex;
   flex-wrap: wrap;

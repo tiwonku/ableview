@@ -5,6 +5,8 @@ import {
   dopeFlashParts,
   formatDopeTime,
   paintAdminDopeSlot,
+  paintAdminDopeTally,
+  paintSetDopeTally,
 } from '../public/shared/admin-dope-flash.js';
 
 const HOLD = 30_000;
@@ -216,6 +218,78 @@ test('paint inserts the flash above the color row and removes it when clear', ()
   paintAdminDopeSlot(root, null);
   assert.equal(mast.querySelector('admin-dope-slot'), null);
   assert.equal(mast.firstChild, colors);
+});
+
+test('tally lists who pressed since the set started and stays under the flash', () => {
+  const root = element('main');
+  const mast = element('div');
+  mast.className = 'admin-dashboard-mast';
+  mast.hidden = true;
+  const colors = element('div');
+  colors.className = 'colors-row';
+  mast.appendChild(colors);
+  root.appendChild(mast);
+
+  paintAdminDopeSlot(root, {
+    who: 'Keys',
+    timestamp: '19:17:05;12',
+    loggedAt: '2026-10-07T01:17:05.000Z',
+    count: 1,
+    remainingMs: 1000,
+  });
+  const shown = paintAdminDopeTally(root, [
+    { who: 'Keys', count: 2 },
+    { who: 'Bass', count: 1 },
+    { who: null, count: 1 },
+  ], { latestWho: 'Keys' });
+
+  assert.equal(shown, true);
+  assert.equal(mast.hidden, false);
+  assert.equal(mast.childNodes[0].classList.contains('admin-dope-slot'), true);
+  const strip = mast.childNodes[1];
+  assert.equal(strip.classList.contains('admin-dope-tally'), true);
+  assert.equal(mast.childNodes[2], colors);
+  assert.equal(strip.getAttribute('aria-label'), 'Dope this set: Keys 2, Bass 1, unknown 1');
+  const people = strip.childNodes.filter((node) => node.classList.contains('admin-dope-tally-person'));
+  assert.equal(people.length, 3);
+  assert.equal(people[0].classList.contains('admin-dope-tally-person--latest'), true);
+  assert.equal(people[0].childNodes[0].textContent, 'Keys');
+  assert.equal(people[0].childNodes[1].textContent, '2');
+  assert.equal(people[2].childNodes[0].textContent, 'unknown');
+
+  paintAdminDopeSlot(root, null);
+  assert.equal(mast.querySelector('.admin-dope-slot'), null);
+  assert.equal(mast.querySelector('.admin-dope-tally'), strip);
+  assert.equal(mast.hidden, false);
+
+  paintAdminDopeTally(root, []);
+  assert.equal(mast.querySelector('.admin-dope-tally'), null);
+  assert.equal(mast.hidden, true);
+  assert.equal(mast.firstChild, colors);
+});
+
+test('set page tally uses the same counts and hides when the session has none', () => {
+  const root = element('main');
+  const host = element('div');
+  host.className = 'admin-dope-tally set-dope-tally';
+  host.hidden = true;
+  root.appendChild(host);
+
+  const shown = paintSetDopeTally(root, [
+    { who: 'Keys', count: 2 },
+    { who: 'Bass', count: 1 },
+  ], { latestWho: 'Bass' });
+
+  assert.equal(shown, true);
+  assert.equal(host.hidden, false);
+  assert.equal(host.getAttribute('aria-label'), 'Dope this set: Keys 2, Bass 1');
+  const people = host.childNodes.filter((node) => node.classList.contains('admin-dope-tally-person'));
+  assert.equal(people[1].classList.contains('admin-dope-tally-person--latest'), true);
+
+  paintSetDopeTally(root, []);
+  assert.equal(host.hidden, true);
+  assert.equal(host.childNodes.length, 0);
+  assert.equal(root.querySelector('.set-dope-tally'), host);
 });
 
 test('paint leaves the layout alone when the dashboard look is not mounted', () => {

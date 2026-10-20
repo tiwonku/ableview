@@ -76,6 +76,7 @@ export function buildSessionLogBroadcast(sessionLog) {
     lastLoggedAt: snap.lastLoggedAt ?? null,
     momentCount: snap.momentCount ?? 0,
     lastMoment: moments?.lastMoment ?? null,
+    dopeTally: moments?.dopeTally ?? [],
     capture: snap.capture ?? null,
   };
 }
