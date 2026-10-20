@@ -2,6 +2,12 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { validateConfig } from './index.js';
 import { DEFAULT_LIVE_COLOR_COLUMNS, DEFAULT_LIVE_COLOR_SLOTS, DEFAULT_STATIC_COLOR_SLOTS } from '../core/live-colors.js';
+import {
+  COLOR_SIM_ALTERNATE_MS,
+  COLOR_SIM_LOOK,
+  COLOR_SIM_LOOK_B,
+  resolveSimPalette,
+} from '../sacn/loopback.js';
 import { DEFAULT_BREATH, normalizeBreathSettings } from '../../public/shared/breath-math.js';
 
 function serializeBreath(breath) {
@@ -68,6 +74,13 @@ function serializeSacn(sacn) {
       settleMs: src.log?.settleMs ?? 200,
       motionIntervalMs: src.log?.motionIntervalMs ?? 400,
       minIntervalMs: src.log?.minIntervalMs ?? 100,
+    },
+    sim: {
+      enabled: src.sim?.enabled === true,
+      alternate: src.sim?.alternate === true,
+      alternateMs: src.sim?.alternateMs ?? COLOR_SIM_ALTERNATE_MS,
+      look: resolveSimPalette(src.sim?.look, COLOR_SIM_LOOK),
+      lookB: resolveSimPalette(src.sim?.lookB, COLOR_SIM_LOOK_B),
     },
   };
 }

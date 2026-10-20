@@ -44,6 +44,13 @@ test('settings panel maps FX and static look channels independently', () => {
   assert.match(src, /Live FX/);
   assert.match(src, /Static look/);
   assert.match(src, /sacn-preview-row/);
+  assert.match(src, /sacnSimEnabled/);
+  assert.match(src, /Simulate GrandMA colors/);
+  assert.match(src, /'sacnSimLook'/);
+  assert.match(src, /'sacnSimLookB'/);
+  assert.match(src, /Alternate Look A and Look B/);
+  assert.match(src, /Apply look/);
+  assert.match(src, /renderColorSimControls/);
 });
 
 test('settings panel configures djay sources and shows packet status', () => {

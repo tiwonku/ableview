@@ -96,6 +96,21 @@
       "settleMs": 200,
       "motionIntervalMs": 400,
       "minIntervalMs": 100
+    },
+    "sim": {
+      "enabled": false,
+      "alternate": false,
+      "alternateMs": 4000,
+      "look": {
+        "main": [255, 80, 0],
+        "secondary": [0, 40, 255],
+        "accent": [20, 200, 80]
+      },
+      "lookB": {
+        "main": [40, 180, 255],
+        "secondary": [255, 40, 120],
+        "accent": [255, 255, 80]
+      }
     }
   },
   "sessionLog": {

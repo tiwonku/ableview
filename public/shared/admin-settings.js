@@ -51,6 +51,21 @@ const SACN_DEFAULTS = Object.freeze({
     motionIntervalMs: 400,
     minIntervalMs: 100,
   },
+  sim: {
+    enabled: false,
+    alternate: false,
+    alternateMs: 4000,
+    look: {
+      main: [255, 80, 0],
+      secondary: [0, 40, 255],
+      accent: [20, 200, 80],
+    },
+    lookB: {
+      main: [40, 180, 255],
+      secondary: [255, 40, 120],
+      accent: [255, 255, 80],
+    },
+  },
 });
 
 const MOMENTS_DEFAULTS = Object.freeze({
@@ -100,6 +115,30 @@ function mergeSlotGroup(defaults, raw) {
   };
 }
 
+function normalizeSimPalette(raw, fallback) {
+  const out = {};
+  for (const id of ['main', 'secondary', 'accent']) {
+    const rgb = raw?.[id];
+    const ok = Array.isArray(rgb)
+      && rgb.length === 3
+      && rgb.every((n) => Number.isInteger(Number(n)) && Number(n) >= 0 && Number(n) <= 255);
+    out[id] = ok ? rgb.map((n) => Number(n)) : [...fallback[id]];
+  }
+  return out;
+}
+
+function normalizeSacnSim(raw) {
+  const defaults = SACN_DEFAULTS.sim;
+  const alternateMs = Number(raw?.alternateMs);
+  return {
+    enabled: raw?.enabled === true,
+    alternate: raw?.alternate === true,
+    alternateMs: Number.isInteger(alternateMs) ? alternateMs : defaults.alternateMs,
+    look: normalizeSimPalette(raw?.look, defaults.look),
+    lookB: normalizeSimPalette(raw?.lookB, defaults.lookB),
+  };
+}
+
 function normalizeSacn(raw) {
   return {
     ...SACN_DEFAULTS,
@@ -107,7 +146,34 @@ function normalizeSacn(raw) {
     slots: mergeSlotGroup(SACN_DEFAULTS.slots, raw?.slots),
     staticSlots: mergeSlotGroup(SACN_DEFAULTS.staticSlots, raw?.staticSlots),
     log: { ...SACN_DEFAULTS.log, ...(raw?.log ?? {}) },
+    sim: normalizeSacnSim(raw?.sim),
   };
+}
+
+function rgbToHex(rgb) {
+  const parts = Array.isArray(rgb) && rgb.length === 3 ? rgb : [0, 0, 0];
+  const byte = (n) => Math.max(0, Math.min(255, Number(n) || 0)).toString(16).padStart(2, '0');
+  return `#${byte(parts[0])}${byte(parts[1])}${byte(parts[2])}`;
+}
+
+function hexToRgb(hex) {
+  const match = /^#?([0-9a-f]{6})$/i.exec(String(hex ?? '').trim());
+  if (!match) return null;
+  const n = Number.parseInt(match[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function colorInput(name, rgb) {
+  const input = el('input');
+  input.type = 'color';
+  input.name = name;
+  input.value = rgbToHex(rgb);
+  input.className = 'settings-color-input';
+  return input;
+}
+
+function slotInputName(prefix, id) {
+  return `${prefix}${id.charAt(0).toUpperCase()}${id.slice(1)}`;
 }
 
 function el(tag, className, text) {
@@ -274,6 +340,13 @@ function renderSacnStatusBox(sacnStatus, settings) {
       'ableton-session-line',
       'sACN listener is off. Enable below and save to receive live RGB from GrandMA.',
     ));
+    if (settings?.sacn?.sim?.enabled === true) {
+      box.appendChild(el(
+        'p',
+        'ableton-session-line warn',
+        'Color sim is saved but idle until the listener is on.',
+      ));
+    }
     return box;
   }
 
@@ -294,6 +367,9 @@ function renderSacnStatusBox(sacnStatus, settings) {
     const name = sacnStatus.sourceName ? ` · ${sacnStatus.sourceName}` : '';
     const uniText = fxUni === lookUni ? `universe ${fxUni}` : `FX U${fxUni} · look U${lookUni}`;
     signalLine.textContent = `Live ${uniText}${from}${name}${seen ? ` (last packet ${seen})` : ''}`;
+  } else if (settings?.sacn?.sim?.enabled === true) {
+    const uniText = fxUni === lookUni ? `universe ${fxUni}` : `FX U${fxUni} / look U${lookUni}`;
+    signalLine.textContent = `Color sim is on, but no loopback packet yet on ${uniText}. Save with this listener enabled.`;
   } else {
     const uniText = fxUni === lookUni ? `universe ${fxUni}` : `FX U${fxUni} / look U${lookUni}`;
     signalLine.textContent = `No signal on ${uniText} — pick the lighting NIC and confirm GrandMA is sending`;
@@ -853,7 +929,108 @@ function sacnFromForm(fd, current) {
       motionIntervalMs: current.sacn?.log?.motionIntervalMs ?? SACN_DEFAULTS.log.motionIntervalMs,
       minIntervalMs: current.sacn?.log?.minIntervalMs ?? SACN_DEFAULTS.log.minIntervalMs,
     },
+    sim: {
+      enabled: fd.get('sacnSimEnabled') === 'on',
+      alternate: fd.get('sacnSimAlternate') === 'on',
+      alternateMs: Math.round(Number(fd.get('sacnSimAlternateSeconds')) * 1000),
+      look: paletteFromForm(fd, 'sacnSimLook', current.sacn?.sim?.look ?? SACN_DEFAULTS.sim.look),
+      lookB: paletteFromForm(fd, 'sacnSimLookB', current.sacn?.sim?.lookB ?? SACN_DEFAULTS.sim.lookB),
+    },
   };
+}
+
+function paletteFromForm(fd, prefix, fallback) {
+  const out = {};
+  for (const id of ['main', 'secondary', 'accent']) {
+    out[id] = hexToRgb(fd.get(slotInputName(prefix, id))) ?? [...fallback[id]];
+  }
+  return out;
+}
+
+function renderPaletteFields(title, prefix, palette) {
+  const wrap = el('div', 'settings-color-block');
+  wrap.appendChild(el('p', 'settings-subhead', title));
+  const row = el('div', 'settings-color-row');
+  for (const [id, label] of [['main', 'Main'], ['secondary', 'Secondary'], ['accent', 'Accent']]) {
+    const field = el('label', 'settings-color-field');
+    field.appendChild(el('span', 'settings-color-label', label));
+    field.appendChild(colorInput(slotInputName(prefix, id), palette[id]));
+    row.appendChild(field);
+  }
+  wrap.appendChild(row);
+  return wrap;
+}
+
+function renderColorSimControls(settings) {
+  const sim = settings.sacn?.sim ?? SACN_DEFAULTS.sim;
+  const wrap = el('div', 'settings-color-sim');
+  wrap.appendChild(el('p', 'settings-subhead', 'GrandMA color sim'));
+
+  const simOn = sim.enabled === true;
+  const simCheck = el('input');
+  simCheck.type = 'checkbox';
+  simCheck.name = 'sacnSimEnabled';
+  simCheck.id = 'sacnSimEnabled';
+  simCheck.checked = simOn;
+  simCheck.className = 'settings-checkbox';
+  const simRow = el('div', 'settings-field settings-field-checkbox');
+  simRow.appendChild(simCheck);
+  const simLabel = el('label', 'settings-checkbox-label');
+  simLabel.htmlFor = 'sacnSimEnabled';
+  simLabel.textContent = 'Simulate GrandMA colors (loopback on this PC)';
+  simRow.appendChild(simLabel);
+  wrap.appendChild(simRow);
+
+  if (simOn && settings.sacn?.enabled !== true) {
+    wrap.appendChild(el(
+      'p',
+      'settings-sim-warn',
+      'Color sim is on, but the sACN listener is off. Turn on “Receive live RGB” in GrandMA colors and save, or these looks never reach the log.',
+    ));
+  } else if (simOn) {
+    wrap.appendChild(el(
+      'p',
+      'settings-sim-warn',
+      'Color sim is ON. Looks go to this PC only, then into the session log and the website. It will fight a real GrandMA on this universe. Turn it off before show night.',
+    ));
+  }
+
+  wrap.appendChild(renderPaletteFields('Look A', 'sacnSimLook', sim.look));
+  wrap.appendChild(renderPaletteFields('Look B', 'sacnSimLookB', sim.lookB));
+
+  const altOn = sim.alternate === true;
+  const altCheck = el('input');
+  altCheck.type = 'checkbox';
+  altCheck.name = 'sacnSimAlternate';
+  altCheck.id = 'sacnSimAlternate';
+  altCheck.checked = altOn;
+  altCheck.className = 'settings-checkbox';
+  const altRow = el('div', 'settings-field settings-field-checkbox');
+  altRow.appendChild(altCheck);
+  const altLabel = el('label', 'settings-checkbox-label');
+  altLabel.htmlFor = 'sacnSimAlternate';
+  altLabel.textContent = 'Alternate Look A and Look B';
+  altRow.appendChild(altLabel);
+  wrap.appendChild(altRow);
+
+  const seconds = Math.round((sim.alternateMs ?? 4000) / 1000);
+  wrap.appendChild(fieldRow(
+    'Alternate every (seconds)',
+    numberInput('sacnSimAlternateSeconds', seconds, { min: 2, max: 120, step: 1 }),
+  ));
+
+  const apply = el('button', 'settings-sync', 'Apply look');
+  apply.type = 'submit';
+  const applyRow = el('div', 'settings-sync-row');
+  applyRow.appendChild(apply);
+  wrap.appendChild(applyRow);
+
+  wrap.appendChild(el(
+    'p',
+    'settings-sim-hint',
+    'Apply look saves and sends Look A. Change the colors and apply again to log the next hold. Alternate swaps with Look B on the timer. The website crossfades when a new hold settles (about 200 ms) and the capture copy accepts it.',
+  ));
+  return wrap;
 }
 
 function oscOutFromForm(fd) {
@@ -892,6 +1069,11 @@ function renderSacnGroup(settings, sacnStatus, nics) {
   label.textContent = 'Receive live RGB over sACN (E1.31)';
   row.appendChild(label);
   group.appendChild(row);
+  group.appendChild(el(
+    'p',
+    'settings-sim-hint',
+    'Color simulation lives in the Simulation section. This listener has to be on for those looks to reach the log and the website.',
+  ));
 
   group.appendChild(fieldRow(
     'Network interface',
@@ -1068,13 +1250,14 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
   simGroup.appendChild(simRow);
   if (simEnabled) {
     const simWarn = el('p', 'settings-sim-warn');
-    simWarn.textContent = 'Simulation is ON. Operator views show fake data. Turn off before show night.';
+    simWarn.textContent = 'Simulation is ON. Operator views show fake clips. Those clips are written to the session log and copied to the show website. Turn this off before show night.';
     simGroup.appendChild(simWarn);
   } else {
     const simHint = el('p', 'settings-sim-hint');
     simHint.textContent = 'When off, AbleView listens to the real Ableton session via OSC.';
     simGroup.appendChild(simHint);
   }
+  simGroup.appendChild(renderColorSimControls(settings));
   bottomRow.appendChild(simGroup);
 
   const timecodeGroup = el('fieldset', 'settings-group');

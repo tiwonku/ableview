@@ -2299,6 +2299,44 @@ select.settings-input option {
   color: var(--muted);
 }
 
+.settings-color-sim {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.settings-color-sim .settings-sim-hint {
+  margin-left: 0;
+}
+
+.settings-color-block {
+  margin: 0.75rem 0;
+}
+
+.settings-color-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+}
+
+.settings-color-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.settings-color-input {
+  width: 3.25rem;
+  height: 2rem;
+  padding: 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: transparent;
+  cursor: pointer;
+}
+
 .settings-sheet-status {
   margin: 0.75rem 0 0.5rem;
   font-size: 0.85rem;

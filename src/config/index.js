@@ -3,6 +3,13 @@ import { resolve } from 'node:path';
 import dotenv from 'dotenv';
 import { BREATH_CURVES, BREATH_POWER_MAX, BREATH_POWER_MIN, DEFAULT_BREATH } from '../../public/shared/breath-math.js';
 import { DEFAULT_LIVE_COLOR_SLOTS, DEFAULT_STATIC_COLOR_SLOTS } from '../core/live-colors.js';
+import {
+  COLOR_SIM_ALTERNATE_MAX_MS,
+  COLOR_SIM_ALTERNATE_MIN_MS,
+  COLOR_SIM_ALTERNATE_MS,
+  COLOR_SIM_LOOK,
+  COLOR_SIM_LOOK_B,
+} from '../sacn/loopback.js';
 
 export const DEFAULTS = Object.freeze({
   ingest: {
@@ -87,6 +94,21 @@ export const DEFAULTS = Object.freeze({
       settleMs: 200,
       motionIntervalMs: 400,
       minIntervalMs: 100,
+    },
+    sim: {
+      enabled: false,
+      alternate: false,
+      alternateMs: COLOR_SIM_ALTERNATE_MS,
+      look: {
+        main: [...COLOR_SIM_LOOK.main],
+        secondary: [...COLOR_SIM_LOOK.secondary],
+        accent: [...COLOR_SIM_LOOK.accent],
+      },
+      lookB: {
+        main: [...COLOR_SIM_LOOK_B.main],
+        secondary: [...COLOR_SIM_LOOK_B.secondary],
+        accent: [...COLOR_SIM_LOOK_B.accent],
+      },
     },
   },
   sessionLog: {
@@ -231,6 +253,41 @@ export function validateConfig(config) {
     errors.push('sacn.ignorePreview must be a boolean');
   }
   const slotIds = ['main', 'secondary', 'accent'];
+  if (sacn.sim != null) {
+    if (!sacn.sim || typeof sacn.sim !== 'object' || Array.isArray(sacn.sim)) {
+      errors.push('sacn.sim must be an object');
+    } else {
+      if (sacn.sim.enabled != null && typeof sacn.sim.enabled !== 'boolean') {
+        errors.push('sacn.sim.enabled must be a boolean');
+      }
+      if (sacn.sim.alternate != null && typeof sacn.sim.alternate !== 'boolean') {
+        errors.push('sacn.sim.alternate must be a boolean');
+      }
+      if (sacn.sim.alternateMs != null) {
+        const ms = sacn.sim.alternateMs;
+        if (!(Number.isInteger(ms) && ms >= COLOR_SIM_ALTERNATE_MIN_MS && ms <= COLOR_SIM_ALTERNATE_MAX_MS)) {
+          errors.push(`sacn.sim.alternateMs must be an integer ${COLOR_SIM_ALTERNATE_MIN_MS}–${COLOR_SIM_ALTERNATE_MAX_MS}`);
+        }
+      }
+      function validateSimPalette(palette, path) {
+        if (palette == null) return;
+        if (!palette || typeof palette !== 'object' || Array.isArray(palette)) {
+          errors.push(`${path} must be an object`);
+          return;
+        }
+        for (const id of slotIds) {
+          if (palette[id] == null) continue;
+          const rgb = palette[id];
+          const ok = Array.isArray(rgb)
+            && rgb.length === 3
+            && rgb.every((n) => Number.isInteger(n) && n >= 0 && n <= 255);
+          if (!ok) errors.push(`${path}.${id} must be [r, g, b] with each channel 0–255`);
+        }
+      }
+      validateSimPalette(sacn.sim.look, 'sacn.sim.look');
+      validateSimPalette(sacn.sim.lookB, 'sacn.sim.lookB');
+    }
+  }
   function validateSlotGroup(group, path) {
     if (group == null) return;
     if (!group || typeof group !== 'object' || Array.isArray(group)) {
