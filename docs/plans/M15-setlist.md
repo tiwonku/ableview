@@ -18,7 +18,7 @@ until the next automatic match.”
 ## Non-goals
 
 - Auto-pin next song.
-- Using the setlist as a fuzzy-match source (NFR-7 unchanged).
+- Using sheet-backed setlist rows as a fuzzy-match source (NFR-7 unchanged). Local one-off rows are the exception, planned in [M17](./M17-setlist-local-rows.md): they match only while that set is active, and they are not written to Google.
 - Linear “played” auto-advance (DJ sets skip around).
 - Duplicating cue-note columns into the setlist file (store `rowId` + cached title).
 - Persisting pin state across restart.

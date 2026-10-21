@@ -22,6 +22,7 @@ Build specification: [`ableview_spec_from_claude.md`](./ableview_spec_from_claud
 | M14 | Moments — crew Stream Deck markers via Companion HTTP → session log JSONL; auto-start with timestamp session name; live title on operator views | ✅ done — [`docs/plans/M14-moments.md`](./docs/plans/M14-moments.md), [`docs/companion-moments.md`](./docs/companion-moments.md) |
 | M15 | Setlist editor / viewer — named JSON lists of sheet rows, dedicated view, pin from list | ✅ done — [`docs/plans/M15-setlist.md`](./docs/plans/M15-setlist.md) |
 | M16 | Palette view module — droppable 2–3 color look (`type: "palette"`) with linked harmony overlay; sits beside `type: "color"` until cutover | 📋 planned — [`docs/plans/M16-palette-editor.md`](./docs/plans/M16-palette-editor.md) |
+| M17 | Set-local cue rows — one-off titles on the active setlist only, same sheet column names, never written to Google | 📋 planned — [`docs/plans/M17-setlist-local-rows.md`](./docs/plans/M17-setlist-local-rows.md) |
 
 v2026 core scope (spec §10, §13) is complete. Items below are deferred, partial, or
 post-v2026.

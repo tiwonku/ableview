@@ -124,7 +124,7 @@ AbletonOSC / Simulator  →  event bus  →  [matcher]  →  [view server]  → 
 | OSC clock out | `src/outputs/osc.js` | Rebroadcasts Live tempo / beat / bar / transport to configured UDP destinations. |
 | Logger | `src/core/logger.js` | pino, structured JSON. |
 | Session log | `src/session-log/` | Append-only JSONL of `track_clip`, `match`, and optional `deck_on_air` events (M10, M13e). |
-| Setlist | `src/setlist/` | Named JSON setlists (`data/setlists/`) + `.active.json` sidecar; glance + pin, not a match source. |
+| Setlist | `src/setlist/` | Named JSON setlists (`data/setlists/`) + `.active.json` sidecar; glance + pin. Sheet-backed rows are not a match source. Local one-off rows are planned in [M17](./docs/plans/M17-setlist-local-rows.md) and would match only while that set is active. |
 | Deck bridge | `bridge/deck-bridge/` | macOS AX → UDP JSON sidecar for Djay Pro (M13a). Not AbleView ingest. |
 | Program ingest | `src/program/` | Deck-bridge UDP listener (M13b). Own sockets; emits `PROGRAM_DECK_STATE` on fingerprint or stale change only. |
 | Program panel | `public/shared/admin-program.js` | Admin Program Sources UI (M13c). Titles, playing, ON AIR. Admin WebSocket only. |
