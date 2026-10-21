@@ -16,6 +16,8 @@ import {
   updateSetlistLiveChrome,
   resetSetNavScroll,
   buildQuickCueChanges,
+  readSetlistMilestonesOpen,
+  writeSetlistMilestonesOpen,
 } from './setlist-render.js';
 import { setShowTimerContext } from './timer-module.js';
 import {
@@ -190,6 +192,7 @@ export function connectView({
   let setlistAddResults = [];
   let setlistAddSearching = false;
   let setlistAddOpen = null;
+  let setlistMilestonesOpen = readSetlistMilestonesOpen();
   let setlistCreateKey = '';
   let setlistNameDraft = '';
   let setlistAutoFocusSearch = false;
@@ -1437,6 +1440,12 @@ export function connectView({
           method: 'PATCH',
           body: { milestones },
         }),
+        milestonesOpen: setlistMilestonesOpen,
+        onMilestonesOpenChange: (open) => {
+          setlistMilestonesOpen = open === true;
+          writeSetlistMilestonesOpen(setlistMilestonesOpen);
+          render();
+        },
         onNameDraftChange: (name) => {
           setlistNameDraft = name;
           render();

@@ -170,32 +170,113 @@ export function projectClock(sample, clientReceivedAt, nowMs = Date.now()) {
   };
 }
 
-function scheduledMilestones(milestones, nowSeconds) {
-  const upcoming = [];
-  const passed = [];
-  for (const raw of Array.isArray(milestones) ? milestones : []) {
+function milestoneEntries(milestones) {
+  const entries = [];
+  const list = Array.isArray(milestones) ? milestones : [];
+  for (let index = 0; index < list.length; index += 1) {
+    const raw = list[index];
     if (!raw || raw.skip === true || raw.at == null || String(raw.at).trim() === '') continue;
     const parts = parseTimecodeDisplay(raw.at);
     if (!parts) continue;
-    const target = secondsOfDay(parts);
-    const delta = target - nowSeconds;
-    const wrapped = delta < 0 ? delta + DAY_SECONDS : delta;
-    const isUpcoming = delta >= 0 || wrapped <= LOOKAHEAD_SECONDS;
-    const entry = {
+    entries.push({
+      index,
       id: raw.id ?? '',
       label: raw.label ?? '',
       at: formatShowTimecode(parts),
-      delta: isUpcoming ? wrapped : delta,
-    };
-    if (isUpcoming) upcoming.push(entry);
-    else passed.push(entry);
+      target: secondsOfDay(parts),
+    });
   }
-  upcoming.sort((a, b) => a.delta - b.delta || String(a.label).localeCompare(String(b.label)));
+  return entries;
+}
+
+/**
+ * List order is the show order. A clock time earlier than the previous mark
+ * is the next morning (23:00 then 02:00), not a mark that already happened.
+ * Returns null when that walk wraps more than once — the list is not one night.
+ */
+function showTimeline(entries) {
+  if (!entries.length) return [];
+  const placed = [{ ...entries[0], offset: 0 }];
+  let prev = entries[0].target;
+  let offset = 0;
+  for (let i = 1; i < entries.length; i += 1) {
+    const step = (entries[i].target - prev + DAY_SECONDS) % DAY_SECONDS;
+    offset += step;
+    if (offset >= DAY_SECONDS) return null;
+    placed.push({ ...entries[i], offset });
+    prev = entries[i].target;
+  }
+  return placed;
+}
+
+function scheduledByLookahead(entries, nowSeconds) {
+  const upcoming = [];
+  const passed = [];
+  for (const entry of entries) {
+    const delta = entry.target - nowSeconds;
+    const wrapped = delta < 0 ? delta + DAY_SECONDS : delta;
+    const isUpcoming = delta >= 0 || wrapped <= LOOKAHEAD_SECONDS;
+    const item = {
+      id: entry.id,
+      label: entry.label,
+      at: entry.at,
+      delta: isUpcoming ? wrapped : delta,
+      index: entry.index,
+    };
+    if (isUpcoming) upcoming.push(item);
+    else passed.push(item);
+  }
+  upcoming.sort((a, b) => a.delta - b.delta || a.index - b.index);
   passed.sort((a, b) => b.delta - a.delta);
+  const next = upcoming[0] ?? null;
+  const overtime = upcoming.length ? null : (passed[0] ?? null);
   return {
-    next: upcoming[0] ?? null,
-    overtime: upcoming.length ? null : (passed[0] ?? null),
+    next: next && { id: next.id, label: next.label, at: next.at, delta: next.delta },
+    overtime: overtime && { id: overtime.id, label: overtime.label, at: overtime.at, delta: overtime.delta },
   };
+}
+
+function scheduledFromTimeline(placed, nowSeconds) {
+  const origin = placed[0].target;
+  const span = placed[placed.length - 1].offset;
+  const into = (nowSeconds - origin + DAY_SECONDS) % DAY_SECONDS;
+  const pick = (entry, delta) => ({
+    id: entry.id,
+    label: entry.label,
+    at: entry.at,
+    delta,
+  });
+
+  if (into <= span) {
+    let next = null;
+    for (const entry of placed) {
+      const delta = entry.offset - into;
+      if (delta < 0) continue;
+      if (!next || delta < next.delta || (delta === next.delta && entry.index < next.index)) {
+        next = { ...pick(entry, delta), index: entry.index };
+      }
+    }
+    return {
+      next: next && { id: next.id, label: next.label, at: next.at, delta: next.delta },
+      overtime: null,
+    };
+  }
+
+  const sinceEnd = into - span;
+  const untilStart = DAY_SECONDS - into;
+  const last = placed[placed.length - 1];
+  const first = placed[0];
+  if (untilStart <= sinceEnd) return { next: pick(first, untilStart), overtime: null };
+  return { next: null, overtime: pick(last, -sinceEnd) };
+}
+
+function scheduledMilestones(milestones, nowSeconds) {
+  const now = ((Number(nowSeconds) % DAY_SECONDS) + DAY_SECONDS) % DAY_SECONDS;
+  const entries = milestoneEntries(milestones);
+  if (!entries.length) return { next: null, overtime: null };
+  const placed = showTimeline(entries);
+  if (!placed) return scheduledByLookahead(entries, now);
+  return scheduledFromTimeline(placed, now);
 }
 
 export function classifyMilestones(milestones, nowSeconds) {

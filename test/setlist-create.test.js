@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderSetlist, shouldOfferNewCueRow } from '../public/shared/setlist-render.js';
+import {
+  renderSetlist,
+  shouldOfferNewCueRow,
+  readSetlistMilestonesOpen,
+  writeSetlistMilestonesOpen,
+  SETLIST_MILESTONES_OPEN_KEY,
+} from '../public/shared/setlist-render.js';
 
 function installDocument() {
   function querySelector(node, selector) {
@@ -184,4 +190,97 @@ test('each setlist row has an edit button and a missing row cannot open it', () 
   assert.deepEqual(opened, ['234']);
   buttons[1].listeners.click();
   assert.deepEqual(opened, ['234']);
+});
+
+function renderMilestones(overrides = {}) {
+  installDocument();
+  const root = document.createElement('div');
+  renderSetlist(root, {
+    title: 'Set',
+    payload: { match: { matched: false } },
+    setlist: {
+      name: 'Tonight',
+      items: [{ rowId: '1', title: 'Desperado', status: 'confirmed' }],
+      library: [{ name: 'Tonight', itemCount: 1 }],
+      milestones: [{ id: 'curfew', label: 'Curfew', at: '02:00:00:00' }],
+    },
+    connected: true,
+    ...overrides,
+  });
+  return root;
+}
+
+test('milestones stay collapsed until opened, and the clock stays visible', () => {
+  const changes = [];
+  const root = renderMilestones({
+    onMilestonesOpenChange: (open) => changes.push(open),
+  });
+  const toggle = findAll(root, 'setlist-milestones-toggle')[0];
+  assert.equal(toggle.textContent, 'Milestones');
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  assert.equal(findAll(root, 'setlist-milestone').length, 0);
+  assert.equal(findAll(root, 'setlist-milestones-clock').length, 1);
+  assert.equal(findAll(root, 'setlist-milestones-actions').length, 0);
+  toggle.listeners.click();
+  assert.deepEqual(changes, [true]);
+
+  const openRoot = renderMilestones({ milestonesOpen: true });
+  const openToggle = findAll(openRoot, 'setlist-milestones-toggle')[0];
+  assert.equal(openToggle.getAttribute('aria-expanded'), 'true');
+  assert.equal(findAll(openRoot, 'setlist-milestone').length, 1);
+  assert.match(textOf(openRoot), /Curfew/);
+  assert.match(textOf(openRoot), /Show start/);
+  openToggle.listeners.click();
+});
+
+test('milestone up and down reorder the list', () => {
+  const saved = [];
+  const root = renderMilestones({
+    milestonesOpen: true,
+    onMilestones: (milestones) => saved.push(milestones.map((item) => item.label)),
+    setlist: {
+      name: 'Tonight',
+      items: [],
+      library: [{ name: 'Tonight', itemCount: 0 }],
+      milestones: [
+        { id: 'line', label: 'Line Check start', at: '08:00:00:00' },
+        { id: 'curfew', label: 'Curfew', at: '02:00:00:00' },
+      ],
+    },
+  });
+  const rows = findAll(root, 'setlist-milestone');
+  assert.equal(rows.length, 2);
+  const down = rows[0].childNodes.find((node) => node.getAttribute?.('aria-label') === 'Move Line Check start down');
+  const up = rows[0].childNodes.find((node) => node.getAttribute?.('aria-label') === 'Move Line Check start up');
+  const curfewUp = rows[1].childNodes.find((node) => node.getAttribute?.('aria-label') === 'Move Curfew up');
+  assert.equal(up.disabled, true);
+  assert.equal(down.disabled, false);
+  assert.equal(curfewUp.disabled, false);
+  up.listeners.click();
+  assert.deepEqual(saved, []);
+  down.listeners.click();
+  assert.deepEqual(saved, [['Curfew', 'Line Check start']]);
+});
+
+test('milestone disclosure preference is closed unless this browser stored it open', () => {
+  const storage = {
+    values: {},
+    getItem(key) {
+      return this.values[key] ?? null;
+    },
+    setItem(key, value) {
+      this.values[key] = String(value);
+    },
+  };
+  assert.equal(readSetlistMilestonesOpen(storage), false);
+  writeSetlistMilestonesOpen(true, storage);
+  assert.equal(storage.values[SETLIST_MILESTONES_OPEN_KEY], '1');
+  assert.equal(readSetlistMilestonesOpen(storage), true);
+  writeSetlistMilestonesOpen(false, storage);
+  assert.equal(readSetlistMilestonesOpen(storage), false);
+  assert.equal(readSetlistMilestonesOpen({
+    getItem() {
+      throw new Error('blocked');
+    },
+  }), false);
 });

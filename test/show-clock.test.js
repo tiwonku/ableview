@@ -102,6 +102,66 @@ test('countdown wraps midnight and then shows overtime', () => {
   assert.equal(over.primary, '+3:10:00');
 });
 
+const showNight = [
+  { id: 'line', label: 'Line Check start', at: '08:00:00:00' },
+  { id: 'sound', label: 'Sound Check start', at: '09:00:00:00' },
+  { id: 'sound-end', label: 'Sound check end', at: '11:00:00:00' },
+  { id: 'show', label: 'Show start', at: '23:00:00:00' },
+  { id: 'curfew', label: 'Curfew', at: '02:00:00:00' },
+];
+
+function timerAt(hours, minutes, milestones) {
+  const nowMs = 1;
+  return describeTimer({
+    sample: { source: 'clock', hours, minutes, seconds: 0, frames: 0, fps: null },
+    clientReceivedAt: nowMs,
+    milestones,
+    mode: 'next',
+    nowMs,
+  });
+}
+
+test('a show that crosses midnight stays in list order', () => {
+  const afternoon = timerAt(16, 51, showNight);
+  assert.equal(afternoon.kind, 'countdown');
+  assert.equal(afternoon.label, 'Show start');
+  assert.equal(afternoon.primary, '\u22126:09:00');
+
+  const beforeCurfew = timerAt(23, 30, showNight);
+  assert.equal(beforeCurfew.label, 'Curfew');
+  assert.equal(beforeCurfew.primary, '\u22122:30:00');
+
+  const afterMidnight = timerAt(0, 30, showNight);
+  assert.equal(afterMidnight.kind, 'countdown');
+  assert.equal(afterMidnight.label, 'Curfew');
+  assert.equal(afterMidnight.primary, '\u22121:30:00');
+
+  const justAfter = timerAt(2, 30, showNight);
+  assert.equal(justAfter.kind, 'overtime');
+  assert.equal(justAfter.label, 'Curfew');
+  assert.equal(justAfter.primary, '+30:00');
+
+  const callTime = timerAt(7, 30, showNight);
+  assert.equal(callTime.kind, 'countdown');
+  assert.equal(callTime.label, 'Line Check start');
+  assert.equal(callTime.primary, '\u221230:00');
+});
+
+test('a milestone already passed does not count down a full day after midnight', () => {
+  const view = timerAt(1, 0, [{ id: 'show', label: 'Show start', at: '23:00:00:00' }]);
+  assert.equal(view.kind, 'overtime');
+  assert.equal(view.label, 'Show start');
+  assert.equal(view.primary, '+2:00:00');
+
+  const stillAhead = timerAt(1, 0, [
+    { id: 'show', label: 'Show start', at: '23:00:00:00' },
+    { id: 'curfew', label: 'Curfew', at: '02:00:00:00' },
+  ]);
+  assert.equal(stillAhead.kind, 'countdown');
+  assert.equal(stillAhead.label, 'Curfew');
+  assert.equal(stillAhead.primary, '\u22121:00:00');
+});
+
 test('tap modes show the milestone time or the clock', () => {
   const sample = { source: 'artnet', hours: 19, minutes: 0, seconds: 0, frames: 0, fps: 30 };
   const milestones = [{ id: 'curfew', label: 'Curfew', at: '23:00:00:00' }];

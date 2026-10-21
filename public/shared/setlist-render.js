@@ -17,6 +17,27 @@ const MILESTONE_PRESETS = [
   { id: 'curfew', label: 'Curfew' },
 ];
 
+/** Per-browser Milestones disclosure on the Set page. */
+export const SETLIST_MILESTONES_OPEN_KEY = 'ableview.setlistMilestonesOpen';
+
+export function readSetlistMilestonesOpen(storage) {
+  try {
+    const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+    return store?.getItem(SETLIST_MILESTONES_OPEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeSetlistMilestonesOpen(open, storage) {
+  try {
+    const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+    store?.setItem(SETLIST_MILESTONES_OPEN_KEY, open ? '1' : '0');
+  } catch {
+    // private mode / disabled storage
+  }
+}
+
 export const SETLIST_STATUSES = Object.freeze(['confirmed', 'likely', 'maybe']);
 export const SETLIST_KEY_COLUMN = 'Key';
 
@@ -590,6 +611,16 @@ function replaceMilestone(list, id, patch) {
   ));
 }
 
+function moveMilestone(list, id, direction) {
+  const index = list.findIndex((item) => item.id === id);
+  const next = index + direction;
+  if (index < 0 || next < 0 || next >= list.length) return list;
+  const copy = list.slice();
+  const [item] = copy.splice(index, 1);
+  copy.splice(next, 0, item);
+  return copy;
+}
+
 function applyTime(list, id, rawValue) {
   const raw = String(rawValue ?? '').trim();
   const current = list.find((item) => item.id === id);
@@ -606,8 +637,9 @@ function applyTime(list, id, rawValue) {
 
 /** Include a time or name that has been typed but not blurred yet. */
 function applyOpenMilestoneEdit(list) {
+  const Input = globalThis.HTMLInputElement;
   const active = document.activeElement;
-  if (!(active instanceof HTMLInputElement) || !active.isConnected) return list;
+  if (!Input || !(active instanceof Input) || !active.isConnected) return list;
   const field = active.dataset.setlistField ?? '';
   if (field.startsWith('milestone-time-')) {
     return applyTime(list, field.slice('milestone-time-'.length), active.value);
@@ -622,28 +654,48 @@ function applyOpenMilestoneEdit(list) {
   return list;
 }
 
-function renderMilestoneSection(parent, { milestones, busy, onMilestones }) {
+function renderMilestoneSection(parent, {
+  milestones,
+  busy,
+  onMilestones,
+  open = false,
+  onOpenChange,
+}) {
   const list = Array.isArray(milestones) ? milestones : [];
   const section = el('section', 'setlist-milestones');
   section.setAttribute('aria-label', 'Show milestones');
 
   const head = el('div', 'setlist-milestones-head');
-  head.appendChild(el('h2', 'setlist-milestones-title', 'Milestones'));
+  const toggle = el('button', 'setlist-milestones-toggle', 'Milestones');
+  toggle.type = 'button';
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  toggle.setAttribute('aria-controls', 'setlist-milestones-panel');
+  toggle.title = open ? 'Hide milestones' : 'Show milestones';
+  toggle.addEventListener('click', () => onOpenChange?.(!open));
+  head.appendChild(toggle);
   const clock = el('span', 'setlist-milestones-clock', 'Clock —');
   clock.dataset.role = 'show-clock-readout';
   head.appendChild(clock);
   section.appendChild(head);
   mountClockReadout(clock);
 
+  if (!open) {
+    parent.appendChild(section);
+    return;
+  }
+
+  const panel = el('div', 'setlist-milestones-panel');
+  panel.id = 'setlist-milestones-panel';
+
   if (!list.length) {
-    section.appendChild(el(
+    panel.appendChild(el(
       'p',
       'setlist-milestones-empty',
       'Countdown uses the log clock. Stamp a time, or type 10pm, 22:00, or 2200.',
     ));
   }
 
-  for (const milestone of list) {
+  list.forEach((milestone, index) => {
     const row = el('div', 'setlist-milestone');
     if (milestone.skip) row.classList.add('setlist-milestone--skip');
 
@@ -693,6 +745,28 @@ function renderMilestoneSection(parent, { milestones, busy, onMilestones }) {
     });
     row.appendChild(time);
 
+    const up = el('button', 'admin-editor-btn setlist-icon-btn', '↑');
+    up.type = 'button';
+    up.title = 'Move up';
+    up.setAttribute('aria-label', `Move ${milestone.label || 'milestone'} up`);
+    up.disabled = busy || index === 0;
+    up.addEventListener('click', () => {
+      if (index === 0) return;
+      onMilestones?.(moveMilestone(applyOpenMilestoneEdit(list), milestone.id, -1));
+    });
+    row.appendChild(up);
+
+    const down = el('button', 'admin-editor-btn setlist-icon-btn', '↓');
+    down.type = 'button';
+    down.title = 'Move down';
+    down.setAttribute('aria-label', `Move ${milestone.label || 'milestone'} down`);
+    down.disabled = busy || index === list.length - 1;
+    down.addEventListener('click', () => {
+      if (index === list.length - 1) return;
+      onMilestones?.(moveMilestone(applyOpenMilestoneEdit(list), milestone.id, 1));
+    });
+    row.appendChild(down);
+
     const stamp = el('button', 'admin-editor-btn', 'Stamp');
     stamp.type = 'button';
     stamp.title = 'Set this milestone to the current log clock';
@@ -723,8 +797,8 @@ function renderMilestoneSection(parent, { milestones, busy, onMilestones }) {
     });
     row.appendChild(remove);
 
-    section.appendChild(row);
-  }
+    panel.appendChild(row);
+  });
 
   const actions = el('div', 'setlist-milestones-actions');
   const present = new Set(list.map((milestone) => milestone.id));
@@ -748,7 +822,8 @@ function renderMilestoneSection(parent, { milestones, busy, onMilestones }) {
     onMilestones?.([...applyOpenMilestoneEdit(list), { label: 'Milestone', at: null, skip: false }]);
   });
   actions.appendChild(add);
-  section.appendChild(actions);
+  panel.appendChild(actions);
+  section.appendChild(panel);
 
   parent.appendChild(section);
 }
@@ -799,6 +874,8 @@ export function renderSetlist(root, ctx) {
     onDuplicate,
     onDelete,
     onMilestones,
+    milestonesOpen = false,
+    onMilestonesOpenChange,
     onNameDraftChange,
     onPin,
     onClearPin,
@@ -924,6 +1001,8 @@ export function renderSetlist(root, ctx) {
     milestones: setlist?.milestones,
     busy,
     onMilestones,
+    open: milestonesOpen === true,
+    onOpenChange: onMilestonesOpenChange,
   });
 
   if (saveError) {
