@@ -14,14 +14,26 @@ import {
   wrapCamelot,
 } from '../public/shared/camelot.js';
 
-test('parseKey accepts tonic, optional accent, optional m', () => {
+test('parseKey accepts tonic, optional accent, optional m or -', () => {
   assert.deepEqual(parseKey('Gm'), {
+    pc: 7, mode: 'minor', letter: 'G', accent: '', prefer: 'natural',
+  });
+  assert.deepEqual(parseKey('G-'), {
+    pc: 7, mode: 'minor', letter: 'G', accent: '', prefer: 'natural',
+  });
+  assert.deepEqual(parseKey('G -'), {
     pc: 7, mode: 'minor', letter: 'G', accent: '', prefer: 'natural',
   });
   assert.deepEqual(parseKey('  ebm  '), {
     pc: 3, mode: 'minor', letter: 'E', accent: 'b', prefer: 'flat',
   });
+  assert.deepEqual(parseKey('Eb-'), {
+    pc: 3, mode: 'minor', letter: 'E', accent: 'b', prefer: 'flat',
+  });
   assert.deepEqual(parseKey('C#m'), {
+    pc: 1, mode: 'minor', letter: 'C', accent: '#', prefer: 'sharp',
+  });
+  assert.deepEqual(parseKey('c#-'), {
     pc: 1, mode: 'minor', letter: 'C', accent: '#', prefer: 'sharp',
   });
   assert.deepEqual(parseKey('Bb'), {
@@ -76,7 +88,7 @@ test('fromCamelot round-trips every slot', () => {
 });
 
 test('harmonyFromRaw(Gm) is 6A with relative and ±1', () => {
-  const harmony = harmonyFromRaw('Gm');
+  const harmony = harmonyFromRaw('G-');
   assert.equal(harmony.current.code, '6A');
   assert.equal(harmony.current.name, 'Gm');
   assert.deepEqual(

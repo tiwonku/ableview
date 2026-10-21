@@ -1,6 +1,6 @@
-// Sheet Key cells: tonic A–G, optional b/#, optional m (minor; default major).
+// Sheet Key cells: tonic A–G, optional b/#, optional minor mark (m or -; default major).
 
-const KEY_PATTERN = /^([A-G])([b#])?(m)?$/i;
+const KEY_PATTERN = /^([A-G])([b#])?\s*(m|-)?$/i;
 
 const NATURAL_NAMES = Object.freeze(['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']);
 const SHARP_NAMES = Object.freeze(['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']);
