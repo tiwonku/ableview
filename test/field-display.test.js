@@ -61,7 +61,7 @@ test('a dope module shares the hero row and does not change layout mode', () => 
   assert.equal(rows[0].items[3].display, 'dope');
 });
 
-test('a timer module stays out of the cue grid and does not change layout mode', () => {
+test('a timer module is its own cell and does not change layout mode', () => {
   const fields = [
     { column: 'Key', display: 'token' },
     { type: 'timer', label: 'Show' },
@@ -70,9 +70,14 @@ test('a timer module stays out of the cue grid and does not change layout mode',
   assert.equal(isTimerField(fields[1]), true);
   assert.equal(resolveFieldsLayoutMode(fields), 'hero');
   const rows = groupFieldsForLayout(fields, { row: { Key: 'Gm' }, tempo: 105 });
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].items.length, 2);
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0].type, 'row');
+  assert.equal(rows[0].items.length, 1);
   assert.equal(rows[0].items.some((item) => item.field.type === 'timer'), false);
+  assert.equal(rows[1].type, 'timer');
+  assert.equal(rows[1].field.label, 'Show');
+  assert.equal(rows[2].type, 'row');
+  assert.equal(rows[2].items[0].field.source, 'tempo');
 });
 
 test('a setlist module stays out of the token row and does not change layout mode', () => {

@@ -25,7 +25,7 @@ export function isDopeField(field) {
   return field?.type === 'dope';
 }
 
-/** Show countdown. Drawn in its own strip, not in the cue-field grid. */
+/** Show countdown. Its own cell; not a sheet column and not part of the layout count. */
 export function isTimerField(field) {
   return field?.type === 'timer';
 }
@@ -111,6 +111,7 @@ export function groupFieldsForLayout(fields, payload) {
     const field = fields[i];
 
     if (isTimerField(field)) {
+      rows.push({ type: 'timer', field });
       i++;
       continue;
     }
@@ -149,11 +150,7 @@ export function groupFieldsForLayout(fields, payload) {
     const items = [];
     let counted = 0;
     while (i < fields.length && fields[i].type !== 'color' && fields[i].type !== 'image') {
-      if (isTimerField(fields[i])) {
-        i++;
-        continue;
-      }
-      if (isSetlistField(fields[i])) break;
+      if (isTimerField(fields[i]) || isSetlistField(fields[i])) break;
       if (isDopeField(fields[i])) {
         items.push({ field: fields[i], display: 'dope' });
         i++;

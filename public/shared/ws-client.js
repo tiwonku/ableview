@@ -1396,6 +1396,7 @@ export function connectView({
         ...flashLookProps(),
         liveColorColumns,
         setlist: lastSetlist,
+        layout: currentViewId === 'band' ? 'strip' : null,
       });
     }
     paintLiveColors();

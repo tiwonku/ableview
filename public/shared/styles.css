@@ -1671,17 +1671,12 @@ body.layout-operator .clip-name--pinned {
   min-height: 0;
 }
 
-.timer-strip {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 0.5rem;
-  min-width: 0;
-  margin: 0 0 var(--op-gap, 0.5rem);
-}
-
 .timer-module-host {
-  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
   min-width: 0;
+  min-height: 0;
 }
 
 .timer-module {
@@ -1737,6 +1732,43 @@ body.layout-operator .clip-name--pinned {
 
 .timer-module--over .timer-module-time {
   color: var(--warn);
+}
+
+body.layout-operator .fields-strip > .timer-module-host {
+  height: 100%;
+  container-type: size;
+}
+
+body.layout-operator .fields-hero > .timer-module-host {
+  flex: 0 0 auto;
+}
+
+body.layout-operator .fields-strip > .timer-module-host > .timer-module {
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 0;
+  padding: var(--op-pad);
+  text-align: center;
+  container-type: inline-size;
+}
+
+body.layout-operator .fields-strip > .timer-module-host .timer-module-time {
+  width: 100%;
+  max-width: 100%;
+  font-size: clamp(
+    0.875rem,
+    calc(100cqw / var(--timer-chars, 6) / 0.7),
+    6rem
+  );
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.no-match-panel > .timer-module-host,
+.no-match > .timer-module-host {
+  margin-bottom: 0.75rem;
 }
 
 .dope-members {

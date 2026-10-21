@@ -16,7 +16,7 @@ import {
   isTimerField,
   isSetlistField,
 } from './field-display.js';
-import { renderTimerStrip } from './timer-module.js';
+import { renderTimerModule } from './timer-module.js';
 import {
   beginSetlistPreviewPass,
   endSetlistPreviewPass,
@@ -333,15 +333,18 @@ function renderNoMatchPanel(root, {
   noMatch.className = editable ? 'no-match-panel' : 'no-match';
   if (playing) noMatch.classList.add('no-match--clips');
 
-  const setlistField = (fields ?? []).find((field) => isSetlistField(field));
-  if (setlistField) {
-    noMatch.appendChild(renderSetlistModule(setlistField, {
-      payload,
-      setlist,
-      fields,
-      matchColumn,
-      layout: 'row',
-    }));
+  for (const field of fields ?? []) {
+    if (isTimerField(field)) {
+      noMatch.appendChild(renderTimerModule(field));
+    } else if (isSetlistField(field)) {
+      noMatch.appendChild(renderSetlistModule(field, {
+        payload,
+        setlist,
+        fields,
+        matchColumn,
+        layout: 'row',
+      }));
+    }
   }
 
   // Operator views already show a hero "No Match"; keep the longer prompt on admin.
@@ -428,6 +431,7 @@ export function renderView(root, {
   flashLookTitle = '',
   liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
   setlist = null,
+  layout = null,
 }) {
   closeColorPicker();
   beginSetlistPreviewPass();
@@ -478,9 +482,6 @@ export function renderView(root, {
   }
   if (editActions) clipRow.appendChild(editActions);
   root.appendChild(clipRow);
-
-  const timerStrip = renderTimerStrip(fields);
-  if (timerStrip) root.appendChild(timerStrip);
 
   const showNoMatch = payload && !matched && !busy
     && (hasPlayingClips(payload) || payload.clipName?.trim());
@@ -565,6 +566,7 @@ export function renderView(root, {
       getMomentWho,
       setlist,
       matchColumn,
+      layout,
     }));
   } else if (!busy && fields?.length && showLastFields) {
     root.appendChild(renderLastMatchedFields(fields, payload, {
@@ -573,6 +575,7 @@ export function renderView(root, {
       getMomentWho,
       setlist,
       matchColumn,
+      layout,
     }));
   }
 
@@ -637,6 +640,7 @@ function renderLastMatchedFields(fields, payload, {
   getMomentWho = null,
   setlist = null,
   matchColumn = null,
+  layout = null,
 } = {}) {
   const panel = document.createElement('div');
   panel.className = 'no-match-panel no-match-panel--last-fields';
@@ -668,6 +672,7 @@ function renderLastMatchedFields(fields, payload, {
     setlist,
     setlistPayload: payload,
     matchColumn,
+    layout,
   }));
   return panel;
 }
@@ -816,21 +821,26 @@ function renderFieldsGrid(fields, payload, {
   setlist = null,
   setlistPayload = null,
   matchColumn = null,
+  layout = null,
 } = {}) {
   const fieldsWrap = document.createElement('div');
   fieldsWrap.className = 'view-fields-wrap';
   const previewPayload = setlistPayload ?? payload;
   const setlistCtx = { payload: previewPayload, setlist, fields, matchColumn };
 
-  const layoutMode = resolveFieldsLayoutMode(fields);
+  const layoutMode = layout === 'strip' || layout === 'hero'
+    ? layout
+    : resolveFieldsLayoutMode(fields);
   const grid = document.createElement('div');
   grid.className = `fields fields-${layoutMode}` + (fields.length > 4 ? ' fields-many' : '');
 
   if (layoutMode === 'strip') {
-    const stripCount = fields.filter((field) => !isTimerField(field)).length;
-    grid.style.setProperty('--strip-cols', String(Math.max(stripCount, 1)));
+    grid.style.setProperty('--strip-cols', String(Math.max(fields.length, 1)));
     for (const field of fields) {
-      if (isTimerField(field)) continue;
+      if (isTimerField(field)) {
+        grid.appendChild(renderTimerModule(field));
+        continue;
+      }
       if (isSetlistField(field)) {
         grid.appendChild(renderSetlistModule(field, { ...setlistCtx, layout: 'stack' }));
         continue;
@@ -851,6 +861,8 @@ function renderFieldsGrid(fields, payload, {
     for (const row of groupFieldsForLayout(fields, payload)) {
       if (row.type === 'colors') {
         grid.appendChild(renderColorGroup(row.fields, payload, { onPickColor }));
+      } else if (row.type === 'timer') {
+        grid.appendChild(renderTimerModule(row.field));
       } else if (row.type === 'setlist') {
         grid.appendChild(renderSetlistModule(row.field, { ...setlistCtx, layout: 'row' }));
       } else if (row.type === 'image') {

@@ -56,7 +56,10 @@ function paintTimerButton(button, field) {
   const time = button.querySelector('[data-role="timer-time"]');
   if (label) label.textContent = view.label;
   if (source) source.textContent = view.source ?? '';
-  if (time) time.textContent = view.primary;
+  if (time) {
+    time.textContent = view.primary;
+    time.style.setProperty('--timer-chars', String([...view.primary].length || 1));
+  }
   const spoken = view.source
     ? `${view.label}, ${view.primary}, ${view.source}`
     : `${view.label}, ${view.primary}`;
@@ -103,18 +106,12 @@ export function mountTimerModule(host, field) {
   queueMicrotask(tick);
 }
 
-export function renderTimerStrip(fields) {
-  const timers = (fields ?? []).filter((field) => field?.type === 'timer');
-  if (!timers.length) return null;
-  const strip = document.createElement('div');
-  strip.className = 'timer-strip';
-  for (const field of timers) {
-    const host = document.createElement('div');
-    host.className = 'timer-module-host';
-    mountTimerModule(host, field);
-    strip.appendChild(host);
-  }
-  return strip;
+/** One countdown cell for the view field grid. */
+export function renderTimerModule(field) {
+  const host = document.createElement('div');
+  host.className = 'timer-module-host';
+  mountTimerModule(host, field);
+  return host;
 }
 
 /** Show-box clock readout for the Set page. Stops when the node leaves the document. */
