@@ -313,3 +313,17 @@ test('operator pin cue is wired in view-render and ws-client', () => {
   assert.match(clientSrc, /mergePinResults/);
   assert.match(clientSrc, /applyPinResults\(''\)/);
 });
+
+test('operator song titles stay on at most two lines', () => {
+  const css = readFileSync(
+    fileURLToPath(new URL('../public/shared/styles.css', import.meta.url)),
+    'utf8',
+  );
+  const viewSrc = readFileSync(
+    fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)),
+    'utf8',
+  );
+  assert.match(css, /body\.layout-operator \.clip-name-text\s*\{[^}]*-webkit-line-clamp:\s*2/s);
+  assert.match(viewSrc, /function fitHeroTitle/);
+  assert.match(viewSrc, /scheduleHeroTitleFit\(root\)/);
+});

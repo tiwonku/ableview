@@ -228,6 +228,112 @@ function renderHeroRow(parent, heroText, payload, {
   parent.appendChild(row);
 }
 
+/** Last fitted operator title, so a re-render of the same song skips remeasure. */
+let heroTitleFit = { text: '', width: 0, font: '' };
+/** @type {ResizeObserver | null} */
+let heroTitleObserver = null;
+
+function scheduleHeroTitleFit(root) {
+  const text = root?.querySelector?.('.clip-name-text');
+  if (!text || !document.body.classList.contains('layout-operator')) {
+    heroTitleObserver?.disconnect();
+    return;
+  }
+  fitHeroTitle(text);
+  if (typeof ResizeObserver !== 'function') return;
+  const head = text.closest('.clip-head');
+  if (!head) return;
+  if (!heroTitleObserver) {
+    heroTitleObserver = new ResizeObserver(() => {
+      const live = document.querySelector('body.layout-operator .clip-name-text');
+      if (live) fitHeroTitle(live);
+    });
+  }
+  heroTitleObserver.disconnect();
+  heroTitleObserver.observe(head);
+}
+
+let heroTitleFitting = false;
+
+function titleMinPx() {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--title-min').trim() || '2.5rem';
+  const probe = document.createElement('span');
+  probe.style.cssText = `position:absolute;visibility:hidden;font-size:${raw}`;
+  document.body.appendChild(probe);
+  const px = parseFloat(getComputedStyle(probe).fontSize);
+  probe.remove();
+  return Number.isFinite(px) ? px : 40;
+}
+
+/** Line boxes with the two-line cap lifted, so the count matches the real wrap. */
+function heroTitleLineCount(text) {
+  const prev = {
+    webkitLineClamp: text.style.webkitLineClamp,
+    lineClamp: text.style.lineClamp,
+    maxHeight: text.style.maxHeight,
+    overflow: text.style.overflow,
+  };
+  text.style.webkitLineClamp = 'unset';
+  text.style.lineClamp = 'unset';
+  text.style.maxHeight = 'none';
+  text.style.overflow = 'visible';
+  const range = document.createRange();
+  range.selectNodeContents(text);
+  const lines = range.getClientRects().length;
+  text.style.webkitLineClamp = prev.webkitLineClamp;
+  text.style.lineClamp = prev.lineClamp;
+  text.style.maxHeight = prev.maxHeight;
+  text.style.overflow = prev.overflow;
+  return lines;
+}
+
+function fitHeroTitle(text) {
+  if (heroTitleFitting || !text?.isConnected) return;
+  const clip = text.closest('.clip-name');
+  if (!clip) return;
+  const content = text.textContent || '';
+  const width = Math.round(text.clientWidth);
+  if (width < 8) return;
+  if (content === heroTitleFit.text && Math.abs(width - heroTitleFit.width) <= 1) {
+    clip.style.fontSize = heroTitleFit.font;
+    return;
+  }
+
+  heroTitleFitting = true;
+  try {
+    clip.style.fontSize = '';
+    const cap = parseFloat(getComputedStyle(clip).fontSize);
+    if (!Number.isFinite(cap) || cap <= 0) return;
+    const min = Math.min(titleMinPx(), cap);
+    let best = cap;
+    clip.style.fontSize = `${cap}px`;
+    if (heroTitleLineCount(text) > 2) {
+      let lo = min;
+      let hi = cap;
+      best = min;
+      for (let i = 0; i < 12; i += 1) {
+        const mid = (lo + hi) / 2;
+        clip.style.fontSize = `${mid}px`;
+        if (heroTitleLineCount(text) <= 2) {
+          best = mid;
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+    }
+
+    const font = best >= cap - 0.5 ? '' : `${Math.floor(best * 10) / 10}px`;
+    clip.style.fontSize = font;
+    const truncated = heroTitleLineCount(text) > 2;
+    if (truncated) text.title = content;
+    else text.removeAttribute('title');
+    heroTitleFit = { text: content, width: Math.round(text.clientWidth) || width, font };
+  } finally {
+    heroTitleFitting = false;
+  }
+}
+
 function viewHasColorFields(fields) {
   return (fields ?? []).some((field) => field?.type === 'color');
 }
@@ -581,6 +687,7 @@ export function renderView(root, {
 
   updateStatusBar({ connected, lastUpdate, payload });
   endSetlistPreviewPass();
+  scheduleHeroTitleFit(root);
 }
 
 export function updateViewLiveChrome(root, {
@@ -598,6 +705,7 @@ export function updateViewLiveChrome(root, {
   if (editSession) updateEditContextBanner(root, editSession, payload);
 
   updateStatusBar({ connected, lastUpdate, payload });
+  scheduleHeroTitleFit(root);
 }
 
 function frozenEditHeroText(editSession, matchColumn) {

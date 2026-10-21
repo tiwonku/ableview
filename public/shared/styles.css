@@ -370,6 +370,21 @@ main {
   min-width: 0;
 }
 
+/* Operator hero: a long song title stays on two lines so the header
+   doesn't stretch the action buttons and squash the field cards. */
+body.layout-operator .clip-name-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  flex: 1 1 auto;
+  max-width: 100%;
+  min-height: 0;
+  max-height: 2.2em;
+  overflow-wrap: break-word;
+}
+
 .clip-name--nomatch {
   color: #ffd591;
 }
