@@ -66,6 +66,20 @@ export function registerSetlistRoutes(app, { setlistStore, log }) {
     }
   });
 
+  app.patch('/api/setlist/milestones', async (req, reply) => {
+    if (!setlistStore) {
+      return reply.code(501).send({ ok: false, error: 'setlist is not available' });
+    }
+    try {
+      const state = setlistStore.setMilestones(req.body?.milestones);
+      return reply.send({ ok: true, ...state });
+    } catch (err) {
+      const message = err.message ?? 'milestone update failed';
+      log.warn({ err: message }, 'setlist milestones patch failed');
+      return reply.code(httpCode(err)).send({ ok: false, error: message });
+    }
+  });
+
   app.post('/api/setlist/items', async (req, reply) => {
     if (!setlistStore) {
       return reply.code(501).send({ ok: false, error: 'setlist is not available' });

@@ -48,7 +48,10 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
   assert.match(clientSrc, /currentViewId === 'setlist'/);
   assert.match(clientSrc, /renderSetlist/);
   assert.match(clientSrc, /syncSessionLogPanel/);
+  assert.match(renderSrc, /Milestones/);
+  assert.match(renderSrc, /currentStampDisplay/);
   assert.match(clientSrc, /\/api\/setlist/);
+  assert.match(clientSrc, /\/api\/setlist\/milestones/);
   assert.match(clientSrc, /body: \{ delete: true \}/);
   assert.match(clientSrc, /function setlistCueChanged/);
   assert.match(clientSrc, /mergePinResults/);

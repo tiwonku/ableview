@@ -59,6 +59,21 @@ test('validateConfig allows a dope module without a column', () => {
   assert.equal(validateConfig(cfg), cfg);
 });
 
+test('validateConfig allows a timer module without a column', () => {
+  const cfg = baseConfig();
+  cfg.views.band.fields = [
+    { column: 'Key' },
+    { type: 'timer', label: 'Show' },
+  ];
+  assert.equal(validateConfig(cfg), cfg);
+
+  cfg.views.band.fields = [{ type: 'timer', column: 'Key' }];
+  assert.throws(() => validateConfig(cfg), /cannot set column on a timer module/);
+
+  cfg.views.band.fields = [{ type: 'timer', source: 'tempo' }];
+  assert.throws(() => validateConfig(cfg), /cannot set source on a timer module/);
+});
+
 test('validateConfig rejects unknown field source and source+column', () => {
   const cfg = baseConfig();
   cfg.views.band.fields = [{ source: 'beat' }];

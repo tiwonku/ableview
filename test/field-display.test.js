@@ -10,6 +10,7 @@ import {
   isLiveField,
   isCamelotField,
   isDopeField,
+  isTimerField,
 } from '../public/shared/field-display.js';
 
 test('resolveFieldDisplay respects explicit display', () => {
@@ -57,6 +58,20 @@ test('a dope module shares the hero row and does not change layout mode', () => 
   assert.equal(rows[0].type, 'row');
   assert.equal(rows[0].items.length, 4);
   assert.equal(rows[0].items[3].display, 'dope');
+});
+
+test('a timer module stays out of the cue grid and does not change layout mode', () => {
+  const fields = [
+    { column: 'Key', display: 'token' },
+    { type: 'timer', label: 'Show' },
+    { source: 'tempo', label: 'Tempo' },
+  ];
+  assert.equal(isTimerField(fields[1]), true);
+  assert.equal(resolveFieldsLayoutMode(fields), 'hero');
+  const rows = groupFieldsForLayout(fields, { row: { Key: 'Gm' }, tempo: 105 });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].items.length, 2);
+  assert.equal(rows[0].items.some((item) => item.field.type === 'timer'), false);
 });
 
 test('resolveFieldsLayoutMode uses strip for color or many fields', () => {

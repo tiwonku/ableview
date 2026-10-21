@@ -17,6 +17,7 @@ import {
   resetSetNavScroll,
   buildQuickCueChanges,
 } from './setlist-render.js';
+import { setShowTimerContext } from './timer-module.js';
 import {
   collectEditorChanges,
   collectEditorValues,
@@ -172,6 +173,13 @@ export function connectView({
   let cuePane = resolveStoredCuePane(readStoredCuePane());
   let pinSession = null;
   let lastSetlist = null;
+  let lastClock = null;
+  let lastClockClientAt = 0;
+  setShowTimerContext(() => ({
+    sample: lastClock,
+    clientReceivedAt: lastClockClientAt,
+    milestones: lastSetlist?.milestones ?? [],
+  }));
   let setlistAddQuery = '';
   let setlistAddResults = [];
   let setlistAddSearching = false;
@@ -324,6 +332,10 @@ export function connectView({
         lastSetlist = msg.setlist;
         if (!setlistNameDraft) setlistNameDraft = msg.setlist.name ?? '';
       }
+      if (msg.clock) {
+        lastClock = msg.clock;
+        lastClockClientAt = Date.now();
+      }
       if (msg.liveColors) lastLiveColors = msg.liveColors;
       if (msg.liveColorColumns) liveColorColumns = msg.liveColorColumns;
       if (msg.program) lastProgram = msg.program;
@@ -360,6 +372,12 @@ export function connectView({
 
     if (msg.type === 'sessionLog' && msg.sessionLog) {
       applySessionLogState(msg.sessionLog);
+      return;
+    }
+
+    if (msg.type === 'clock' && msg.clock) {
+      lastClock = msg.clock;
+      lastClockClientAt = Date.now();
       return;
     }
 
@@ -1284,6 +1302,10 @@ export function connectView({
         onCreate: (name) => mutateSetlist('/api/setlist', { method: 'PATCH', body: { name, create: true } }),
         onDuplicate: (name) => mutateSetlist('/api/setlist', { method: 'PATCH', body: { name, duplicate: true } }),
         onDelete: () => mutateSetlist('/api/setlist', { method: 'PATCH', body: { delete: true } }),
+        onMilestones: (milestones) => mutateSetlist('/api/setlist/milestones', {
+          method: 'PATCH',
+          body: { milestones },
+        }),
         onNameDraftChange: (name) => {
           setlistNameDraft = name;
           render();

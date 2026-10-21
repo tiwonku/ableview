@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createBus, EVENTS } from '../src/core/bus.js';
@@ -334,6 +334,53 @@ test('restart restores the active setlist from the sidecar', () => {
   assert.equal(state.items.length, 1);
   assert.equal(state.items[0].rowId, '7');
   assert.equal(state.items[0].status, 'likely');
+});
+
+test('milestones persist on the set, duplicate, and survive reload', () => {
+  const { store, dir } = tempStore();
+  store.start();
+  const state = store.setMilestones([
+    { id: 'show-start', label: 'Show start', at: '20:00:00' },
+    { label: 'Curfew', at: '23:00:00:00', skip: false },
+    { id: 'set-break', label: 'Set break', at: null, skip: true },
+  ]);
+  assert.equal(state.milestones.length, 3);
+  assert.equal(state.milestones[0].at, '20:00:00:00');
+  assert.equal(state.milestones[1].id, 'curfew');
+  assert.equal(state.milestones[2].skip, true);
+
+  const saved = JSON.parse(readFileSync(join(dir, 'default.json'), 'utf8'));
+  assert.equal(saved.milestones[0].label, 'Show start');
+  assert.equal(saved.items.length, 0);
+
+  store.duplicate('mempho');
+  const copy = JSON.parse(readFileSync(join(dir, 'mempho.json'), 'utf8'));
+  assert.equal(copy.milestones.length, 3);
+  assert.equal(copy.milestones[1].at, '23:00:00:00');
+
+  store.stop();
+  const { store: again } = tempStore({ setlist: { directory: dir, defaultName: 'default' } });
+  again.start();
+  again.switchTo('mempho');
+  assert.equal(again.getState().milestones[0].id, 'show-start');
+});
+
+test('a set file without milestones loads as an empty list', () => {
+  const { store, dir } = tempStore();
+  writeFileSync(join(dir, 'default.json'), `${JSON.stringify({
+    name: 'default',
+    updatedAt: '2026-10-10T00:00:00.000Z',
+    items: [],
+  })}\n`);
+  store.start();
+  assert.deepEqual(store.getState().milestones, []);
+});
+
+test('setMilestones rejects a time that is not a clock', () => {
+  const { store } = tempStore();
+  store.start();
+  assert.throws(() => store.setMilestones([{ label: 'Doors', at: '8pm' }]), /HH:MM:SS/);
+  assert.throws(() => store.setMilestones([{ label: '' }]), /label/);
 });
 
 test('store emits SETLIST on the bus', () => {

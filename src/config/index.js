@@ -501,10 +501,11 @@ export function validateConfig(config) {
     }
     for (const [i, field] of (view.fields ?? []).entries()) {
       const path = `views.${viewId}.fields[${i}]`;
-      if (field?.type === 'dope') {
-        if (field.column) errors.push(`${path} cannot set column on a dope module`);
-        if (field.source) errors.push(`${path} cannot set source on a dope module`);
-        if (field.members != null) {
+      if (field?.type === 'dope' || field?.type === 'timer') {
+        const kind = field.type === 'dope' ? 'dope' : 'timer';
+        if (field.column) errors.push(`${path} cannot set column on a ${kind} module`);
+        if (field.source) errors.push(`${path} cannot set source on a ${kind} module`);
+        if (field.type === 'dope' && field.members != null) {
           const namesOk = Array.isArray(field.members) && field.members.every((name) => {
             if (typeof name !== 'string') return false;
             const trimmed = name.trim();
@@ -522,7 +523,7 @@ export function validateConfig(config) {
         errors.push(`${path}.source must be "tempo" (got "${field.source}")`);
         continue;
       }
-      if (!field?.column) errors.push(`${path}.column is required (or use source: "tempo" or type: "dope")`);
+      if (!field?.column) errors.push(`${path}.column is required (or use source: "tempo" or type: "dope" or type: "timer")`);
     }
   }
 

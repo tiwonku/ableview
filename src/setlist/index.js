@@ -9,6 +9,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { EVENTS } from '../core/bus.js';
 import { sanitizeSessionName } from '../session-log/sanitize.js';
+import { formatShowTimecode, parseTimecodeDisplay } from '../../public/shared/show-clock.js';
 
 export const SETLIST_STATUSES = Object.freeze(['confirmed', 'likely', 'maybe']);
 export const DEFAULT_SETLIST_STATUS = 'confirmed';
@@ -54,11 +55,87 @@ function writeJson(filePath, data) {
   writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 }
 
+const MAX_MILESTONES = 12;
+const MAX_MILESTONE_LABEL = 48;
+
+function milestoneSlug(raw, label) {
+  const candidate = String(raw ?? '').trim().toLowerCase();
+  if (/^[a-z0-9][a-z0-9-]{0,40}$/.test(candidate)) return candidate;
+  const slug = String(label ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return slug || 'mark';
+}
+
+function uniqueMilestoneId(seen, raw, label) {
+  let id = milestoneSlug(raw, label);
+  const base = id;
+  let n = 2;
+  while (seen.has(id)) {
+    const suffix = `-${n}`;
+    id = `${base.slice(0, 41 - suffix.length)}${suffix}`;
+    n += 1;
+  }
+  seen.add(id);
+  return id;
+}
+
+/** Lenient disk load. A bad row is dropped so one corrupt milestone cannot hide the set. */
+function milestoneFromDisk(raw, seen) {
+  const label = String(raw?.label ?? '').trim().slice(0, MAX_MILESTONE_LABEL);
+  if (!label) return null;
+  let at = null;
+  if (raw?.at != null && String(raw.at).trim() !== '') {
+    const parsed = parseTimecodeDisplay(raw.at);
+    if (parsed) at = formatShowTimecode(parsed);
+  }
+  return {
+    id: uniqueMilestoneId(seen, raw?.id, label),
+    label,
+    at,
+    skip: raw?.skip === true,
+  };
+}
+
+/** Operator edit. Invalid rows throw so the Set page can show the error. */
+export function normalizeMilestoneList(rawList) {
+  if (!Array.isArray(rawList)) throw new Error('milestones must be an array');
+  if (rawList.length > MAX_MILESTONES) {
+    throw new Error(`milestones are limited to ${MAX_MILESTONES}`);
+  }
+  const seen = new Set();
+  const out = [];
+  for (const raw of rawList) {
+    const label = String(raw?.label ?? '').trim();
+    if (!label) throw new Error('each milestone needs a label');
+    if (label.length > MAX_MILESTONE_LABEL) {
+      throw new Error(`milestone label must be ${MAX_MILESTONE_LABEL} characters or fewer`);
+    }
+    let at = null;
+    if (raw?.at != null && String(raw.at).trim() !== '') {
+      const parsed = parseTimecodeDisplay(raw.at);
+      if (!parsed) throw new Error(`milestone time must look like HH:MM:SS (${label})`);
+      at = formatShowTimecode(parsed);
+    }
+    out.push({
+      id: uniqueMilestoneId(seen, raw?.id, label),
+      label,
+      at,
+      skip: raw?.skip === true,
+    });
+  }
+  return out;
+}
+
 function emptyDocument(name) {
   return {
     name,
     updatedAt: new Date().toISOString(),
     items: [],
+    milestones: [],
   };
 }
 
@@ -80,10 +157,17 @@ function normalizeDocument(parsed, fallbackName) {
     seen.add(item.rowId);
     items.push(item);
   }
+  const milestones = [];
+  const milestoneIds = new Set();
+  for (const raw of Array.isArray(parsed?.milestones) ? parsed.milestones : []) {
+    const milestone = milestoneFromDisk(raw, milestoneIds);
+    if (milestone) milestones.push(milestone);
+  }
   return {
     name,
     updatedAt: typeof parsed?.updatedAt === 'string' ? parsed.updatedAt : new Date().toISOString(),
     items,
+    milestones,
   };
 }
 
@@ -95,6 +179,12 @@ function persistableDocument(doc) {
       rowId: item.rowId,
       title: item.title,
       status: item.status,
+    })),
+    milestones: (doc.milestones ?? []).map((milestone) => ({
+      id: milestone.id,
+      label: milestone.label,
+      at: milestone.at,
+      skip: milestone.skip === true,
     })),
   };
 }
@@ -285,8 +375,15 @@ export function createSetlistStore({
       updatedAt: document.updatedAt,
       itemCount: document.items.length,
       items: document.items.map((item) => hydrateItem(item, snapshot, columns)),
+      milestones: (document.milestones ?? []).map((milestone) => ({ ...milestone })),
       library: listLibrary(),
     };
+  }
+
+  function setMilestones(milestones) {
+    document.milestones = normalizeMilestoneList(milestones);
+    log?.info({ name: document.name, count: document.milestones.length }, 'setlist milestones updated');
+    return stampAndPersist();
   }
 
   function stampAndPersist() {
@@ -403,6 +500,7 @@ export function createSetlistStore({
       name: next,
       updatedAt: new Date().toISOString(),
       items: document.items.map((item) => ({ ...item })),
+      milestones: (document.milestones ?? []).map((milestone) => ({ ...milestone })),
     };
     persistDocument();
     log?.info({ name: next }, 'setlist duplicated');
@@ -486,6 +584,7 @@ export function createSetlistStore({
     removeItem,
     setItemStatus,
     reorder,
+    setMilestones,
     switchTo,
     createNew,
     duplicate,

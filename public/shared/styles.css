@@ -1671,6 +1671,74 @@ body.layout-operator .clip-name--pinned {
   min-height: 0;
 }
 
+.timer-strip {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0 0 var(--op-gap, 0.5rem);
+}
+
+.timer-module-host {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.timer-module {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.15rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.35rem 0.75rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.timer-module:hover {
+  border-color: var(--accent);
+}
+
+.timer-module:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.timer-module-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.timer-source {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+}
+
+.timer-module-time {
+  font-size: clamp(1.8rem, 6dvh, 4.2rem);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+}
+
+.timer-module--over .timer-module-time {
+  color: var(--warn);
+}
+
 .dope-members {
   display: flex;
   flex-direction: column;
@@ -5447,6 +5515,81 @@ body.layout-setlist .setlist-main {
   margin-bottom: var(--set-gap);
 }
 
+.setlist-milestones {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: var(--set-gap);
+}
+
+.setlist-milestones-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.setlist-milestones-title {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.setlist-milestones-clock {
+  color: var(--text);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.setlist-milestones-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.setlist-milestone {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.setlist-milestone--skip {
+  opacity: 0.55;
+}
+
+.setlist-milestone-label,
+.setlist-milestone-time {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.setlist-milestone-label {
+  flex: 1 1 8rem;
+  min-width: 6rem;
+}
+
+.setlist-milestone-time {
+  flex: 0 1 9.5rem;
+  width: 9.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.setlist-milestones-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .setlist-select,
 .setlist-name-input,
 .setlist-status {
@@ -6642,3 +6785,4 @@ body.layout-admin-dashboard .view-edit-btn--set[aria-expanded="true"] {
     grid-row: 3;
   }
 }
+

@@ -25,6 +25,11 @@ export function isDopeField(field) {
   return field?.type === 'dope';
 }
 
+/** Show countdown. Drawn in its own strip, not in the cue-field grid. */
+export function isTimerField(field) {
+  return field?.type === 'timer';
+}
+
 /** Format Ableton tempo for operator field tokens (number only; label is separate). */
 export function formatTempoFieldValue(tempo) {
   if (tempo == null || Number.isNaN(Number(tempo))) return null;
@@ -82,7 +87,7 @@ export const ROW_MAX_FIELDS = 3;
 
 /** @returns {'hero' | 'strip'} */
 export function resolveFieldsLayoutMode(fields) {
-  const layoutFields = (fields ?? []).filter((field) => !isDopeField(field));
+  const layoutFields = (fields ?? []).filter((field) => !isDopeField(field) && !isTimerField(field));
   const hasColor = layoutFields.some((f) => f.type === 'color');
   if (layoutFields.length <= 3 && !hasColor) return 'hero';
   return 'strip';
@@ -97,6 +102,11 @@ export function groupFieldsForLayout(fields, payload) {
 
   while (i < fields.length) {
     const field = fields[i];
+
+    if (isTimerField(field)) {
+      i++;
+      continue;
+    }
 
     if (field.type === 'color') {
       const group = [];
@@ -126,6 +136,10 @@ export function groupFieldsForLayout(fields, payload) {
     const items = [];
     let counted = 0;
     while (i < fields.length && fields[i].type !== 'color' && fields[i].type !== 'image') {
+      if (isTimerField(fields[i])) {
+        i++;
+        continue;
+      }
       if (isDopeField(fields[i])) {
         items.push({ field: fields[i], display: 'dope' });
         i++;
@@ -139,7 +153,7 @@ export function groupFieldsForLayout(fields, payload) {
       i++;
       counted++;
     }
-    rows.push({ type: 'row', items });
+    if (items.length) rows.push({ type: 'row', items });
   }
 
   return rows;

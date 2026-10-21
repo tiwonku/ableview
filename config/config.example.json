@@ -190,6 +190,10 @@
           "type": "dope",
           "label": "DOPE",
           "members": ["Keys", "Bass", "Drums"]
+        },
+        {
+          "type": "timer",
+          "label": "Show"
         }
       ]
     },
@@ -224,6 +228,10 @@
           "column": "VIBE TAGS",
           "label": "Vibe Tags",
           "display": "note"
+        },
+        {
+          "type": "timer",
+          "label": "Show"
         }
       ]
     },
@@ -259,6 +267,10 @@
         },
         {
           "column": "Automation"
+        },
+        {
+          "type": "timer",
+          "label": "Show"
         }
       ]
     },

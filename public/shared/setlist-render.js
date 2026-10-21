@@ -8,6 +8,14 @@ import { renderAliasPanel } from './alias-panel.js';
 import { renderPinPanel } from './pin-panel.js';
 import { withKioskQuery } from './kiosk-controls.js';
 import { applyColorSwatchStyle, parseRgbCell } from './color-parse.js';
+import { parseTimecodeDisplay, formatShowTimecode } from './show-clock.js';
+import { currentStampDisplay, mountClockReadout } from './timer-module.js';
+
+const MILESTONE_PRESETS = [
+  { id: 'show-start', label: 'Show start' },
+  { id: 'set-break', label: 'Set break' },
+  { id: 'curfew', label: 'Curfew' },
+];
 
 export const SETLIST_STATUSES = Object.freeze(['confirmed', 'likely', 'maybe']);
 export const SETLIST_KEY_COLUMN = 'Key';
@@ -545,6 +553,175 @@ function scrollCurrentIntoView(root, liveRowId) {
   root.querySelector('.setlist-item--current')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+function replaceMilestone(list, id, patch) {
+  return list.map((milestone) => (
+    milestone.id === id ? { ...milestone, ...patch } : milestone
+  ));
+}
+
+function applyTime(list, id, rawValue) {
+  const raw = String(rawValue ?? '').trim();
+  const current = list.find((item) => item.id === id);
+  if (!raw) {
+    if (current?.at == null) return list;
+    return replaceMilestone(list, id, { at: null });
+  }
+  const parsed = parseTimecodeDisplay(raw);
+  if (!parsed) return list;
+  const canonical = formatShowTimecode(parsed);
+  if (canonical === current?.at) return list;
+  return replaceMilestone(list, id, { at: canonical });
+}
+
+/** Include a time or name that has been typed but not blurred yet. */
+function applyOpenMilestoneEdit(list) {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLInputElement) || !active.isConnected) return list;
+  const field = active.dataset.setlistField ?? '';
+  if (field.startsWith('milestone-time-')) {
+    return applyTime(list, field.slice('milestone-time-'.length), active.value);
+  }
+  if (field.startsWith('milestone-label-')) {
+    const id = field.slice('milestone-label-'.length);
+    const next = active.value.trim();
+    if (!next) return list.filter((item) => item.id !== id);
+    if (next === list.find((item) => item.id === id)?.label) return list;
+    return replaceMilestone(list, id, { label: next });
+  }
+  return list;
+}
+
+function renderMilestoneSection(parent, { milestones, busy, onMilestones }) {
+  const list = Array.isArray(milestones) ? milestones : [];
+  const section = el('section', 'setlist-milestones');
+  section.setAttribute('aria-label', 'Show milestones');
+
+  const head = el('div', 'setlist-milestones-head');
+  head.appendChild(el('h2', 'setlist-milestones-title', 'Milestones'));
+  const clock = el('span', 'setlist-milestones-clock', 'Clock —');
+  clock.dataset.role = 'show-clock-readout';
+  head.appendChild(clock);
+  section.appendChild(head);
+  mountClockReadout(clock);
+
+  if (!list.length) {
+    section.appendChild(el(
+      'p',
+      'setlist-milestones-empty',
+      'Countdown uses the log clock. Stamp a time or type HH:MM:SS.',
+    ));
+  }
+
+  for (const milestone of list) {
+    const row = el('div', 'setlist-milestone');
+    if (milestone.skip) row.classList.add('setlist-milestone--skip');
+
+    const label = el('input', 'setlist-milestone-label');
+    label.type = 'text';
+    label.value = milestone.label ?? '';
+    label.maxLength = 48;
+    label.setAttribute('aria-label', 'Milestone name');
+    label.dataset.setlistField = `milestone-label-${milestone.id}`;
+    label.disabled = busy;
+    label.addEventListener('blur', () => {
+      if (!label.isConnected) return;
+      const next = label.value.trim();
+      if (!next) {
+        onMilestones?.(list.filter((item) => item.id !== milestone.id));
+        return;
+      }
+      if (next === milestone.label) return;
+      onMilestones?.(replaceMilestone(list, milestone.id, { label: next }));
+    });
+    row.appendChild(label);
+
+    const time = el('input', 'setlist-milestone-time');
+    time.type = 'text';
+    time.inputMode = 'numeric';
+    time.placeholder = 'HH:MM:SS';
+    time.value = milestone.at ?? '';
+    time.setAttribute('aria-label', `${milestone.label || 'Milestone'} time`);
+    time.dataset.setlistField = `milestone-time-${milestone.id}`;
+    time.disabled = busy;
+    const commitTime = () => {
+      if (!time.isConnected) return;
+      const next = applyTime(list, milestone.id, time.value);
+      if (next === list) {
+        if (time.value.trim() && !parseTimecodeDisplay(time.value)) {
+          time.value = milestone.at ?? '';
+        }
+        return;
+      }
+      onMilestones?.(next);
+    };
+    time.addEventListener('blur', commitTime);
+    time.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      commitTime();
+    });
+    row.appendChild(time);
+
+    const stamp = el('button', 'admin-editor-btn', 'Stamp');
+    stamp.type = 'button';
+    stamp.title = 'Set this milestone to the current log clock';
+    stamp.disabled = busy;
+    stamp.addEventListener('click', () => {
+      const display = currentStampDisplay();
+      if (!display) return;
+      const base = applyOpenMilestoneEdit(list);
+      onMilestones?.(replaceMilestone(base, milestone.id, { at: display, skip: false }));
+    });
+    row.appendChild(stamp);
+
+    const skip = el('button', 'admin-editor-btn', milestone.skip ? 'Use' : 'Skip');
+    skip.type = 'button';
+    skip.title = milestone.skip ? 'Include this milestone in the countdown' : 'Leave this milestone out of the countdown';
+    skip.disabled = busy;
+    skip.addEventListener('click', () => {
+      onMilestones?.(replaceMilestone(applyOpenMilestoneEdit(list), milestone.id, { skip: !milestone.skip }));
+    });
+    row.appendChild(skip);
+
+    const remove = el('button', 'admin-editor-btn admin-editor-btn--danger', 'Remove');
+    remove.type = 'button';
+    remove.disabled = busy;
+    remove.addEventListener('click', () => {
+      const base = applyOpenMilestoneEdit(list);
+      onMilestones?.(base.filter((item) => item.id !== milestone.id));
+    });
+    row.appendChild(remove);
+
+    section.appendChild(row);
+  }
+
+  const actions = el('div', 'setlist-milestones-actions');
+  const present = new Set(list.map((milestone) => milestone.id));
+  for (const preset of MILESTONE_PRESETS) {
+    const button = el('button', 'setlist-chip setlist-chip--action', preset.label);
+    button.type = 'button';
+    button.disabled = busy || present.has(preset.id);
+    button.addEventListener('click', () => {
+      if (present.has(preset.id)) return;
+      onMilestones?.([
+        ...applyOpenMilestoneEdit(list),
+        { id: preset.id, label: preset.label, at: null, skip: false },
+      ]);
+    });
+    actions.appendChild(button);
+  }
+  const add = el('button', 'setlist-chip setlist-chip--action', 'Add');
+  add.type = 'button';
+  add.disabled = busy || list.length >= 12;
+  add.addEventListener('click', () => {
+    onMilestones?.([...applyOpenMilestoneEdit(list), { label: 'Milestone', at: null, skip: false }]);
+  });
+  actions.appendChild(add);
+  section.appendChild(actions);
+
+  parent.appendChild(section);
+}
+
 /**
  * @param {HTMLElement} root
  * @param {object} ctx
@@ -589,6 +766,7 @@ export function renderSetlist(root, ctx) {
     onCreate,
     onDuplicate,
     onDelete,
+    onMilestones,
     onNameDraftChange,
     onPin,
     onClearPin,
@@ -709,6 +887,12 @@ export function renderSetlist(root, ctx) {
   toolbar.appendChild(deleteBtn);
 
   root.appendChild(toolbar);
+
+  renderMilestoneSection(root, {
+    milestones: setlist?.milestones,
+    busy,
+    onMilestones,
+  });
 
   if (saveError) {
     root.appendChild(el('p', 'admin-editor-error', saveError));

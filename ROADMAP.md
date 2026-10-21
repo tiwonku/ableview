@@ -48,6 +48,7 @@ post-v2026.
 | **Admin dashboard** | 16:9 board mode on Admin (`Dashboard` / `Detail` toggle). One palette, art, keys, role notes, session decks — not a collage of operator views. `?mode=dashboard` or kiosk defaults to the board; preference in `localStorage`. | ✅ done |
 | **Show capture** | Optional live copy of the session JSONL to the show website. `seq` / `lineId` are per log title. Disk write stays on the log path; HTTP drains a queue. Set-view **Site** checkbox. `SHOW_CAPTURE_URL` and `SHOW_CAPTURE_SECRET` in `.env`. | ✅ done |
 | **Logged sets + EDL** | `/views/sets` lists session logs (link from the Set log bar, not a nav tab). One set exports a Resolve timeline-marker EDL: songs from collapsed `match` rows, dopes, optional notes, session-clock stamps. | ✅ done |
+| **Show timer** | Milestones on the set (show start, set break, curfew). Countdown module (`type: "timer"`) on any operator view. Clock matches the session log: live Art-Net, otherwise the show-box clock. | ✅ done |
 
 ---
 

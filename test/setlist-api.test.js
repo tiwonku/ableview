@@ -293,6 +293,49 @@ test('WS init includes setlist and mutations broadcast', async () => {
   }
 });
 
+test('PATCH /api/setlist/milestones saves and broadcasts', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ableview-setlist-milestones-'));
+  const { server } = await createTestServer(dir);
+  let ws;
+  try {
+    ws = new WebSocket(`ws://127.0.0.1:${server.port}/ws?view=band`);
+    const messages = collectWsMessages(ws);
+    await new Promise((resolve, reject) => {
+      ws.once('open', resolve);
+      ws.once('error', reject);
+    });
+    await waitForMessage(messages, (m) => m.type === 'init');
+
+    const updated = waitForMessage(
+      messages,
+      (m) => m.type === 'setlist' && m.setlist?.milestones?.length === 1,
+    );
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/setlist/milestones`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        milestones: [{ id: 'curfew', label: 'Curfew', at: '23:15:00' }],
+      }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.milestones[0].at, '23:15:00:00');
+
+    const msg = await updated;
+    assert.equal(msg.setlist.milestones[0].label, 'Curfew');
+
+    const bad = await fetch(`http://127.0.0.1:${server.port}/api/setlist/milestones`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ milestones: [{ label: 'Doors', at: 'late' }] }),
+    });
+    assert.equal(bad.status, 400);
+  } finally {
+    ws?.close();
+    await server.stop();
+  }
+});
+
 test('GET /api/setlist returns 501 when the store is missing', async () => {
   const bus = createBus();
   const server = await createViewServer({

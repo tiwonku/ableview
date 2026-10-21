@@ -13,7 +13,9 @@ import {
   resolveFieldsLayoutMode,
   isCamelotField,
   isDopeField,
+  isTimerField,
 } from './field-display.js';
+import { renderTimerStrip } from './timer-module.js';
 import { renderCamelotField } from './camelot-render.js';
 import {
   captureEditSession,
@@ -456,6 +458,9 @@ export function renderView(root, {
   if (editActions) clipRow.appendChild(editActions);
   root.appendChild(clipRow);
 
+  const timerStrip = renderTimerStrip(fields);
+  if (timerStrip) root.appendChild(timerStrip);
+
   const showNoMatch = payload && !matched && !busy
     && (hasPlayingClips(payload) || payload.clipName?.trim());
   const showLastFields = showNoMatch && pane === 'last';
@@ -537,7 +542,11 @@ export function renderView(root, {
       getMomentWho,
     }));
   } else if (!busy && fields?.length && showLastFields) {
-    root.appendChild(renderLastMatchedFields(fields, payload, { onPinLast, onStartPin, getMomentWho }));
+    root.appendChild(renderLastMatchedFields(fields, payload, {
+      onPinLast,
+      onStartPin,
+      getMomentWho,
+    }));
   }
 
   updateStatusBar({ connected, lastUpdate, payload });
@@ -771,8 +780,10 @@ function renderFieldsGrid(fields, payload, { onPickColor, getMomentWho = null } 
   grid.className = `fields fields-${layoutMode}` + (fields.length > 4 ? ' fields-many' : '');
 
   if (layoutMode === 'strip') {
-    grid.style.setProperty('--strip-cols', String(fields.length));
+    const stripCount = fields.filter((field) => !isTimerField(field)).length;
+    grid.style.setProperty('--strip-cols', String(Math.max(stripCount, 1)));
     for (const field of fields) {
+      if (isTimerField(field)) continue;
       if (isDopeField(field)) {
         grid.appendChild(renderDopeModule(field, getMomentWho));
       } else if (field.type === 'color') {

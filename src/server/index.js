@@ -15,6 +15,7 @@ import { listIpv4Interfaces } from '../sacn/nics.js';
 import { DEFAULT_LIVE_COLOR_COLUMNS } from '../core/live-colors.js';
 import { buildSharePayload } from '../../public/shared/share-links.js';
 import { collectOperatorViews } from '../../public/shared/admin-dashboard.js';
+import { resolveShowClock } from '../../public/shared/show-clock.js';
 
 function parseViewId(request) {
   const url = new URL(request.url, `http://${request.headers.host ?? 'localhost'}`);
@@ -114,6 +115,24 @@ export async function createViewServer({
     return viewId === 'admin' || viewId === 'setlist';
   }
 
+  function viewWantsClock(viewId) {
+    if (viewId === 'setlist') return true;
+    const fields = getLiveConfig().views?.[viewId]?.fields;
+    return Array.isArray(fields) && fields.some((field) => field?.type === 'timer');
+  }
+
+  function buildClock() {
+    const status = getHealthContext?.()?.getTimecodeStatus?.() ?? {};
+    return resolveShowClock(status);
+  }
+
+  function broadcastClock() {
+    const data = JSON.stringify({ type: 'clock', clock: buildClock() });
+    for (const [ws, { viewId }] of clients) {
+      if (viewWantsClock(viewId) && ws.readyState === ws.OPEN) ws.send(data);
+    }
+  }
+
   function broadcastStatus() {
     const status = buildStatus();
     const data = JSON.stringify({ type: 'status', status });
@@ -154,6 +173,7 @@ export async function createViewServer({
     timecodeBroadcastTimer = setTimeout(() => {
       timecodeBroadcastTimer = null;
       broadcastStatus();
+      broadcastClock();
     }, 250);
     timecodeBroadcastTimer.unref?.();
   });
@@ -334,6 +354,9 @@ export async function createViewServer({
     if (setlistStore) {
       init.setlist = setlistStore.getState();
     }
+    if (viewWantsClock(viewId)) {
+      init.clock = buildClock();
+    }
     init.liveColors = compactLiveColors(
       lastLiveColors ?? getHealthContext?.()?.getLiveColorsStatus?.() ?? null,
     );
@@ -374,6 +397,12 @@ export async function createViewServer({
     });
   });
 
+  let clockTimer = null;
+  clockTimer = setInterval(() => {
+    broadcastClock();
+  }, 1000);
+  clockTimer.unref?.();
+
   let heartbeatTimer = null;
   const heartbeatSeconds = config.server.wsHeartbeatSeconds;
   if (heartbeatSeconds > 0) {
@@ -404,6 +433,7 @@ export async function createViewServer({
     async stop() {
       if (timecodeBroadcastTimer) clearTimeout(timecodeBroadcastTimer);
       if (liveColorsBroadcastTimer) clearTimeout(liveColorsBroadcastTimer);
+      if (clockTimer) clearInterval(clockTimer);
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       for (const ws of clients.keys()) {
         try { ws.terminate(); } catch { /* socket already gone */ }
