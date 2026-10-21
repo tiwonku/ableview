@@ -268,7 +268,7 @@ export async function createViewServer({
   });
 
   if (sheetsActions) {
-    registerSheetsRoutes(app, { sheetsActions, log });
+    registerSheetsRoutes(app, { sheetsActions, log, getConfig: getLiveConfig });
   }
 
   if (matchActions) {

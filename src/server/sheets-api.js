@@ -1,6 +1,13 @@
 /** REST handlers for manual sheet sync and row edits from admin. */
 
-export function registerSheetsRoutes(app, { sheetsActions, log }) {
+import { setlistEditFieldsForHeaders } from '../setlist/edit-fields.js';
+
+function sheetRowTitle(row, matchColumn) {
+  const raw = matchColumn ? row?.data?.[matchColumn] : '';
+  return String(raw ?? '').split('\n')[0].trim();
+}
+
+export function registerSheetsRoutes(app, { sheetsActions, log, getConfig }) {
   app.get('/api/sheets/status', async (_req, reply) => {
     const snapshot = sheetsActions.getSnapshot();
     const aliasColumn = snapshot.aliasColumn ?? null;
@@ -35,6 +42,32 @@ export function registerSheetsRoutes(app, { sheetsActions, log }) {
       aliasColumn,
       aliasColumnPresent,
       results,
+    });
+  });
+
+  app.get('/api/sheets/rows/:rowId', async (req, reply) => {
+    const { rowId } = req.params;
+    const snapshot = sheetsActions.getSnapshot();
+    const row = snapshot.rows?.find((entry) => String(entry.rowId) === String(rowId));
+    if (!row) {
+      return reply.code(404).send({ ok: false, error: `row not found: ${rowId}` });
+    }
+
+    const config = typeof getConfig === 'function' ? getConfig() : {};
+    const fields = setlistEditFieldsForHeaders(config, snapshot.headers);
+    const data = {};
+    for (const field of fields) {
+      const value = row.data?.[field.column];
+      data[field.column] = value == null ? '' : String(value);
+    }
+    const matchColumn = snapshot.matchColumn ?? config.sheets?.matchColumn ?? null;
+
+    return reply.send({
+      ok: true,
+      rowId: String(row.rowId),
+      title: sheetRowTitle(row, matchColumn),
+      fields,
+      row: data,
     });
   });
 

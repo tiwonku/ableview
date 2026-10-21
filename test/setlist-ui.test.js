@@ -31,6 +31,9 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
   assert.match(renderSrc, /Delete set/);
   assert.match(renderSrc, /onDelete/);
   assert.match(renderSrc, /onStartEdit/);
+  assert.match(renderSrc, /onEditItem/);
+  assert.match(renderSrc, /setlist-item-edit/);
+  assert.match(renderSrc, /Edit cue sheet fields/);
   assert.match(renderSrc, /setlist-item-key/);
   assert.match(renderSrc, /onCreateCue/);
   assert.match(renderSrc, /Add to set/);
@@ -57,6 +60,8 @@ test('setlist view is wired in HTML, render, and ws-client', () => {
   assert.match(clientSrc, /mergePinResults/);
   assert.match(clientSrc, /updateSetlistLiveChrome/);
   assert.match(clientSrc, /onStartEdit: startEdit/);
+  assert.match(clientSrc, /onEditItem: editSetlistItem/);
+  assert.match(clientSrc, /openSetlistRowModal/);
   assert.match(clientSrc, /onCreateCue: createSetlistCueRow/);
   assert.match(clientSrc, /\/api\/sheets\/rows/);
   assert.match(clientSrc, /\/api\/sheets\/sync/);

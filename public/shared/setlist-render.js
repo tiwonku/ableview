@@ -790,6 +790,7 @@ export function renderSetlist(root, ctx) {
     onCreateKeyChange,
     onCreateCue,
     onRemove,
+    onEditItem,
     onStatus,
     onMove,
     onReorder,
@@ -1109,6 +1110,19 @@ export function renderSetlist(root, ctx) {
       downBtn.disabled = busy || index === items.length - 1;
       downBtn.addEventListener('click', () => onMove?.(item.rowId, 1));
       actions.appendChild(downBtn);
+
+      if (onEditItem) {
+        const editBtn = el('button', 'admin-editor-btn setlist-item-edit', 'Edit');
+        editBtn.type = 'button';
+        editBtn.disabled = Boolean(busy || item.missing);
+        editBtn.title = item.missing
+          ? 'This row is missing from the cue sheet'
+          : `Edit cue sheet fields for ${itemDisplayTitle(item)}`;
+        editBtn.addEventListener('click', () => {
+          if (!item.missing) onEditItem(item.rowId);
+        });
+        actions.appendChild(editBtn);
+      }
 
       if (isCurrent && pinned && onClearPin) {
         const clearBtn = el('button', 'admin-editor-btn view-edit-btn--unpin', 'Clear pin');

@@ -549,10 +549,14 @@ function renderEditorField(column, raw, columnConfig, fieldLabel, options = {}) 
       break;
     }
     default: {
-      const input = document.createElement('input');
-      input.type = 'text';
+      const multiline = columnConfig?.multiline === true;
+      const input = document.createElement(multiline ? 'textarea' : 'input');
+      if (!multiline) input.type = 'text';
       input.id = inputId;
-      input.className = 'row-editor-input' + (layout === 'operator' ? ' row-editor-input--operator' : '');
+      input.className = 'row-editor-input'
+        + (multiline ? ' row-editor-input--note' : '')
+        + (layout === 'operator' ? ' row-editor-input--operator' : '');
+      if (multiline) input.rows = 4;
       input.value = state;
       input.dataset.editorType = 'text';
       control.appendChild(input);
@@ -736,7 +740,7 @@ function readFieldValue(field) {
       return toggle?.dataset.value === 'true';
     }
     default:
-      return field.querySelector('input')?.value ?? '';
+      return field.querySelector('textarea, input')?.value ?? '';
   }
 }
 

@@ -419,3 +419,78 @@ test('POST /api/sheets/rows/:rowId/aliases returns 400 when column missing', asy
 
   await server.stop();
 });
+
+test('GET /api/sheets/rows/:rowId returns the setlist edit fields for that row', async () => {
+  const bus = createBus();
+  const server = await createViewServer({
+    config: {
+      ...testConfig(),
+      sheets: {
+        matchColumn: 'Song Title',
+        aliasColumn: 'Aliases',
+        editorColumns: {
+          BPM: { type: 'number', step: 0.1 },
+          Cue: { type: 'icon', true: '✅', false: '✖' },
+        },
+      },
+      views: {
+        ...testConfig().views,
+        visuals: {
+          title: 'Visuals',
+          fields: [
+            { column: 'Viz Notes', label: 'Viz', display: 'note' },
+            { column: 'RGB_1', label: 'Color 1', type: 'color' },
+          ],
+        },
+      },
+    },
+    bus,
+    log: silentLog,
+    sheetsActions: {
+      sync: async () => {},
+      getSnapshot: () => ({
+        headers: ['Song Title', 'Aliases', 'Key', 'BPM', 'Viz Notes', 'RGB_1', 'Cue', 'Rare'],
+        matchColumn: 'Song Title',
+        rows: [{
+          rowId: '234',
+          data: {
+            'Song Title': 'Always a Good Day\n',
+            Aliases: 'Good Day',
+            Key: 'Dbm',
+            BPM: '98',
+            'Viz Notes': 'one-off swirl',
+            RGB_1: '255, 0, 80',
+            Cue: '✅',
+            Rare: 'YES',
+          },
+        }],
+      }),
+    },
+  });
+
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/sheets/rows/234`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.rowId, '234');
+  assert.equal(body.title, 'Always a Good Day');
+  assert.deepEqual(body.fields.map((field) => field.column), [
+    'Song Title',
+    'Aliases',
+    'Key',
+    'BPM',
+    'Viz Notes',
+    'RGB_1',
+    'Cue',
+  ]);
+  assert.equal(body.fields.find((field) => field.column === 'Viz Notes').multiline, true);
+  assert.equal(body.fields.find((field) => field.column === 'Key').multiline, false);
+  assert.equal(body.row['Viz Notes'], 'one-off swirl');
+  assert.equal(body.row.Rare, undefined);
+  assert.equal(body.row['Song Title'], 'Always a Good Day\n');
+
+  const missing = await fetch(`http://127.0.0.1:${server.port}/api/sheets/rows/999`);
+  assert.equal(missing.status, 404);
+
+  await server.stop();
+});

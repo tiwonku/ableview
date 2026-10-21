@@ -44,7 +44,10 @@ function installDocument() {
       getAttribute(name) {
         return attrs[name];
       },
-      addEventListener() {},
+      addEventListener(type, fn) {
+        node.listeners = node.listeners || {};
+        node.listeners[type] = fn;
+      },
       appendChild(child) {
         node.childNodes.push(child);
         child.parentNode = node;
@@ -151,4 +154,34 @@ test('empty search still offers a new cue row', () => {
   const text = textOf(root);
   assert.match(text, /No cue row for “Brand New Tune”/);
   assert.equal(findAll(root, 'setlist-create').length, 1);
+});
+
+test('each setlist row has an edit button and a missing row cannot open it', () => {
+  installDocument();
+  const root = document.createElement('div');
+  const opened = [];
+  renderSetlist(root, {
+    title: 'Set',
+    payload: { match: { matched: false } },
+    setlist: {
+      name: 'Tonight',
+      items: [
+        { rowId: '234', title: 'Always a Good Day', key: 'Dbm', status: 'confirmed' },
+        { rowId: '9', title: 'Gone', status: 'likely', missing: true },
+      ],
+      library: [{ name: 'Tonight', itemCount: 2 }],
+    },
+    connected: true,
+    onEditItem: (rowId) => opened.push(rowId),
+  });
+  const buttons = findAll(root, 'setlist-item-edit');
+  assert.equal(buttons.length, 2);
+  assert.equal(buttons[0].textContent, 'Edit');
+  assert.equal(buttons[0].disabled, false);
+  assert.match(buttons[0].title, /Always a Good Day/);
+  assert.equal(buttons[1].disabled, true);
+  buttons[0].listeners.click();
+  assert.deepEqual(opened, ['234']);
+  buttons[1].listeners.click();
+  assert.deepEqual(opened, ['234']);
 });

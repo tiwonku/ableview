@@ -29,6 +29,12 @@ import { captureAliasPanelFocus, createAliasSession } from './alias-panel.js';
 import { createPinSession, mergePinResults } from './pin-panel.js';
 import { closeColorPicker } from './color-picker.js';
 import {
+  closeSetlistRowModal,
+  openSetlistRowModal,
+  setlistRowModalOpen,
+  syncSetlistRowModalContext,
+} from './setlist-row-modal.js';
+import {
   operatorCreateColumns,
   resolveCreateClipName,
   canStartCreate,
@@ -188,6 +194,7 @@ export function connectView({
   let setlistNameDraft = '';
   let setlistAutoFocusSearch = false;
   let setlistSyncing = false;
+  let setlistEditGen = 0;
   let sessionLogGen = 0;
   let unmountSessionLog = null;
   let sessionLogMountEl = null;
@@ -294,6 +301,7 @@ export function connectView({
     };
     if (currentViewId === 'setlist') {
       updateSetlistLiveChrome(root, setlistChromeCtx());
+      syncSetlistRowModalContext(lastPayload);
       return;
     }
     if (viewConfig.system) {
@@ -439,6 +447,7 @@ export function connectView({
       }
       if (currentViewId === 'setlist' && !showingSettings && !statusOnly) {
         updateSetlistLiveChrome(root, setlistChromeCtx());
+        syncSetlistRowModalContext(lastPayload);
         return;
       }
       if (currentViewId === 'admin' && !showingSettings && !statusOnly) {
@@ -461,6 +470,7 @@ export function connectView({
       }
       if (currentViewId === 'setlist' && !setlistCueChanged(prevPayload, lastPayload)) {
         updateSetlistLiveChrome(root, setlistChromeCtx());
+        syncSetlistRowModalContext(lastPayload);
         return;
       }
       if (currentViewId === 'breath' && !showingSettings && !statusOnly && breathCtl) {
@@ -594,8 +604,111 @@ export function connectView({
     }
   }
 
+  function closeSetlistRowEdit() {
+    setlistEditGen += 1;
+    closeSetlistRowModal();
+  }
+
+  async function editSetlistItem(rowId) {
+    const id = String(rowId ?? '').trim();
+    if (!id) return;
+    const gen = ++setlistEditGen;
+    const item = lastSetlist?.items?.find((entry) => String(entry.rowId) === id);
+    const fallbackTitle = String(item?.liveTitle || item?.title || '').trim() || `Row ${id}`;
+    openSetlistRowModal({
+      title: fallbackTitle,
+      rowId: id,
+      loading: true,
+      saving: false,
+      error: null,
+      session: null,
+      livePayload: lastPayload,
+      onClose: () => {
+        setlistEditGen += 1;
+      },
+      onSave: (section) => saveSetlistRowModal(section),
+    });
+
+    try {
+      const res = await fetch(`/api/sheets/rows/${encodeURIComponent(id)}`);
+      const body = await res.json().catch(() => ({}));
+      if (gen !== setlistEditGen) return;
+      if (!res.ok) throw new Error(body.error ?? `Could not load row (${res.status})`);
+      const fields = Array.isArray(body.fields) ? body.fields : [];
+      if (!fields.length) {
+        openSetlistRowModal({
+          title: body.title || fallbackTitle,
+          rowId: String(body.rowId ?? id),
+          loading: false,
+          session: null,
+          error: 'No cue fields are configured to edit from the setlist.',
+        });
+        return;
+      }
+
+      const columns = {};
+      const labels = {};
+      const row = {};
+      for (const field of fields) {
+        if (!field?.column) continue;
+        const base = editorColumns[field.column] && typeof editorColumns[field.column] === 'object'
+          ? editorColumns[field.column]
+          : { type: 'text' };
+        columns[field.column] = field.multiline ? { ...base, multiline: true } : { ...base };
+        labels[field.column] = field.label || field.column;
+        row[field.column] = body.row?.[field.column] == null ? '' : String(body.row[field.column]);
+      }
+      const session = {
+        mode: 'edit',
+        rowId: String(body.rowId ?? id),
+        row,
+        clipNameAtEdit: '',
+        matchedValueAtEdit: body.title || fallbackTitle,
+      };
+      openSetlistRowModal({
+        title: body.title || fallbackTitle,
+        rowId: session.rowId,
+        loading: false,
+        error: null,
+        session,
+        editorColumns: columns,
+        fieldLabels: labels,
+        livePayload: lastPayload,
+        onSave: (section) => saveSetlistRowModal(section, session),
+      });
+    } catch (err) {
+      if (gen !== setlistEditGen) return;
+      openSetlistRowModal({
+        title: fallbackTitle,
+        rowId: id,
+        loading: false,
+        session: null,
+        error: err.message ?? 'Could not load row',
+      });
+    }
+  }
+
+  async function saveSetlistRowModal(section, session) {
+    const form = section?.querySelector?.('.row-editor');
+    if (!form || !session) return;
+    const changes = collectEditorChanges(form, session.row);
+    if (Object.keys(changes).length === 0) {
+      closeSetlistRowEdit();
+      return;
+    }
+    const res = await fetch(`/api/sheets/rows/${encodeURIComponent(session.rowId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(changes),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error ?? `Save failed (${res.status})`);
+    closeSetlistRowEdit();
+  }
+
   function startEdit(openColorColumn) {
     if (!lastPayload?.match?.matched || !lastPayload.row) return;
+    closeSetlistRowEdit();
     closeFlashLook();
     if (pinSession) cancelPin();
     if (aliasSession) cancelAlias();
@@ -628,6 +741,7 @@ export function connectView({
       ? sheetHeaders.filter(Boolean)
       : operatorCreateColumns(viewConfig.fields, matchColumn, aliasColumn);
     if (!columns.length) return;
+    closeSetlistRowEdit();
 
     editSession = captureCreateSession({
       clipName,
@@ -649,6 +763,7 @@ export function connectView({
       : (lastPayload?.clipName?.trim() ?? '');
     if (!clipName) return;
     if (typeof clipNameOverride !== 'string' && lastPayload?.match?.matched === true) return;
+    closeSetlistRowEdit();
     closeFlashLook();
     if (editSession) cancelEdit();
     if (pinSession) cancelPin();
@@ -710,6 +825,7 @@ export function connectView({
   }
 
   function startPin() {
+    closeSetlistRowEdit();
     closeFlashLook();
     if (editSession) cancelEdit();
     if (aliasSession) cancelAlias();
@@ -892,7 +1008,10 @@ export function connectView({
       setlistSyncing = false;
       if (currentViewId === 'setlist' && !showingSettings && !statusOnly) {
         if (saveError) render();
-        else updateSetlistLiveChrome(root, setlistChromeCtx());
+        else {
+          updateSetlistLiveChrome(root, setlistChromeCtx());
+          syncSetlistRowModalContext(lastPayload);
+        }
       }
     }
   }
@@ -1192,7 +1311,7 @@ export function connectView({
   }
 
   function render() {
-    closeColorPicker();
+    if (!setlistRowModalOpen()) closeColorPicker();
     abortFlashLookIfRowChanged(
       lastPayload?.match?.matched === true ? lastPayload.match.rowId : null,
     );
@@ -1324,6 +1443,7 @@ export function connectView({
         },
         onPin: postPin,
         onClearPin: clearPin,
+        onEditItem: editSetlistItem,
         onStartEdit: startEdit,
         onStartCreate: startCreate,
         onStartAlias: startAlias,
@@ -1335,6 +1455,7 @@ export function connectView({
         getMomentWho,
       });
       paintLiveColors();
+      syncSetlistRowModalContext(lastPayload);
       return;
     }
     if (viewConfig.system) {
@@ -1624,6 +1745,7 @@ export function connectView({
     stopDashBreath();
     closeColorPicker();
     closeFlashLook();
+    closeSetlistRowEdit();
     editSession = null;
     aliasSession = null;
     pinSession = null;
@@ -1664,6 +1786,7 @@ export function connectView({
     }
     currentViewId = nextId;
     closeFlashLook();
+    closeSetlistRowEdit();
     editSession = null;
     aliasSession = null;
     pinSession = null;
