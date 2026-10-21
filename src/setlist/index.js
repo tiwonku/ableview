@@ -117,7 +117,7 @@ export function normalizeMilestoneList(rawList) {
     let at = null;
     if (raw?.at != null && String(raw.at).trim() !== '') {
       const parsed = parseTimecodeDisplay(raw.at);
-      if (!parsed) throw new Error(`milestone time must look like HH:MM:SS (${label})`);
+      if (!parsed) throw new Error(`milestone time was not understood (${label})`);
       at = formatShowTimecode(parsed);
     }
     out.push({

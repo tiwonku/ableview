@@ -22,8 +22,24 @@ test('parseTimecodeDisplay accepts log-style stamps', () => {
     hours: 20, minutes: 4, seconds: 12, frames: 0, dropFrame: false,
   });
   assert.equal(parseTimecodeDisplay('20:04:12;08').dropFrame, true);
-  assert.equal(parseTimecodeDisplay('8pm'), null);
   assert.equal(parseTimecodeDisplay('25:00:00'), null);
+  assert.equal(parseTimecodeDisplay('13pm'), null);
+});
+
+test('casual milestone times share one clock value', () => {
+  const forms = ['22:00:00', '22:00', '2200', '220000', '10:00pm', '10pm', '10 pm', '10:00 PM'];
+  for (const form of forms) {
+    const parsed = parseTimecodeDisplay(form);
+    assert.ok(parsed, form);
+    assert.equal(parsed.hours, 22, form);
+    assert.equal(parsed.minutes, 0, form);
+    assert.equal(parsed.seconds, 0, form);
+  }
+  assert.equal(parseTimecodeDisplay('8pm').hours, 20);
+  assert.equal(parseTimecodeDisplay('12am').hours, 0);
+  assert.equal(parseTimecodeDisplay('12pm').hours, 12);
+  assert.equal(parseTimecodeDisplay('12:30am').hours, 0);
+  assert.equal(parseTimecodeDisplay('12:30am').minutes, 30);
 });
 
 test('resolveShowClock matches the session log', () => {

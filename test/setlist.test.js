@@ -376,10 +376,12 @@ test('a set file without milestones loads as an empty list', () => {
   assert.deepEqual(store.getState().milestones, []);
 });
 
-test('setMilestones rejects a time that is not a clock', () => {
+test('setMilestones accepts casual times and rejects a non-clock', () => {
   const { store } = tempStore();
   store.start();
-  assert.throws(() => store.setMilestones([{ label: 'Doors', at: '8pm' }]), /HH:MM:SS/);
+  const state = store.setMilestones([{ label: 'Doors', at: '8pm' }]);
+  assert.equal(state.milestones[0].at, '20:00:00:00');
+  assert.throws(() => store.setMilestones([{ label: 'Doors', at: 'late' }]), /not understood/);
   assert.throws(() => store.setMilestones([{ label: '' }]), /label/);
 });
 

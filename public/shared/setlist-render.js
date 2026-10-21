@@ -608,7 +608,7 @@ function renderMilestoneSection(parent, { milestones, busy, onMilestones }) {
     section.appendChild(el(
       'p',
       'setlist-milestones-empty',
-      'Countdown uses the log clock. Stamp a time or type HH:MM:SS.',
+      'Countdown uses the log clock. Stamp a time, or type 10pm, 22:00, or 2200.',
     ));
   }
 
@@ -638,7 +638,7 @@ function renderMilestoneSection(parent, { milestones, busy, onMilestones }) {
     const time = el('input', 'setlist-milestone-time');
     time.type = 'text';
     time.inputMode = 'numeric';
-    time.placeholder = 'HH:MM:SS';
+    time.placeholder = '10pm';
     time.value = milestone.at ?? '';
     time.setAttribute('aria-label', `${milestone.label || 'Milestone'} time`);
     time.dataset.setlistField = `milestone-time-${milestone.id}`;

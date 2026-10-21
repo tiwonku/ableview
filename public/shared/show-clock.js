@@ -30,23 +30,56 @@ export function formatDuration(totalSeconds) {
   return `${mm}:${ss}`;
 }
 
-/** @returns {{ hours: number, minutes: number, seconds: number, frames: number, dropFrame: boolean } | null} */
+function clockParts(hours, minutes, seconds, frames = 0, dropFrame = false) {
+  if (hours > 23 || minutes > 59 || seconds > 59 || frames > 29) return null;
+  return { hours, minutes, seconds, frames, dropFrame };
+}
+
+/**
+ * Log stamps (`HH:MM:SS`, `HH:MM:SS:FF`, drop-frame `;FF`) and casual
+ * milestone typing (`10pm`, `10:00 pm`, `220000`, `22:00`).
+ * @returns {{ hours: number, minutes: number, seconds: number, frames: number, dropFrame: boolean } | null}
+ */
 export function parseTimecodeDisplay(raw) {
   const text = String(raw ?? '').trim();
-  const match = text.match(/^(\d{1,2}):([0-5]\d):([0-5]\d)(?::([0-2]\d)|;([0-2]\d))?$/);
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  const seconds = Number(match[3]);
-  const frames = Number(match[4] ?? match[5] ?? 0);
-  if (hours > 23 || frames > 29) return null;
-  return {
-    hours,
-    minutes,
-    seconds,
-    frames,
-    dropFrame: match[5] != null,
-  };
+  if (!text) return null;
+
+  const smpte = text.match(/^(\d{1,2}):([0-5]\d):([0-5]\d)(?::([0-2]\d)|;([0-2]\d))?$/);
+  if (smpte) {
+    return clockParts(
+      Number(smpte[1]),
+      Number(smpte[2]),
+      Number(smpte[3]),
+      Number(smpte[4] ?? smpte[5] ?? 0),
+      smpte[5] != null,
+    );
+  }
+
+  const hm = text.match(/^(\d{1,2}):([0-5]\d)$/);
+  if (hm) return clockParts(Number(hm[1]), Number(hm[2]), 0);
+
+  const casual = text.match(/^(\d{1,2})(?::([0-5]\d))?(?::([0-5]\d))?\s*([ap])\.?m\.?$/i);
+  if (casual) {
+    let hours = Number(casual[1]);
+    const minutes = Number(casual[2] ?? 0);
+    const seconds = Number(casual[3] ?? 0);
+    if (hours < 1 || hours > 12) return null;
+    const pm = casual[4].toLowerCase() === 'p';
+    if (!pm && hours === 12) hours = 0;
+    else if (pm && hours !== 12) hours += 12;
+    return clockParts(hours, minutes, seconds);
+  }
+
+  const digits = text.replace(/\s+/g, '');
+  if (/^\d{4}$/.test(digits) || /^\d{6}$/.test(digits)) {
+    return clockParts(
+      Number(digits.slice(0, 2)),
+      Number(digits.slice(2, 4)),
+      digits.length === 6 ? Number(digits.slice(4, 6)) : 0,
+    );
+  }
+
+  return null;
 }
 
 export function secondsOfDay(parts, fps = null) {
