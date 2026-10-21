@@ -51,6 +51,13 @@ test('settings panel maps FX and static look channels independently', () => {
   assert.match(src, /Alternate Look A and Look B/);
   assert.match(src, /Apply look/);
   assert.match(src, /renderColorSimControls/);
+  assert.match(src, /Ableton clip sim/);
+  assert.match(src, /simPlaylist/);
+  assert.match(src, /Default \(scenario file\)/);
+  assert.match(src, /simIntervalSeconds/);
+  assert.match(src, /\/api\/sim\/pause/);
+  assert.match(src, /\/api\/sim\/resume/);
+  assert.match(src, /Apply source/);
 });
 
 test('settings panel configures djay sources and shows packet status', () => {

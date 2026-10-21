@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { EVENTS } from '../../core/bus.js';
 import { makeNowPlaying, SOURCES } from '../../core/now-playing.js';
+import { setlistSimSteps, simSource } from '../../sim/playlist.js';
 import { makeSceneInfo, sceneFromNowPlayingTracks } from '../scene-launch.js';
 
 const SIM_TRACK = { trackIndex: 0, trackName: 'Cue', slotIndex: 0 };
@@ -21,9 +22,35 @@ export function createSimulatorSource({ config, bus, log, getClipNames = null })
   let stepIndex = 0;
   let paused = false;
   let scenarioLoop = false;
+  let lastClip = null;
+  let sourceWarning = null;
+  let warnedKey = null;
+
+  function isSetlistSource() {
+    return simSource(config.sim) === 'setlist';
+  }
 
   function isAutoDriver() {
+    if (isSetlistSource()) return true;
     return driver === 'scenario' || driver === 'sheetClipNames';
+  }
+
+  function noteSetlistProblem(error) {
+    sourceWarning = error || null;
+    const key = error || 'empty';
+    if (warnedKey === key) return;
+    warnedKey = key;
+    log.warn(
+      { setlist: config.sim?.setlist, err: error || undefined },
+      error
+        ? 'setlist sim source unavailable'
+        : 'setlist has no clip titles yet; simulator waiting',
+    );
+  }
+
+  function clearSetlistProblem() {
+    sourceWarning = null;
+    warnedKey = null;
   }
 
   function loadScenario() {
@@ -36,6 +63,15 @@ export function createSimulatorSource({ config, bus, log, getClipNames = null })
   }
 
   function getSteps() {
+    if (isSetlistSource()) {
+      const playlist = setlistSimSteps(config);
+      scenarioLoop = true;
+      if (playlist.error) noteSetlistProblem(playlist.error);
+      else if (playlist.steps.length === 0) noteSetlistProblem(null);
+      else clearSetlistProblem();
+      return playlist.steps;
+    }
+    sourceWarning = null;
     if (driver === 'scenario') {
       const parsed = loadScenario();
       scenarioLoop = parsed.loop ?? false;
@@ -51,6 +87,7 @@ export function createSimulatorSource({ config, bus, log, getClipNames = null })
   }
 
   function canLoop(steps) {
+    if (isSetlistSource()) return steps.length > 0;
     if (driver === 'sheetClipNames') return steps.length > 0;
     return scenarioLoop;
   }
@@ -74,6 +111,7 @@ export function createSimulatorSource({ config, bus, log, getClipNames = null })
       isPlaying: true,
       scene,
     });
+    lastClip = event.authoritativeClip;
     log.info({ authoritativeClip: event.authoritativeClip, simulated: true }, 'now playing (simulated)');
     bus.emit(EVENTS.NOW_PLAYING, event);
     return event;
@@ -95,8 +133,8 @@ export function createSimulatorSource({ config, bus, log, getClipNames = null })
 
     const steps = getSteps();
     if (steps.length === 0) {
-      if (driver === 'sheetClipNames') {
-        log.warn('sheet has no clip names yet; simulator waiting');
+      if (isSetlistSource() || driver === 'sheetClipNames') {
+        if (!isSetlistSource()) log.warn('sheet has no clip names yet; simulator waiting');
         scheduleAuto(intervalSeconds);
       }
       return;
@@ -124,11 +162,17 @@ export function createSimulatorSource({ config, bus, log, getClipNames = null })
   }
 
   async function start() {
-    log.warn({ driver }, 'SIMULATION MODE active — events are not from Ableton');
+    log.warn(
+      { driver, source: simSource(config.sim), setlist: isSetlistSource() ? config.sim?.setlist ?? null : null },
+      'SIMULATION MODE active — events are not from Ableton',
+    );
     paused = false;
     stepIndex = 0;
+    lastClip = null;
 
-    if (driver === 'scenario') {
+    if (isSetlistSource()) {
+      advanceAuto();
+    } else if (driver === 'scenario') {
       scenarioLoop = loadScenario().loop ?? false;
       advanceAuto();
     } else if (driver === 'sheetClipNames') {
@@ -216,12 +260,18 @@ export function createSimulatorSource({ config, bus, log, getClipNames = null })
       }
     }
 
+    const usingSetlist = isSetlistSource();
     return {
       paused,
       driver,
+      source: usingSetlist ? 'setlist' : 'default',
+      setlist: usingSetlist ? (config.sim?.setlist ?? null) : null,
       stepIndex,
+      clipCount: clipNames.length,
+      currentClip: lastClip,
       clipNames,
       canAutoAdvance: isAutoDriver(),
+      warning: sourceWarning,
     };
   }
 

@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createBus, EVENTS } from '../src/core/bus.js';
 import { createLogger } from '../src/core/logger.js';
 import { createSimulatorSource } from '../src/ingest/sources/simulator.js';
@@ -13,6 +16,21 @@ function simConfig(overrides = {}) {
     ...DEFAULTS,
     sim: { ...DEFAULTS.sim, enabled: true, driver: 'manual', ...overrides },
   };
+}
+
+function withSetlistDir(config, directory) {
+  return { ...config, setlist: { ...config.setlist, directory } };
+}
+
+function writeSetlist(directory, name, titles) {
+  writeFileSync(join(directory, `${name}.json`), JSON.stringify({
+    name,
+    items: titles.map((title, index) => ({
+      rowId: String(index + 1),
+      title,
+      status: 'confirmed',
+    })),
+  }));
 }
 
 test('manual driver emits a NowPlaying event matching the §9.1 contract', () => {
@@ -210,6 +228,93 @@ test('getStatus returns clip names for scenario driver', async () => {
   sim.stop();
 });
 
+test('setlist source walks titles in order and loops back to the first song', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ableview-sim-setlist-'));
+  writeSetlist(dir, 'Night', ['First', '  ', 'Second']);
+
+  const bus = createBus();
+  const events = [];
+  bus.on(EVENTS.NOW_PLAYING, (e) => events.push(e));
+
+  const sim = createSimulatorSource({
+    config: withSetlistDir(simConfig({
+      driver: 'scenario',
+      source: 'setlist',
+      setlist: 'Night',
+      intervalSeconds: 30,
+    }), dir),
+    bus,
+    log: silentLog,
+  });
+  await sim.start();
+  assert.equal(events[0].authoritativeClip, 'First');
+  assert.equal(sim.getStatus().currentClip, 'First');
+
+  sim.pause();
+  sim.step('next');
+  assert.equal(events.at(-1).authoritativeClip, 'Second');
+  sim.step('next');
+  assert.equal(events.at(-1).authoritativeClip, 'First');
+
+  const status = sim.getStatus();
+  assert.equal(status.source, 'setlist');
+  assert.equal(status.setlist, 'Night');
+  assert.equal(status.paused, true);
+  assert.deepEqual(status.clipNames, ['First', 'Second']);
+  assert.equal(status.canAutoAdvance, true);
+  sim.stop();
+});
+
+test('missing setlist waits instead of throwing', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ableview-sim-setlist-'));
+  const bus = createBus();
+  const events = [];
+  bus.on(EVENTS.NOW_PLAYING, (e) => events.push(e));
+
+  const sim = createSimulatorSource({
+    config: withSetlistDir(simConfig({
+      source: 'setlist',
+      setlist: 'Missing',
+      intervalSeconds: 30,
+    }), dir),
+    bus,
+    log: silentLog,
+  });
+  await sim.start();
+  assert.equal(events.length, 0);
+  assert.match(sim.getStatus().warning, /not found/i);
+  assert.equal(sim.getStatus().canAutoAdvance, true);
+  sim.stop();
+});
+
+test('setlist pause stops auto-advance and resume continues in order', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ableview-sim-setlist-'));
+  writeSetlist(dir, 'Night', ['First', 'Second']);
+
+  const bus = createBus();
+  const events = [];
+  bus.on(EVENTS.NOW_PLAYING, (e) => events.push(e));
+
+  const sim = createSimulatorSource({
+    config: withSetlistDir(simConfig({
+      source: 'setlist',
+      setlist: 'Night',
+      intervalSeconds: 0.05,
+    }), dir),
+    bus,
+    log: silentLog,
+  });
+  await sim.start();
+  assert.equal(events[0].authoritativeClip, 'First');
+  sim.pause();
+  await new Promise((r) => setTimeout(r, 120));
+  assert.equal(events.length, 1);
+  sim.resume();
+  await new Promise((r) => setTimeout(r, 120));
+  assert.equal(events[1].authoritativeClip, 'Second');
+  sim.stop();
+});
+
 test('sheetClipNames driver without sheets provider fails loudly, not silently', async () => {
   const sim = createSimulatorSource({
     config: simConfig({ driver: 'sheetClipNames' }),
@@ -224,6 +329,25 @@ test('config validation rejects bad values', () => {
   bad.ingest.oscListenPort = 999999;
   bad.sim.driver = 'nonsense';
   assert.throws(() => validateConfig(bad), /oscListenPort[\s\S]*driver/);
+});
+
+test('config validation accepts default sim source and requires a setlist name', () => {
+  const ok = structuredClone(DEFAULTS);
+  assert.equal(validateConfig(ok).sim.source, 'default');
+
+  const named = structuredClone(DEFAULTS);
+  named.sim.source = 'setlist';
+  named.sim.setlist = 'Mempho-26';
+  assert.equal(validateConfig(named).sim.setlist, 'Mempho-26');
+
+  const missing = structuredClone(DEFAULTS);
+  missing.sim.source = 'setlist';
+  missing.sim.setlist = null;
+  assert.throws(() => validateConfig(missing), /sim\.setlist/);
+
+  const badSource = structuredClone(DEFAULTS);
+  badSource.sim.source = 'playlist';
+  assert.throws(() => validateConfig(badSource), /sim\.source/);
 });
 
 test('track strategy requires an authoritative track; bestMatch does not', () => {

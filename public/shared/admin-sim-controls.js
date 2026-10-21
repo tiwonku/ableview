@@ -46,9 +46,12 @@ export function mountSimControls(rootSelector) {
 
     const stateLine = el('p', 'sim-controls-state');
     if (simStatus?.canAutoAdvance) {
+      const where = simStatus.source === 'setlist' && simStatus.setlist
+        ? simStatus.setlist
+        : 'scenario file';
       stateLine.textContent = simStatus.paused
-        ? 'Auto-advance paused'
-        : 'Auto-advance running';
+        ? `Auto-advance paused · ${where}`
+        : `Auto-advance running · ${where}`;
     } else {
       stateLine.textContent = 'Manual driver — fire clips on demand';
     }

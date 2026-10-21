@@ -10,6 +10,7 @@ import {
   COLOR_SIM_LOOK,
   COLOR_SIM_LOOK_B,
 } from '../sacn/loopback.js';
+import { sanitizeSetlistName } from '../setlist/index.js';
 
 export const DEFAULTS = Object.freeze({
   ingest: {
@@ -25,6 +26,8 @@ export const DEFAULTS = Object.freeze({
     enabled: false,
     mode: 'internal',
     driver: 'scenario',
+    source: 'default',
+    setlist: null,
     scenario: './config/scenarios/demo-set.json',
     intervalSeconds: 8,
     quantDelaySeconds: 1,
@@ -178,6 +181,17 @@ export function validateConfig(config) {
   }
   if (!VALID_SIM_DRIVERS.includes(config.sim.driver)) {
     errors.push(`sim.driver must be one of: ${VALID_SIM_DRIVERS.join(', ')}`);
+  }
+  const simSource = config.sim.source ?? 'default';
+  if (simSource !== 'default' && simSource !== 'setlist') {
+    errors.push('sim.source must be "default" or "setlist"');
+  }
+  if (simSource === 'setlist') {
+    try {
+      sanitizeSetlistName(config.sim.setlist);
+    } catch {
+      errors.push('sim.setlist must be a setlist name when sim.source is "setlist"');
+    }
   }
   if (!(config.sim.intervalSeconds > 0)) errors.push('sim.intervalSeconds must be > 0');
   if (config.sim.quantDelaySeconds != null && !(config.sim.quantDelaySeconds >= 0)) {

@@ -839,9 +839,7 @@ function settingsFromForm(form, current) {
   const strategy = strategyRaw || current.ingest.authoritative?.strategy || 'bestMatch';
 
   return {
-    sim: {
-      enabled: fd.get('simEnabled') === 'on',
-    },
+    sim: simFromForm(fd),
     ingest: {
       abletonHost: fd.get('abletonHost')?.trim() ?? current.ingest.abletonHost,
       oscListenPort: Number(fd.get('oscListenPort')),
@@ -959,6 +957,122 @@ function renderPaletteFields(title, prefix, palette) {
   }
   wrap.appendChild(row);
   return wrap;
+}
+
+function simFromForm(fd) {
+  const playlist = String(fd.get('simPlaylist') ?? '').trim();
+  return {
+    enabled: fd.get('simEnabled') === 'on',
+    source: playlist ? 'setlist' : 'default',
+    setlist: playlist || null,
+    intervalSeconds: Number(fd.get('simIntervalSeconds')),
+  };
+}
+
+function renderAbletonSimControls(settings, setlistLibrary, transportState, onToggle) {
+  const sim = settings.sim ?? {};
+  const wrap = el('div', 'settings-sim-block');
+  wrap.appendChild(el('p', 'settings-subhead', 'Ableton clip sim'));
+
+  const selected = sim.source === 'setlist' ? String(sim.setlist ?? '').trim() : '';
+  const select = el('select', 'settings-input');
+  select.name = 'simPlaylist';
+  select.id = 'simPlaylist';
+
+  const fallback = el('option', null, 'Default (scenario file)');
+  fallback.value = '';
+  if (!selected) fallback.selected = true;
+  select.appendChild(fallback);
+
+  const names = new Set();
+  for (const entry of setlistLibrary ?? []) {
+    const name = String(entry?.name ?? '').trim();
+    if (!name || names.has(name)) continue;
+    names.add(name);
+    const opt = el('option', null, entry.itemCount != null ? `${name} (${entry.itemCount})` : name);
+    opt.value = name;
+    if (name === selected) opt.selected = true;
+    select.appendChild(opt);
+  }
+  if (selected && !names.has(selected)) {
+    const missing = el('option', null, `${selected} (missing)`);
+    missing.value = selected;
+    missing.selected = true;
+    select.appendChild(missing);
+  }
+  wrap.appendChild(fieldRow('Clip source', select));
+
+  wrap.appendChild(fieldRow(
+    'Advance every (seconds)',
+    numberInput('simIntervalSeconds', sim.intervalSeconds ?? 8, { min: 1, max: 600, step: 1 }),
+  ));
+
+  const transport = el('div', 'settings-sim-transport');
+  transport.dataset.role = 'ableton-sim-transport';
+  paintAbletonSimTransport(transport, {
+    simEnabled: sim.enabled === true,
+    transport: transportState?.status ?? null,
+    message: transportState?.message ?? '',
+    busy: transportState?.busy === true,
+    onToggle,
+  });
+  wrap.appendChild(transport);
+
+  const apply = el('button', 'settings-sync', 'Apply source');
+  apply.type = 'submit';
+  const applyRow = el('div', 'settings-sync-row');
+  applyRow.appendChild(apply);
+  wrap.appendChild(applyRow);
+
+  wrap.appendChild(el(
+    'p',
+    'settings-sim-hint',
+    'Default walks the scenario file, the same as today. A setlist plays that set in order and returns to the first song after the last. Play and Pause take effect immediately. Apply source saves the dropdown and the hold, then starts auto-advance on that source.',
+  ));
+  return wrap;
+}
+
+function paintAbletonSimTransport(node, { simEnabled, transport, message, busy, onToggle }) {
+  node.replaceChildren();
+
+  const line = el('p', 'settings-sheet-status');
+  let buttonLabel = 'Play';
+  let buttonDisabled = true;
+
+  if (!simEnabled) {
+    line.textContent = 'Simulation is off. Turn it on and save to play clips.';
+  } else if (!transport) {
+    line.textContent = 'Play and Pause are available while internal simulation is running.';
+  } else if (transport.canAutoAdvance !== true) {
+    line.textContent = 'This driver does not auto-advance. Choose Default or a setlist, then apply.';
+  } else {
+    const where = transport.source === 'setlist'
+      ? (transport.setlist || 'setlist')
+      : 'scenario file';
+    const clip = transport.currentClip ? ` · ${transport.currentClip}` : '';
+    const pos = transport.stepIndex > 0 && transport.clipCount
+      ? ` (${transport.stepIndex} of ${transport.clipCount})`
+      : '';
+    line.textContent = `${transport.paused ? 'Paused' : 'Playing'} · ${where}${clip}${pos}`;
+    buttonLabel = transport.paused ? 'Play' : 'Pause';
+    buttonDisabled = false;
+  }
+  node.appendChild(line);
+
+  if (transport?.warning) {
+    node.appendChild(el('p', 'settings-sim-warn', transport.warning));
+  }
+  if (message) {
+    node.appendChild(el('p', 'settings-sim-hint', message));
+  }
+
+  const row = el('div', 'settings-sync-row');
+  const btn = el('button', 'settings-sync', busy ? 'Working…' : buttonLabel);
+  btn.type = 'button';
+  btn.disabled = buttonDisabled || busy === true;
+  btn.addEventListener('click', () => onToggle?.());
+  row.appendChild(btn);
+  node.appendChild(row);
 }
 
 function renderColorSimControls(settings) {
@@ -1136,7 +1250,7 @@ function renderSacnGroup(settings, sacnStatus, nics) {
   return group;
 }
 
-function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, oscOutStatus, programStatus, nics, share, shareViewId, onShareViewChange }) {
+function renderForm(root, settings, { onSave, onSync, onSimTransport, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, oscOutStatus, programStatus, nics, share, shareViewId, onShareViewChange, setlistLibrary, simTransport }) {
   root.innerHTML = '';
 
   const heading = el('h2', 'section-title', 'Settings');
@@ -1257,6 +1371,7 @@ function renderForm(root, settings, { onSave, onSync, status, sheetStatus, syncS
     simHint.textContent = 'When off, AbleView listens to the real Ableton session via OSC.';
     simGroup.appendChild(simHint);
   }
+  simGroup.appendChild(renderAbletonSimControls(settings, setlistLibrary, simTransport, onSimTransport));
   simGroup.appendChild(renderColorSimControls(settings));
   bottomRow.appendChild(simGroup);
 
@@ -1409,6 +1524,8 @@ export function mountSettingsPanel(rootSelector) {
   let nics = [{ name: 'All interfaces', address: '0.0.0.0' }];
   let share = { port: 8080, views: [], origins: [] };
   let shareViewId = 'band';
+  let setlistLibrary = [];
+  let simTransport = { status: null, message: '', busy: false };
   let pollTimer = null;
   let stopped = false;
 
@@ -1417,6 +1534,7 @@ export function mountSettingsPanel(rootSelector) {
     renderForm(root, settings, {
       onSave: save,
       onSync: syncSheet,
+      onSimTransport: toggleSimTransport,
       status,
       sheetStatus,
       syncStatus,
@@ -1432,7 +1550,72 @@ export function mountSettingsPanel(rootSelector) {
         shareViewId = id;
         updateShareUrls(root, shareViewId);
       },
+      setlistLibrary,
+      simTransport,
     });
+  }
+
+  function refreshAbletonSimTransport() {
+    const existing = root.querySelector('[data-role="ableton-sim-transport"]');
+    if (!existing || !settings) return;
+    paintAbletonSimTransport(existing, {
+      simEnabled: settings.sim?.enabled === true,
+      transport: simTransport.status,
+      message: simTransport.message,
+      busy: simTransport.busy,
+      onToggle: toggleSimTransport,
+    });
+  }
+
+  async function loadSetlistLibrary() {
+    try {
+      const res = await fetch('/api/setlist');
+      if (!res.ok) {
+        setlistLibrary = [];
+        return;
+      }
+      const data = await res.json();
+      setlistLibrary = Array.isArray(data.library) ? data.library : [];
+    } catch {
+      setlistLibrary = [];
+    }
+  }
+
+  async function loadSimTransport() {
+    if (simTransport.busy) return;
+    let next = null;
+    let ok = false;
+    try {
+      const res = await fetch('/api/sim/status');
+      if (res.ok) {
+        next = await res.json();
+        ok = true;
+      }
+    } catch {
+      ok = false;
+    }
+    if (simTransport.busy) return;
+    simTransport = { ...simTransport, status: ok ? next : null };
+  }
+
+  async function toggleSimTransport() {
+    if (simTransport.busy) return;
+    const paused = simTransport.status?.paused === true;
+    simTransport = { ...simTransport, busy: true, message: '' };
+    refreshAbletonSimTransport();
+    try {
+      const res = await fetch(paused ? '/api/sim/resume' : '/api/sim/pause', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Request failed');
+      simTransport = {
+        status: data.status ?? simTransport.status,
+        message: data.status?.paused ? 'Auto-advance paused.' : 'Auto-advance playing.',
+        busy: false,
+      };
+    } catch (err) {
+      simTransport = { ...simTransport, busy: false, message: err.message };
+    }
+    refreshAbletonSimTransport();
   }
 
   function refreshAbletonSessionBox() {
@@ -1502,7 +1685,7 @@ export function mountSettingsPanel(rootSelector) {
     serverSupportsSacn = data.settings?.sacn !== undefined;
     settings = normalizeSettings(data.settings);
     if (data.oscOutStatus) oscOutStatus = data.oscOutStatus;
-    await Promise.all([loadSheetStatus(), loadHealthStatus(), loadNics()]);
+    await Promise.all([loadSheetStatus(), loadHealthStatus(), loadNics(), loadSetlistLibrary(), loadSimTransport()]);
     if (!serverSupportsTimecode) {
       status = {
         ok: false,
@@ -1562,7 +1745,13 @@ export function mountSettingsPanel(rootSelector) {
       return;
     }
     status = { ok: true, message: `Settings saved.${reloaded}` };
-    await Promise.all([loadSheetStatus(), wait(400).then(() => loadHealthStatus())]);
+    simTransport = { ...simTransport, message: '' };
+    await Promise.all([
+      loadSheetStatus(),
+      wait(400).then(() => loadHealthStatus()),
+      loadSetlistLibrary(),
+      loadSimTransport(),
+    ]);
     render();
   }
 
@@ -1605,13 +1794,17 @@ export function mountSettingsPanel(rootSelector) {
     const prevTimecode = JSON.stringify(timecodeStatus);
     const prevSacn = JSON.stringify(sacnStatus);
     const prevProgram = JSON.stringify(programStatus);
-    loadHealthStatus()
+    const prevTransport = JSON.stringify(simTransport.status);
+    Promise.all([loadHealthStatus(), loadSimTransport()])
       .then(() => {
         if (stopped) return;
         if (JSON.stringify(ingestStatus) !== prevIngest) refreshAbletonSessionBox();
         if (JSON.stringify(timecodeStatus) !== prevTimecode) refreshTimecodeSessionBox();
         if (JSON.stringify(sacnStatus) !== prevSacn) refreshSacnSessionBox();
         if (JSON.stringify(programStatus) !== prevProgram) refreshProgramStatusBox();
+        if (!simTransport.busy && JSON.stringify(simTransport.status) !== prevTransport) {
+          refreshAbletonSimTransport();
+        }
       })
       .catch(() => {});
   }, 3000);

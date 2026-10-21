@@ -2367,10 +2367,20 @@ select.settings-input option {
   color: var(--muted);
 }
 
+.settings-sim-block,
 .settings-color-sim {
   margin-top: 1rem;
   padding-top: 0.75rem;
   border-top: 1px solid var(--border);
+}
+
+.settings-sim-block .settings-sim-hint,
+.settings-sim-block .settings-sheet-status {
+  margin-left: 0;
+}
+
+.settings-sim-transport {
+  margin-top: 0.75rem;
 }
 
 .settings-color-sim .settings-sim-hint {

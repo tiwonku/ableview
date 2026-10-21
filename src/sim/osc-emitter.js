@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import osc from 'osc';
+import { setlistSimSteps, simSource } from './playlist.js';
 
 const NOTHING_PLAYING = -1;
 
@@ -25,8 +26,18 @@ export function createOscEmitter({ config, log }) {
   const slotClips = new Map();
   let tempo = 120;
   let subscriber = null; // { address, port } of the listening AbleView instance
+  let setlistWarned = null;
 
   function loadSteps() {
+    if (simSource(config.sim) === 'setlist') {
+      const playlist = setlistSimSteps(config);
+      if (playlist.error && setlistWarned !== playlist.error) {
+        setlistWarned = playlist.error;
+        log.warn({ err: playlist.error, setlist: config.sim?.setlist }, 'osc-emitter setlist unavailable');
+      }
+      if (!playlist.error) setlistWarned = null;
+      return { steps: playlist.steps, loop: true };
+    }
     const parsed = JSON.parse(readFileSync(resolve(process.cwd(), scenario), 'utf8'));
     return { steps: parsed.steps ?? [], loop: parsed.loop ?? true };
   }
@@ -79,7 +90,13 @@ export function createOscEmitter({ config, log }) {
 
   function advance() {
     const { steps, loop } = loadSteps();
-    if (steps.length === 0) return;
+    if (steps.length === 0) {
+      if (simSource(config.sim) === 'setlist') {
+        timer = setTimeout(advance, intervalSeconds * 1000);
+        timer.unref?.();
+      }
+      return;
+    }
     if (stepIndex >= steps.length) {
       if (!loop) return;
       stepIndex = 0;

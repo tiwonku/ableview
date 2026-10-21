@@ -171,6 +171,36 @@ function normalizeDocument(parsed, fallbackName) {
   };
 }
 
+/**
+ * Clip titles for one named setlist, in file order.
+ * Does not switch the active set. Missing or unreadable files return an error
+ * and an empty name list so simulation can wait and retry.
+ */
+export function readSetlistClipNames(directory, setlistName, cwd = process.cwd()) {
+  let name;
+  try {
+    name = sanitizeSetlistName(setlistName);
+  } catch (err) {
+    return { found: false, names: [], error: err.message };
+  }
+  let file;
+  try {
+    ({ file } = setlistFilePath(directory, name, cwd));
+  } catch (err) {
+    return { found: false, names: [], error: err.message };
+  }
+  if (!existsSync(file)) {
+    return { found: false, names: [], error: `setlist not found: ${name}` };
+  }
+  try {
+    const doc = normalizeDocument(readJson(file), name);
+    const names = doc.items.map((item) => item.title.trim()).filter(Boolean);
+    return { found: true, names, error: null };
+  } catch (err) {
+    return { found: false, names: [], error: err.message ?? 'setlist could not be read' };
+  }
+}
+
 function persistableDocument(doc) {
   return {
     name: doc.name,
