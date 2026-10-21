@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { setlistPreviewModel } from '../public/shared/setlist-preview.js';
+import { horizontalPeekWheelDelta, setlistPreviewModel } from '../public/shared/setlist-preview.js';
 
 const color = (value, column = 'RGB_1', label = 'Color 1') => ({ column, label, value });
 
@@ -117,6 +117,15 @@ test('waiting and an empty set stay explicit', () => {
   assert.equal(empty.slots[0].title, 'Solo');
   assert.equal(empty.slots[0].key, '11B');
   assert.equal(empty.slots[1].empty, true);
+});
+
+test('a vertical mouse wheel scrolls the sideways peek, a sideways gesture does not', () => {
+  assert.equal(horizontalPeekWheelDelta({ deltaY: 120 }), 120);
+  assert.equal(horizontalPeekWheelDelta({ deltaY: -40 }), -40);
+  assert.equal(horizontalPeekWheelDelta({ deltaY: 3, deltaMode: 1 }), 144);
+  assert.equal(horizontalPeekWheelDelta({ deltaY: 1, deltaMode: 2, clientWidth: 800 }), 800);
+  assert.equal(horizontalPeekWheelDelta({ deltaX: 80, deltaY: 10 }), null);
+  assert.equal(horizontalPeekWheelDelta({ deltaY: 0 }), null);
 });
 
 test('lighting view places the setlist module where Automation was', () => {

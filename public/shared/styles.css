@@ -6899,12 +6899,12 @@ body.layout-admin-dashboard .view-edit-btn--set[aria-expanded="true"] {
 
 .setlist-module--stack .setlist-module-slots {
   flex: 1 1 auto;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .setlist-module--row .setlist-module-slots {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 0.72fr 1fr 1fr;
   gap: 0.45rem;
 }
 
@@ -6920,14 +6920,15 @@ body.layout-admin-dashboard .view-edit-btn--set[aria-expanded="true"] {
 }
 
 .setlist-module--stack .setlist-slot {
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  min-height: 0;
   gap: 0.2rem;
   padding: 0.4rem 0.45rem;
 }
 
 .setlist-module--stack .setlist-slot--now {
-  flex: 1 1 auto;
-  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0.28rem 0.4rem;
 }
 
 .setlist-slot--now,
@@ -6964,7 +6965,14 @@ body.layout-admin-dashboard .view-edit-btn--set[aria-expanded="true"] {
 }
 
 .setlist-module--stack .setlist-slot--now .setlist-slot-title {
-  font-size: 1.35rem;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.setlist-module--stack .setlist-slot--next .setlist-slot-title,
+.setlist-module--stack .setlist-slot--after .setlist-slot-title {
+  font-size: 1.15rem;
   line-height: 1.15;
 }
 
@@ -6992,6 +7000,13 @@ body.layout-admin-dashboard .view-edit-btn--set[aria-expanded="true"] {
   margin-top: 0.2rem;
 }
 
+.setlist-module--stack .setlist-slot--next .setlist-slot-meta,
+.setlist-module--stack .setlist-slot--after .setlist-slot-meta {
+  flex: 1 1 auto;
+  align-items: stretch;
+  min-height: 0;
+}
+
 .setlist-module--row .setlist-slot-meta {
   flex-direction: row;
   align-items: center;
@@ -7017,17 +7032,18 @@ body.layout-admin-dashboard .view-edit-btn--set[aria-expanded="true"] {
 }
 
 .setlist-module--stack .setlist-slot--now .setlist-slot-key {
-  font-size: 0.95rem;
-  min-width: 2.2rem;
-  min-height: 1.45rem;
+  font-size: 0.72rem;
+  min-width: 1.6rem;
+  min-height: 1.1rem;
+  padding: 0 0.25rem;
 }
 
 .setlist-module--stack .setlist-slot--next .setlist-slot-key,
 .setlist-module--stack .setlist-slot--after .setlist-slot-key,
 .setlist-module--row .setlist-slot-key {
-  font-size: 0.8rem;
-  min-width: 1.8rem;
-  min-height: 1.25rem;
+  font-size: 0.9rem;
+  min-width: 2rem;
+  min-height: 1.4rem;
   padding: 0 0.3rem;
 }
 
@@ -7045,16 +7061,11 @@ body.layout-admin-dashboard .view-edit-btn--set[aria-expanded="true"] {
   min-height: 0.9rem;
 }
 
-.setlist-module--stack .setlist-slot-colors {
-  flex: 1 1 auto;
-  height: 1.7rem;
-  min-height: 1.7rem;
-}
-
 .setlist-module--stack .setlist-slot--next .setlist-slot-colors,
 .setlist-module--stack .setlist-slot--after .setlist-slot-colors {
-  height: 0.7rem;
-  min-height: 0.7rem;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 1.6rem;
 }
 
 .setlist-module--row .setlist-slot-colors {
@@ -7160,6 +7171,7 @@ body.setlist-modal-open {
   font-weight: 650;
 }
 
+.setlist-modal-present,
 .setlist-modal-close {
   flex: 0 0 auto;
   min-height: 2.5rem;
@@ -7172,6 +7184,16 @@ body.setlist-modal-open {
   border: 1px solid var(--border);
   border-radius: 0.4rem;
   cursor: pointer;
+}
+
+.setlist-modal-present {
+  margin-left: auto;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.setlist-modal-present[hidden] {
+  display: none !important;
 }
 
 .setlist-modal-close:hover,
@@ -7194,6 +7216,7 @@ body.setlist-modal-open {
   gap: 0.45rem;
   overflow-x: hidden;
   overflow-y: auto;
+  touch-action: pan-y;
 }
 
 .setlist-modal-track--horizontal {
@@ -7203,6 +7226,7 @@ body.setlist-modal-open {
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
+  touch-action: pan-x;
 }
 
 .setlist-modal-empty {

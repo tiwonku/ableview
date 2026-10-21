@@ -252,7 +252,7 @@ function renderSlot(slot) {
   if (!slot.empty && !slot.waiting && !slot.unmatched) {
     const meta = el('span', 'setlist-slot-meta');
     meta.appendChild(keyBadge(slot.key));
-    appendSwatches(meta, slot.colors, slot.title);
+    if (slot.role !== 'now') appendSwatches(meta, slot.colors, slot.title);
     card.appendChild(meta);
   }
   return card;
@@ -273,6 +273,75 @@ function readScrollAxis() {
   const width = window.innerWidth || 0;
   const height = window.innerHeight || 0;
   return height > width ? 'vertical' : 'horizontal';
+}
+
+/**
+ * Mouse-wheel movement for the sideways peek. A trackpad already scrolling
+ * sideways is left to the browser. Null means do not take over the gesture.
+ */
+export function horizontalPeekWheelDelta({
+  deltaX = 0,
+  deltaY = 0,
+  deltaMode = 0,
+  clientWidth = 0,
+} = {}) {
+  if (Math.abs(deltaX) > Math.abs(deltaY)) return null;
+  let delta = deltaY;
+  if (deltaMode === 1) delta *= 48;
+  else if (deltaMode === 2) delta *= clientWidth || 0;
+  if (!delta) return null;
+  return delta;
+}
+
+function presentIsAway(track) {
+  const card = track?.querySelector?.('[data-current="true"]');
+  if (!card) return false;
+  const view = track.getBoundingClientRect();
+  const box = card.getBoundingClientRect();
+  const horizontal = track.classList.contains('setlist-modal-track--horizontal');
+  if (horizontal) {
+    const mid = (view.left + view.right) / 2;
+    return box.right < mid - 8 || box.left > mid + 8;
+  }
+  const mid = (view.top + view.bottom) / 2;
+  return box.bottom < mid - 8 || box.top > mid + 8;
+}
+
+function syncPresentButton() {
+  const button = overlay?.querySelector('.setlist-modal-present');
+  const track = overlay?.querySelector('[data-role="setlist-modal-track"]');
+  if (!button || !track) return;
+  button.hidden = !(modalOpen && presentIsAway(track));
+}
+
+function returnToPresent() {
+  const track = overlay?.querySelector('[data-role="setlist-modal-track"]');
+  const current = track?.querySelector('[data-current="true"]');
+  current?.scrollIntoView({ inline: 'center', block: 'center', behavior: 'smooth' });
+}
+
+let snapTimer = 0;
+
+function onPanelWheel(event) {
+  const track = overlay?.querySelector('[data-role="setlist-modal-track"]');
+  if (!track?.classList.contains('setlist-modal-track--horizontal')) return;
+  if (event.target?.closest?.('.setlist-modal-present, .setlist-modal-close')) return;
+  const delta = horizontalPeekWheelDelta({
+    deltaX: event.deltaX,
+    deltaY: event.deltaY,
+    deltaMode: event.deltaMode,
+    clientWidth: track.clientWidth,
+  });
+  if (delta == null) return;
+  if (track.scrollWidth <= track.clientWidth + 1) return;
+  event.preventDefault();
+  track.style.scrollSnapType = 'none';
+  track.scrollLeft += delta;
+  clearTimeout(snapTimer);
+  snapTimer = setTimeout(() => {
+    track.style.scrollSnapType = '';
+    syncPresentButton();
+  }, 160);
 }
 
 function renderModalCard(item) {
@@ -346,10 +415,12 @@ function paintModal(model, { recenter = false } = {}) {
     const current = track.querySelector('[data-current="true"]');
     requestAnimationFrame(() => {
       current?.scrollIntoView({ inline: 'center', block: 'center' });
+      syncPresentButton();
     });
   } else {
     track.scrollLeft = prevLeft;
     track.scrollTop = prevTop;
+    syncPresentButton();
   }
 }
 
@@ -387,14 +458,21 @@ function ensureModal() {
   heading.append(title, el('p', 'setlist-modal-meta'));
   heading.querySelector('p').dataset.role = 'setlist-modal-meta';
 
+  const presentBtn = el('button', 'setlist-modal-present', 'Return to present');
+  presentBtn.type = 'button';
+  presentBtn.hidden = true;
+  presentBtn.addEventListener('click', () => returnToPresent());
+
   const closeBtn = el('button', 'setlist-modal-close', 'Close');
   closeBtn.type = 'button';
   closeBtn.addEventListener('click', () => closeSetlistPreview());
-  header.append(heading, closeBtn);
+  header.append(heading, presentBtn, closeBtn);
 
   const track = el('div', 'setlist-modal-track');
   track.dataset.role = 'setlist-modal-track';
+  track.addEventListener('scroll', () => syncPresentButton(), { passive: true });
   panel.append(header, track);
+  panel.addEventListener('wheel', onPanelWheel, { passive: false });
   overlay.append(backdrop, panel);
   overlay.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') closeSetlistPreview();
@@ -419,7 +497,11 @@ export function closeSetlistPreview() {
   if (!modalOpen) return;
   modalOpen = false;
   paintedCurrentId = null;
-  if (overlay) overlay.hidden = true;
+  if (overlay) {
+    overlay.hidden = true;
+    const presentBtn = overlay.querySelector('.setlist-modal-present');
+    if (presentBtn) presentBtn.hidden = true;
+  }
   document.body.classList.remove('setlist-modal-open');
 }
 
