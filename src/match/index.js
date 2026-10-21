@@ -3,6 +3,7 @@ import { EVENTS } from '../core/bus.js';
 import { makeCuePayload, makeLastMatched, makeMatchResult, refreshLastMatchedRow, applyPinnedRow } from '../core/cue-payload.js';
 import {
   hasTokenOverlap,
+  isExtraWordTitle,
   isGenericNormalizedQuery,
   normalizeClipName,
   parseAliases,
@@ -160,19 +161,24 @@ export function resolveClipMatch(clipName, snapshot, config) {
     return { match: emptyMatch(), row: null };
   }
 
-  const best = results[0];
-  const confidence = scoreToConfidence(best.score);
   // Fuse.js (ignoreLocation) can return scores worse than `threshold`.
   // Enforce the floor ourselves so NFR-7 cannot leak a wrong row.
   // fuseMinConfidence is a safety floor: loosening threshold must not
   // re-open 50–60% false positives (wrong song is worse than no match).
+  // Extra whole words are a different song ("Good Day" vs "Always a Good Day").
+  // Skip those hits and keep a later typo/alias hit if it still clears the floor.
   const minConfidence = Math.max(1 - threshold, fuseMinConfidence);
-  if (confidence < minConfidence) {
+  const best = results.find((hit) => {
+    const hitConfidence = scoreToConfidence(hit.score);
+    if (hitConfidence < minConfidence) return false;
+    if (requireTokenOverlap && !hasTokenOverlap(query, hit.item.norm)) return false;
+    if (isExtraWordTitle(query, hit.item.norm)) return false;
+    return true;
+  });
+  if (!best) {
     return { match: emptyMatch(), row: null };
   }
-  if (requireTokenOverlap && !hasTokenOverlap(query, best.item.norm)) {
-    return { match: emptyMatch(), row: null };
-  }
+  const confidence = scoreToConfidence(best.score);
 
   const { row, matchedValue, viaAlias, viaAlsFolder } = best.item;
 

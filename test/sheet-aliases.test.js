@@ -68,3 +68,26 @@ test('searchSheetRows ranks title and ALS Folder hits', () => {
   assert.equal(results[0].title, 'Hot Like Rox');
   assert.equal(results[0].key, 'Ebm');
 });
+
+test('search still lists a shorter similar title', () => {
+  const snapshot = {
+    rows: [
+      {
+        rowId: '214',
+        data: {
+          'Song Title': 'Good Day',
+          Aliases: 'AGoodDaySTEMS',
+          Key: 'Cm',
+        },
+      },
+    ],
+  };
+  const results = searchSheetRows(snapshot, {
+    query: 'Always a Good Day',
+    matchColumn: 'Song Title',
+    aliasColumn: 'Aliases',
+  });
+  assert.equal(results.length, 1);
+  assert.equal(results[0].title, 'Good Day');
+  assert.equal(results[0].rowId, '214');
+});

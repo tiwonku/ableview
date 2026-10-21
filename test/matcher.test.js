@@ -6,6 +6,7 @@ import { makeNowPlaying, SOURCES } from '../src/core/now-playing.js';
 import { DEFAULTS } from '../src/config/index.js';
 import {
   hasTokenOverlap,
+  isExtraWordTitle,
   isGenericNormalizedQuery,
   normalizeClipName,
   parseAliases,
@@ -137,6 +138,14 @@ test('hasTokenOverlap requires a shared stem, not Fuse-adjacent letters', () => 
   assert.equal(hasTokenOverlap('solament', 'solamente'), true);
   assert.equal(hasTokenOverlap('hot rox', 'hotrox'), true);
   assert.equal(hasTokenOverlap('hotrox', 'hot like rox'), false);
+});
+
+test('isExtraWordTitle flags a shorter title inside a longer one', () => {
+  assert.equal(isExtraWordTitle('good day', 'always a good day'), true);
+  assert.equal(isExtraWordTitle('always a good day', 'good day'), true);
+  assert.equal(isExtraWordTitle('gazing at the glre', 'gazing at the glare'), false);
+  assert.equal(isExtraWordTitle('always agood day', 'always a good day'), false);
+  assert.equal(isExtraWordTitle('good day', 'good day'), false);
 });
 
 test('exact clip name matches the correct row', () => {
@@ -594,6 +603,40 @@ test('prefix match prefers longest sheet title', () => {
   assert.equal(payload.match.matched, true);
   assert.equal(payload.match.rowId, '10');
   assert.equal(payload.match.matchedValue, 'So Bright');
+});
+
+test('extra words keep similar song titles from matching each other', () => {
+  const goodDay = {
+    rowId: '214',
+    data: { 'Clip Name': 'Good Day', Aliases: 'AGoodDaySTEMS', Key: 'Cm' },
+  };
+  const always = {
+    rowId: '300',
+    data: { 'Clip Name': 'Always a Good Day', Aliases: '', Key: 'Am' },
+  };
+  const config = testConfig({ match: { ...DEFAULTS.match, threshold: 0.4 } });
+  const both = snapshot({ rows: [goodDay, always] });
+
+  const alwaysHit = matchClip('Always a Good Day', both, config);
+  assert.equal(alwaysHit.match.matched, true);
+  assert.equal(alwaysHit.match.rowId, '300');
+
+  const goodHit = matchClip('Good Day', both, config);
+  assert.equal(goodHit.match.matched, true);
+  assert.equal(goodHit.match.rowId, '214');
+
+  const shortAgainstLong = matchClip('Good Day', snapshot({ rows: [always] }), config);
+  assert.equal(shortAgainstLong.match.matched, false);
+
+  const longAgainstShort = matchClip('Always a Good Day', snapshot({ rows: [goodDay] }), config);
+  assert.equal(longAgainstShort.match.matched, false);
+
+  const article = matchClip('A Good Day', both, config);
+  assert.notEqual(article.match.rowId, '300');
+
+  const stem = matchClip('Am_98bpm_AlwaysAGoodDay_24', both, config);
+  assert.equal(stem.match.matched, true);
+  assert.equal(stem.match.rowId, '300');
 });
 
 test('prefix match requires title at start of clip name', () => {

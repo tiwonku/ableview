@@ -136,3 +136,29 @@ export function hasTokenOverlap(query, candidate) {
   }
   return false;
 }
+
+function contentTokens(value) {
+  return String(value ?? '').split(/\s+/).filter(Boolean);
+}
+
+/** True when `part` appears inside `whole` as whole words, with words left over. */
+function isProperTokenSubsequence(part, whole) {
+  const needle = contentTokens(part);
+  const hay = contentTokens(whole);
+  if (needle.length === 0 || hay.length <= needle.length) return false;
+  let index = 0;
+  for (const token of hay) {
+    if (token !== needle[index]) continue;
+    index += 1;
+    if (index === needle.length) return true;
+  }
+  return false;
+}
+
+/**
+ * "Good Day" inside "Always a Good Day" is a different title, not a typo.
+ * Character edits (glre/glare, solament/solamente) are not extra words.
+ */
+export function isExtraWordTitle(a, b) {
+  return isProperTokenSubsequence(a, b) || isProperTokenSubsequence(b, a);
+}

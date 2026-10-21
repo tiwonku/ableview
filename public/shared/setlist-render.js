@@ -82,6 +82,35 @@ function renderColorPeek(colors, { title } = {}) {
   return row;
 }
 
+function normalizeLooseTitle(value) {
+  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function queryHitsSheetRow(query, result) {
+  const q = normalizeLooseTitle(query);
+  if (!q || !result) return false;
+  if (normalizeLooseTitle(result.title) === q) return true;
+  return String(result.aliases ?? '')
+    .split(/[|,]/)
+    .some((alias) => normalizeLooseTitle(alias) === q);
+}
+
+/**
+ * New cue row when the typed title is not already a sheet title or alias.
+ * A prefix ("good" → "Good Day") is still a search, not a new song.
+ */
+export function shouldOfferNewCueRow(query, results) {
+  const q = normalizeLooseTitle(query);
+  if (!q) return false;
+  const hits = Array.isArray(results) ? results : [];
+  if (hits.some((result) => queryHitsSheetRow(q, result))) return false;
+  if (hits.some((result) => {
+    const title = normalizeLooseTitle(result?.title);
+    return title.startsWith(q) && title !== q;
+  })) return false;
+  return true;
+}
+
 /** Sheet columns for the empty-search shortcut (title + key only). */
 export function buildQuickCueChanges({
   title,
@@ -305,7 +334,7 @@ function secondaryLabel(result) {
   return '';
 }
 
-function renderQuickCreate({ title, key, busy, onCreateKeyChange, onCreateCue }) {
+function renderQuickCreate({ title, key, busy, similar = false, onCreateKeyChange, onCreateCue }) {
   const form = el('form', 'setlist-create');
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -316,7 +345,9 @@ function renderQuickCreate({ title, key, busy, onCreateKeyChange, onCreateCue })
   form.appendChild(el(
     'p',
     'setlist-create-copy',
-    `No cue row for “${title}”. Add it with a key:`,
+    similar
+      ? `“${title}” is a different song from the rows above. Add it to the cue sheet with a key:`
+      : `No cue row for “${title}”. Add it with a key:`,
   ));
 
   const field = el('label', 'setlist-create-field');
@@ -957,8 +988,7 @@ export function renderSetlist(root, ctx) {
 
     if (
       !addSearching
-      && String(addQuery ?? '').trim()
-      && !addResults.length
+      && shouldOfferNewCueRow(addQuery, addResults)
       && typeof onCreateCue === 'function'
       && matchColumn
     ) {
@@ -966,6 +996,7 @@ export function renderSetlist(root, ctx) {
         title: String(addQuery ?? '').trim(),
         key: createKey,
         busy,
+        similar: addResults.length > 0,
         onCreateKeyChange,
         onCreateCue,
       }));
