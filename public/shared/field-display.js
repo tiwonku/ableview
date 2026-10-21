@@ -30,6 +30,11 @@ export function isTimerField(field) {
   return field?.type === 'timer';
 }
 
+/** Setlist glance. Its own cell; not a sheet column and not part of the layout count. */
+export function isSetlistField(field) {
+  return field?.type === 'setlist';
+}
+
 /** Format Ableton tempo for operator field tokens (number only; label is separate). */
 export function formatTempoFieldValue(tempo) {
   if (tempo == null || Number.isNaN(Number(tempo))) return null;
@@ -87,7 +92,9 @@ export const ROW_MAX_FIELDS = 3;
 
 /** @returns {'hero' | 'strip'} */
 export function resolveFieldsLayoutMode(fields) {
-  const layoutFields = (fields ?? []).filter((field) => !isDopeField(field) && !isTimerField(field));
+  const layoutFields = (fields ?? []).filter((field) => (
+    !isDopeField(field) && !isTimerField(field) && !isSetlistField(field)
+  ));
   const hasColor = layoutFields.some((f) => f.type === 'color');
   if (layoutFields.length <= 3 && !hasColor) return 'hero';
   return 'strip';
@@ -104,6 +111,12 @@ export function groupFieldsForLayout(fields, payload) {
     const field = fields[i];
 
     if (isTimerField(field)) {
+      i++;
+      continue;
+    }
+
+    if (isSetlistField(field)) {
+      rows.push({ type: 'setlist', field });
       i++;
       continue;
     }
@@ -140,6 +153,7 @@ export function groupFieldsForLayout(fields, payload) {
         i++;
         continue;
       }
+      if (isSetlistField(fields[i])) break;
       if (isDopeField(fields[i])) {
         items.push({ field: fields[i], display: 'dope' });
         i++;

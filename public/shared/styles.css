@@ -6786,3 +6786,510 @@ body.layout-admin-dashboard .view-edit-btn--set[aria-expanded="true"] {
   }
 }
 
+/* Setlist glance module — current song plus the next two, click for the full set. */
+.setlist-module {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+}
+
+.setlist-module:hover {
+  border-color: var(--accent);
+}
+
+.setlist-module:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.setlist-module-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.setlist-module-label,
+.setlist-module-open {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.setlist-module-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.setlist-module-open {
+  margin-left: auto;
+  color: var(--accent);
+}
+
+.setlist-module-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.setlist-module--stack .setlist-module-slots {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.setlist-module--row .setlist-module-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.setlist-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  min-width: 0;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.setlist-module--stack .setlist-slot {
+  flex: 0 0 auto;
+  gap: 0.2rem;
+  padding: 0.4rem 0.45rem;
+}
+
+.setlist-module--stack .setlist-slot--now {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.setlist-slot--now,
+.setlist-slot--current {
+  border-color: var(--accent);
+  background: rgba(91, 141, 239, 0.14);
+}
+
+.setlist-slot-kicker,
+.setlist-slot-note {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.setlist-slot--now .setlist-slot-kicker {
+  color: var(--accent);
+}
+
+.setlist-slot-title {
+  display: block;
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.setlist-module--stack .setlist-slot--now .setlist-slot-title {
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.setlist-module--row .setlist-slot-title {
+  font-size: 1rem;
+}
+
+.setlist-slot--empty .setlist-slot-title {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.setlist-slot-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.setlist-module--stack .setlist-slot-meta {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 0.2rem;
+}
+
+.setlist-module--row .setlist-slot-meta {
+  flex-direction: row;
+  align-items: center;
+}
+
+.setlist-slot-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  min-width: 2.5rem;
+  min-height: 1.6rem;
+  padding: 0.12rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 1rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+
+.setlist-module--stack .setlist-slot--now .setlist-slot-key {
+  font-size: 0.95rem;
+  min-width: 2.2rem;
+  min-height: 1.45rem;
+}
+
+.setlist-module--stack .setlist-slot--next .setlist-slot-key,
+.setlist-module--stack .setlist-slot--after .setlist-slot-key,
+.setlist-module--row .setlist-slot-key {
+  font-size: 0.8rem;
+  min-width: 1.8rem;
+  min-height: 1.25rem;
+  padding: 0 0.3rem;
+}
+
+.setlist-slot-key--empty {
+  color: var(--muted);
+  font-weight: 500;
+  background: transparent;
+  border-color: transparent;
+}
+
+.setlist-slot-colors {
+  display: flex;
+  gap: 0.25rem;
+  min-width: 0;
+  min-height: 0.9rem;
+}
+
+.setlist-module--stack .setlist-slot-colors {
+  flex: 1 1 auto;
+  height: 1.7rem;
+  min-height: 1.7rem;
+}
+
+.setlist-module--stack .setlist-slot--next .setlist-slot-colors,
+.setlist-module--stack .setlist-slot--after .setlist-slot-colors {
+  height: 0.7rem;
+  min-height: 0.7rem;
+}
+
+.setlist-module--row .setlist-slot-colors {
+  flex: 1 1 auto;
+  height: 1.35rem;
+}
+
+.setlist-slot-swatch {
+  width: auto;
+  aspect-ratio: auto;
+  height: auto;
+  margin: 0;
+  flex: 1 1 0;
+  align-self: stretch;
+  min-width: 0.5rem;
+  min-height: 0.85rem;
+  border-radius: 0.28rem;
+}
+
+body.layout-operator .fields-strip > .setlist-module,
+body.layout-operator .fields-hero > .setlist-module {
+  min-width: 0;
+  min-height: 0;
+  padding: var(--op-pad);
+}
+
+body.layout-operator .fields-strip > .setlist-module {
+  height: 100%;
+}
+
+body.layout-operator .fields-hero > .setlist-module {
+  flex: 0 0 auto;
+}
+
+.no-match-panel > .setlist-module,
+.no-match > .setlist-module {
+  margin-bottom: 0.75rem;
+}
+
+.setlist-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  padding: clamp(0.5rem, 1.6vw, 1.1rem);
+}
+
+.setlist-modal[hidden] {
+  display: none !important;
+}
+
+body.setlist-modal-open {
+  overflow: hidden;
+}
+
+.setlist-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.72);
+  cursor: pointer;
+}
+
+.setlist-modal-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.setlist-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.setlist-modal-heading-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.setlist-modal-meta {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.setlist-modal-close {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  padding: 0.45rem 1rem;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+.setlist-modal-close:hover,
+.setlist-modal-close:focus-visible {
+  border-color: var(--accent);
+}
+
+.setlist-modal-track {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.75rem;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.setlist-modal-track--vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.setlist-modal-track--horizontal {
+  display: flex;
+  flex-direction: row;
+  gap: 0.7rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+}
+
+.setlist-modal-empty {
+  margin: auto;
+  color: var(--muted);
+  text-align: center;
+}
+
+.setlist-modal-card {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--surface);
+  scroll-margin: 0.75rem;
+}
+
+.setlist-modal-card--now {
+  border-color: var(--accent);
+  background: rgba(91, 141, 239, 0.16);
+}
+
+.setlist-modal-card--played {
+  opacity: 0.62;
+}
+
+.setlist-modal-track--vertical .setlist-modal-card {
+  display: grid;
+  grid-template-columns: 2.4rem 4.4rem minmax(0, 1fr);
+  gap: 0.45rem 0.7rem;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  scroll-snap-align: start;
+}
+
+.setlist-modal-track--horizontal .setlist-modal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  flex: 0 0 clamp(15rem, 26vw, 22rem);
+  height: 100%;
+  padding: 0.8rem 0.85rem;
+  scroll-snap-align: center;
+}
+
+.setlist-modal-index {
+  font-size: 1.05rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.setlist-modal-track--horizontal .setlist-modal-index {
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+}
+
+.setlist-modal-track--horizontal .setlist-slot-key {
+  align-self: flex-start;
+  font-size: clamp(1.4rem, 3dvh, 2.2rem);
+  min-height: 2.4rem;
+  padding: 0.2rem 0.6rem;
+}
+
+.setlist-modal-main {
+  min-width: 0;
+}
+
+.setlist-modal-track--horizontal .setlist-modal-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.setlist-modal-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+}
+
+.setlist-modal-title {
+  margin: 0;
+  font-size: clamp(1rem, 2.2dvh, 1.45rem);
+  font-weight: 750;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.setlist-modal-track--horizontal .setlist-modal-title {
+  font-size: clamp(1.15rem, 2.8dvh, 1.8rem);
+}
+
+.setlist-modal-badge {
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.setlist-modal-badge--played,
+.setlist-modal-badge--status {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.setlist-modal-badge--missing {
+  background: transparent;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+}
+
+.setlist-modal-track--vertical .setlist-slot-colors {
+  height: 1.55rem;
+  margin-top: 0.35rem;
+}
+
+.setlist-modal-track--horizontal .setlist-slot-colors {
+  flex: 1 1 auto;
+  min-height: 4.5rem;
+  margin-top: 0.55rem;
+}
+
+.setlist-modal-track--horizontal .setlist-slot-swatch {
+  min-height: 4rem;
+}

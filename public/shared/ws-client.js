@@ -404,6 +404,18 @@ export function connectView({
         const nav = root?.querySelector('#admin-set-nav');
         if (nav) renderSetNav(nav, setNavCtx());
       }
+      if (
+        viewConfig
+        && !viewConfig.system
+        && !showingSettings
+        && !statusOnly
+        && !editSession
+        && !aliasSession
+        && !pinSession
+        && (viewConfig.fields ?? []).some((field) => field?.type === 'setlist')
+      ) {
+        render();
+      }
       return;
     }
 
@@ -1383,6 +1395,7 @@ export function connectView({
         getMomentWho,
         ...flashLookProps(),
         liveColorColumns,
+        setlist: lastSetlist,
       });
     }
     paintLiveColors();

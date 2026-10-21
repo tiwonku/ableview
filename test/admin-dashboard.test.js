@@ -131,6 +131,7 @@ test('collectOperatorViews skips system views and keeps config order', () => {
 test('dashboard zones dedupe colors and skip tempo', () => {
   assert.equal(dashboardFieldKind({ source: 'tempo' }), 'skip');
   assert.equal(dashboardFieldKind({ type: 'dope', label: 'DOPE' }), 'skip');
+  assert.equal(dashboardFieldKind({ type: 'setlist', label: 'Set' }), 'skip');
   assert.equal(dashboardFieldKind({ column: 'Key' }), 'token');
   assert.equal(dashboardFieldKind({ column: 'Key', type: 'camelot' }), 'camelot');
   assert.equal(dashboardFieldKind({ column: 'Lasers' }), 'note');

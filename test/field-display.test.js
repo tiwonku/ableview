@@ -11,6 +11,7 @@ import {
   isCamelotField,
   isDopeField,
   isTimerField,
+  isSetlistField,
 } from '../public/shared/field-display.js';
 
 test('resolveFieldDisplay respects explicit display', () => {
@@ -72,6 +73,23 @@ test('a timer module stays out of the cue grid and does not change layout mode',
   assert.equal(rows.length, 1);
   assert.equal(rows[0].items.length, 2);
   assert.equal(rows[0].items.some((item) => item.field.type === 'timer'), false);
+});
+
+test('a setlist module stays out of the token row and does not change layout mode', () => {
+  const fields = [
+    { column: 'Key', display: 'token' },
+    { source: 'tempo', label: 'Tempo' },
+    { type: 'setlist', label: 'Set' },
+  ];
+  assert.equal(isSetlistField(fields[2]), true);
+  assert.equal(resolveFieldsLayoutMode(fields), 'hero');
+  const rows = groupFieldsForLayout(fields, { row: { Key: 'Gm' }, tempo: 105 });
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].type, 'row');
+  assert.equal(rows[0].items.length, 2);
+  assert.equal(rows[0].items.some((item) => item.field.type === 'setlist'), false);
+  assert.equal(rows[1].type, 'setlist');
+  assert.equal(rows[1].field.label, 'Set');
 });
 
 test('resolveFieldsLayoutMode uses strip for color or many fields', () => {

@@ -74,6 +74,21 @@ test('validateConfig allows a timer module without a column', () => {
   assert.throws(() => validateConfig(cfg), /cannot set source on a timer module/);
 });
 
+test('validateConfig allows a setlist module without a column', () => {
+  const cfg = baseConfig();
+  cfg.views.band.fields = [
+    { column: 'Key' },
+    { type: 'setlist', label: 'Set' },
+  ];
+  assert.equal(validateConfig(cfg), cfg);
+
+  cfg.views.band.fields = [{ type: 'setlist', column: 'Key' }];
+  assert.throws(() => validateConfig(cfg), /cannot set column on a setlist module/);
+
+  cfg.views.band.fields = [{ type: 'setlist', source: 'tempo' }];
+  assert.throws(() => validateConfig(cfg), /cannot set source on a setlist module/);
+});
+
 test('validateConfig rejects unknown field source and source+column', () => {
   const cfg = baseConfig();
   cfg.views.band.fields = [{ source: 'beat' }];

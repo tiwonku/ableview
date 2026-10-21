@@ -266,7 +266,8 @@
           "type": "color"
         },
         {
-          "column": "Automation"
+          "type": "setlist",
+          "label": "Set"
         },
         {
           "type": "timer",

@@ -14,8 +14,14 @@ import {
   isCamelotField,
   isDopeField,
   isTimerField,
+  isSetlistField,
 } from './field-display.js';
 import { renderTimerStrip } from './timer-module.js';
+import {
+  beginSetlistPreviewPass,
+  endSetlistPreviewPass,
+  renderSetlistModule,
+} from './setlist-preview.js';
 import { renderCamelotField } from './camelot-render.js';
 import {
   captureEditSession,
@@ -319,11 +325,24 @@ function renderNoMatchPanel(root, {
   getMomentWho = null,
   liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
   includeLiveBar = true,
+  setlist = null,
+  matchColumn = null,
 }) {
   const playing = hasPlayingClips(payload);
   const noMatch = document.createElement('div');
   noMatch.className = editable ? 'no-match-panel' : 'no-match';
   if (playing) noMatch.classList.add('no-match--clips');
+
+  const setlistField = (fields ?? []).find((field) => isSetlistField(field));
+  if (setlistField) {
+    noMatch.appendChild(renderSetlistModule(setlistField, {
+      payload,
+      setlist,
+      fields,
+      matchColumn,
+      layout: 'row',
+    }));
+  }
 
   // Operator views already show a hero "No Match"; keep the longer prompt on admin.
   if (editable || !playing) {
@@ -408,8 +427,10 @@ export function renderView(root, {
   flashLookReady = false,
   flashLookTitle = '',
   liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
+  setlist = null,
 }) {
   closeColorPicker();
+  beginSetlistPreviewPass();
   root.innerHTML = '';
 
   const titleEl = document.createElement('h1');
@@ -499,6 +520,8 @@ export function renderView(root, {
       getMomentWho,
       liveColorColumns,
       includeLiveBar: !colorView,
+      setlist,
+      matchColumn,
     });
   }
 
@@ -540,16 +563,21 @@ export function renderView(root, {
         ? (column) => onStartEdit(column)
         : undefined,
       getMomentWho,
+      setlist,
+      matchColumn,
     }));
   } else if (!busy && fields?.length && showLastFields) {
     root.appendChild(renderLastMatchedFields(fields, payload, {
       onPinLast,
       onStartPin,
       getMomentWho,
+      setlist,
+      matchColumn,
     }));
   }
 
   updateStatusBar({ connected, lastUpdate, payload });
+  endSetlistPreviewPass();
 }
 
 export function updateViewLiveChrome(root, {
@@ -603,7 +631,13 @@ function renderViewClipHead(parent, payload, matchColumn = null, {
   });
 }
 
-function renderLastMatchedFields(fields, payload, { onPinLast, onStartPin, getMomentWho = null } = {}) {
+function renderLastMatchedFields(fields, payload, {
+  onPinLast,
+  onStartPin,
+  getMomentWho = null,
+  setlist = null,
+  matchColumn = null,
+} = {}) {
   const panel = document.createElement('div');
   panel.className = 'no-match-panel no-match-panel--last-fields';
   panel.setAttribute('aria-label', 'Last matched cue');
@@ -629,7 +663,12 @@ function renderLastMatchedFields(fields, payload, { onPinLast, onStartPin, getMo
     }
     panel.appendChild(actions);
   }
-  panel.appendChild(renderFieldsGrid(fields, lastPanePayload(payload), { getMomentWho }));
+  panel.appendChild(renderFieldsGrid(fields, lastPanePayload(payload), {
+    getMomentWho,
+    setlist,
+    setlistPayload: payload,
+    matchColumn,
+  }));
   return panel;
 }
 
@@ -771,9 +810,17 @@ function renderDopeModule(field, getMomentWho) {
   return host;
 }
 
-function renderFieldsGrid(fields, payload, { onPickColor, getMomentWho = null } = {}) {
+function renderFieldsGrid(fields, payload, {
+  onPickColor,
+  getMomentWho = null,
+  setlist = null,
+  setlistPayload = null,
+  matchColumn = null,
+} = {}) {
   const fieldsWrap = document.createElement('div');
   fieldsWrap.className = 'view-fields-wrap';
+  const previewPayload = setlistPayload ?? payload;
+  const setlistCtx = { payload: previewPayload, setlist, fields, matchColumn };
 
   const layoutMode = resolveFieldsLayoutMode(fields);
   const grid = document.createElement('div');
@@ -784,6 +831,10 @@ function renderFieldsGrid(fields, payload, { onPickColor, getMomentWho = null } 
     grid.style.setProperty('--strip-cols', String(Math.max(stripCount, 1)));
     for (const field of fields) {
       if (isTimerField(field)) continue;
+      if (isSetlistField(field)) {
+        grid.appendChild(renderSetlistModule(field, { ...setlistCtx, layout: 'stack' }));
+        continue;
+      }
       if (isDopeField(field)) {
         grid.appendChild(renderDopeModule(field, getMomentWho));
       } else if (field.type === 'color') {
@@ -800,6 +851,8 @@ function renderFieldsGrid(fields, payload, { onPickColor, getMomentWho = null } 
     for (const row of groupFieldsForLayout(fields, payload)) {
       if (row.type === 'colors') {
         grid.appendChild(renderColorGroup(row.fields, payload, { onPickColor }));
+      } else if (row.type === 'setlist') {
+        grid.appendChild(renderSetlistModule(row.field, { ...setlistCtx, layout: 'row' }));
       } else if (row.type === 'image') {
         grid.appendChild(renderImageField(row.field, payload));
       } else if (row.type === 'note') {
