@@ -1,0 +1,63 @@
+{
+  "name": "Hula-26",
+  "updatedAt": "2026-10-21T22:01:14.756Z",
+  "items": [
+    {
+      "rowId": "225",
+      "title": "Ode To Dracula",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "226",
+      "title": "Desperado",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "172",
+      "title": "Vigs Drop",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "227",
+      "title": "BadTimesBoogie",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "68",
+      "title": "High School Art Class",
+      "status": "confirmed"
+    }
+  ],
+  "milestones": [
+    {
+      "id": "milestone",
+      "label": "Line Check start",
+      "at": "08:00:00:00",
+      "skip": false
+    },
+    {
+      "id": "milestone-2",
+      "label": "Sound Check start",
+      "at": "09:00:00:00",
+      "skip": false
+    },
+    {
+      "id": "show-start",
+      "label": "Sound check end",
+      "at": "11:00:00:00",
+      "skip": false
+    },
+    {
+      "id": "milestone-3",
+      "label": "Show start",
+      "at": "23:00:00:00",
+      "skip": false
+    },
+    {
+      "id": "milestone-4",
+      "label": "Curfew",
+      "at": "02:00:00:00",
+      "skip": false
+    }
+  ]
+}
