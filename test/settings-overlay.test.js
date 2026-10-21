@@ -57,7 +57,11 @@ test('settings panel maps FX and static look channels independently', () => {
   assert.match(src, /simIntervalSeconds/);
   assert.match(src, /\/api\/sim\/pause/);
   assert.match(src, /\/api\/sim\/resume/);
-  assert.match(src, /Apply source/);
+  assert.match(src, /\/api\/sim\/step/);
+  assert.match(src, /'Previous'/);
+  assert.match(src, /'Next'/);
+  assert.match(src, /Start this source/);
+  assert.match(src, /settings-sim-source-field/);
 });
 
 test('settings panel configures djay sources and shows packet status', () => {

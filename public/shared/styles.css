@@ -2415,6 +2415,29 @@ select.settings-input option {
   margin-top: 0.75rem;
 }
 
+.settings-sim-transport-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.settings-sim-source-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  margin-bottom: 0.65rem;
+}
+
+.settings-sim-source-field .settings-label {
+  padding-top: 0;
+}
+
+.settings-sim-source-field > select.settings-input {
+  width: 100%;
+  min-width: 0;
+}
+
 .settings-color-sim .settings-sim-hint {
   margin-left: 0;
 }

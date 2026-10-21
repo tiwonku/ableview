@@ -969,7 +969,7 @@ function simFromForm(fd) {
   };
 }
 
-function renderAbletonSimControls(settings, setlistLibrary, transportState, onToggle) {
+function renderAbletonSimControls(settings, setlistLibrary, transportState, onToggle, onStep) {
   const sim = settings.sim ?? {};
   const wrap = el('div', 'settings-sim-block');
   wrap.appendChild(el('p', 'settings-subhead', 'Ableton clip sim'));
@@ -1000,7 +1000,16 @@ function renderAbletonSimControls(settings, setlistLibrary, transportState, onTo
     missing.selected = true;
     select.appendChild(missing);
   }
-  wrap.appendChild(fieldRow('Clip source', select));
+  const sourceRow = el('div', 'settings-sim-source-field');
+  const sourceLabel = el('label', 'settings-label', 'Clip source');
+  sourceLabel.htmlFor = 'simPlaylist';
+  sourceRow.appendChild(sourceLabel);
+  sourceRow.appendChild(select);
+  const apply = el('button', 'settings-sync', 'Start this source');
+  apply.type = 'submit';
+  apply.title = 'Save the clip source and the hold, then start auto-advance from the first song.';
+  sourceRow.appendChild(apply);
+  wrap.appendChild(sourceRow);
 
   wrap.appendChild(fieldRow(
     'Advance every (seconds)',
@@ -1015,24 +1024,19 @@ function renderAbletonSimControls(settings, setlistLibrary, transportState, onTo
     message: transportState?.message ?? '',
     busy: transportState?.busy === true,
     onToggle,
+    onStep,
   });
   wrap.appendChild(transport);
-
-  const apply = el('button', 'settings-sync', 'Apply source');
-  apply.type = 'submit';
-  const applyRow = el('div', 'settings-sync-row');
-  applyRow.appendChild(apply);
-  wrap.appendChild(applyRow);
 
   wrap.appendChild(el(
     'p',
     'settings-sim-hint',
-    'Default walks the scenario file, the same as today. A setlist plays that set in order and returns to the first song after the last. Play and Pause take effect immediately. Apply source saves the dropdown and the hold, then starts auto-advance on that source.',
+    'Default walks the scenario file, the same as today. A setlist plays that set in order and returns to the first song after the last. Start this source saves the dropdown and the hold, then starts auto-advance from the first song. Play, Pause, Previous, and Next take effect immediately. Previous and Next step one song and pause auto-advance.',
   ));
   return wrap;
 }
 
-function paintAbletonSimTransport(node, { simEnabled, transport, message, busy, onToggle }) {
+function paintAbletonSimTransport(node, { simEnabled, transport, message, busy, onToggle, onStep }) {
   node.replaceChildren();
 
   const line = el('p', 'settings-sheet-status');
@@ -1066,12 +1070,23 @@ function paintAbletonSimTransport(node, { simEnabled, transport, message, busy, 
     node.appendChild(el('p', 'settings-sim-hint', message));
   }
 
-  const row = el('div', 'settings-sync-row');
+  const row = el('div', 'settings-sync-row settings-sim-transport-row');
+  const disabled = buttonDisabled || busy === true;
+  const prev = el('button', 'settings-sync', 'Previous');
+  prev.type = 'button';
+  prev.disabled = disabled;
+  prev.addEventListener('click', () => onStep?.('prev'));
   const btn = el('button', 'settings-sync', busy ? 'Working…' : buttonLabel);
   btn.type = 'button';
-  btn.disabled = buttonDisabled || busy === true;
+  btn.disabled = disabled;
   btn.addEventListener('click', () => onToggle?.());
+  const next = el('button', 'settings-sync', 'Next');
+  next.type = 'button';
+  next.disabled = disabled;
+  next.addEventListener('click', () => onStep?.('next'));
+  row.appendChild(prev);
   row.appendChild(btn);
+  row.appendChild(next);
   node.appendChild(row);
 }
 
@@ -1250,7 +1265,7 @@ function renderSacnGroup(settings, sacnStatus, nics) {
   return group;
 }
 
-function renderForm(root, settings, { onSave, onSync, onSimTransport, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, oscOutStatus, programStatus, nics, share, shareViewId, onShareViewChange, setlistLibrary, simTransport }) {
+function renderForm(root, settings, { onSave, onSync, onSimTransport, onSimStep, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, oscOutStatus, programStatus, nics, share, shareViewId, onShareViewChange, setlistLibrary, simTransport }) {
   root.innerHTML = '';
 
   const heading = el('h2', 'section-title', 'Settings');
@@ -1371,7 +1386,7 @@ function renderForm(root, settings, { onSave, onSync, onSimTransport, status, sh
     simHint.textContent = 'When off, AbleView listens to the real Ableton session via OSC.';
     simGroup.appendChild(simHint);
   }
-  simGroup.appendChild(renderAbletonSimControls(settings, setlistLibrary, simTransport, onSimTransport));
+  simGroup.appendChild(renderAbletonSimControls(settings, setlistLibrary, simTransport, onSimTransport, onSimStep));
   simGroup.appendChild(renderColorSimControls(settings));
   bottomRow.appendChild(simGroup);
 
@@ -1535,6 +1550,7 @@ export function mountSettingsPanel(rootSelector) {
       onSave: save,
       onSync: syncSheet,
       onSimTransport: toggleSimTransport,
+      onSimStep: stepSimTransport,
       status,
       sheetStatus,
       syncStatus,
@@ -1564,6 +1580,7 @@ export function mountSettingsPanel(rootSelector) {
       message: simTransport.message,
       busy: simTransport.busy,
       onToggle: toggleSimTransport,
+      onStep: stepSimTransport,
     });
   }
 
@@ -1610,6 +1627,30 @@ export function mountSettingsPanel(rootSelector) {
       simTransport = {
         status: data.status ?? simTransport.status,
         message: data.status?.paused ? 'Auto-advance paused.' : 'Auto-advance playing.',
+        busy: false,
+      };
+    } catch (err) {
+      simTransport = { ...simTransport, busy: false, message: err.message };
+    }
+    refreshAbletonSimTransport();
+  }
+
+  async function stepSimTransport(direction) {
+    if (simTransport.busy) return;
+    simTransport = { ...simTransport, busy: true, message: '' };
+    refreshAbletonSimTransport();
+    try {
+      const res = await fetch('/api/sim/step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Request failed');
+      const clip = data.authoritativeClip || 'nothing playing';
+      simTransport = {
+        status: data.status ?? simTransport.status,
+        message: direction === 'prev' ? `Previous: ${clip}` : `Next: ${clip}`,
         busy: false,
       };
     } catch (err) {
