@@ -246,7 +246,8 @@
           "display": "token"
         },
         {
-          "column": "Lasers"
+          "type": "timer",
+          "label": "Show"
         },
         {
           "column": "Lighting Notes",
@@ -270,10 +271,6 @@
         {
           "type": "setlist",
           "label": "Set"
-        },
-        {
-          "type": "timer",
-          "label": "Show"
         }
       ]
     },

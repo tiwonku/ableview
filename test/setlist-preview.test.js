@@ -128,16 +128,21 @@ test('a vertical mouse wheel scrolls the sideways peek, a sideways gesture does 
   assert.equal(horizontalPeekWheelDelta({ deltaY: 0 }), null);
 });
 
-test('lighting view places the setlist module where Automation was', () => {
+test('lighting view uses the timer and set peek in place of Lasers and Automation', () => {
   const example = JSON.parse(readFileSync(
     fileURLToPath(new URL('../config/config.example.json', import.meta.url)),
     'utf8',
   ));
   const lighting = example.views.lighting.fields;
   assert.equal(lighting.some((field) => field.column === 'Automation'), false);
+  assert.equal(lighting.some((field) => field.column === 'Lasers'), false);
   const module = lighting.find((field) => field.type === 'setlist');
   assert.equal(module.label, 'Set');
   assert.equal(module.column, undefined);
+  assert.equal(lighting.at(-1).type, 'setlist');
+  const timer = lighting.find((field) => field.type === 'timer');
+  assert.equal(timer.label, 'Show');
+  assert.equal(lighting[1].type, 'timer');
 
   const view = readFileSync(fileURLToPath(new URL('../public/shared/view-render.js', import.meta.url)), 'utf8');
   const client = readFileSync(fileURLToPath(new URL('../public/shared/ws-client.js', import.meta.url)), 'utf8');
