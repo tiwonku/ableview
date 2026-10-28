@@ -9,6 +9,7 @@ export function buildHealthReport({
   getLiveColorsStatus,
   getOscOutStatus,
   getProgramStatus,
+  getOrbitStatus,
   lastCuePayload = null,
 }) {
   const sheets = getSheetSnapshot();
@@ -108,7 +109,32 @@ export function buildHealthReport({
     report.program = compactProgram(getProgramStatus());
   }
 
+  // Orbit is a parallel lane. A dropped watch socket does not degrade the cue path.
+  if (typeof getOrbitStatus === 'function') {
+    report.orbit = compactOrbit(getOrbitStatus());
+  }
+
   return report;
+}
+
+function compactOrbit(status) {
+  const people = Array.isArray(status?.participants) ? status.participants : [];
+  return {
+    enabled: status?.enabled === true,
+    connected: status?.connected === true,
+    lastSeenAt: status?.lastSeenAt ?? null,
+    lastError: typeof status?.lastError === 'string' ? status.lastError : null,
+    logHeartRates: status?.logHeartRates === true,
+    participants: people.map((person) => ({
+      memberId: person?.memberId ?? null,
+      memberName: person?.memberName ?? null,
+      heartRate: person?.heartRate ?? null,
+      heartRateAvg: person?.heartRateAvg ?? null,
+      batteryLevel: person?.batteryLevel ?? null,
+      active: person?.active === true,
+      lastSeenAt: person?.lastSeenAt ?? null,
+    })),
+  };
 }
 
 function compactProgram(status) {

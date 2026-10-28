@@ -140,6 +140,7 @@ export function createSessionLogger({
   let onCuePayload = null;
   let onLiveColors = null;
   let onProgramDeckState = null;
+  let onOrbitHeartRate = null;
   let lastCueForColor = null;
   let liveColorGate = null;
   let lastTempo = null;
@@ -413,6 +414,33 @@ export function createSessionLogger({
       if (previousOnAir) record.previousOnAir = previousOnAir;
       appendRecord(record);
     }
+  }
+
+  function handleOrbitHeartRate(reading) {
+    if (!enabled) return;
+    if (getConfig().orbit?.logHeartRates !== true) return;
+    if (!reading || typeof reading.memberId !== 'string' || !reading.memberId) return;
+
+    const envelope = timestampEnvelope();
+    const simulated = typeof getSimulated === 'function' ? getSimulated() === true : false;
+    appendRecord({
+      ...envelope,
+      event: 'heart_rate',
+      memberId: reading.memberId,
+      memberName: typeof reading.memberName === 'string' ? reading.memberName : reading.memberId,
+      heartRate: reading.heartRate ?? null,
+      heartRateAvg: reading.heartRateAvg ?? null,
+      calories: reading.calories ?? null,
+      batteryLevel: reading.batteryLevel ?? null,
+      bandId: reading.bandId ?? null,
+      measuredAt: reading.measuredAt ?? null,
+      clipName: lastCueForColor?.clipName ?? null,
+      rowId: lastCueForColor?.rowId ?? null,
+      tempo: lastTempo,
+      beat: lastBeat,
+      simulated,
+      sessionName,
+    });
   }
 
   function disableLogging() {
@@ -693,10 +721,12 @@ export function createSessionLogger({
     onCuePayload = (payload) => handleCuePayload(payload);
     onLiveColors = (status) => handleLiveColors(status);
     onProgramDeckState = (state) => handleProgramDeckState(state);
+    onOrbitHeartRate = (reading) => handleOrbitHeartRate(reading);
     bus.on(EVENTS.NOW_PLAYING, onNowPlaying);
     bus.on(EVENTS.CUE_PAYLOAD, onCuePayload);
     bus.on(EVENTS.LIVE_COLORS, onLiveColors);
     bus.on(EVENTS.PROGRAM_DECK_STATE, onProgramDeckState);
+    bus.on(EVENTS.ORBIT_HEART_RATE, onOrbitHeartRate);
   }
 
   function stop() {
@@ -715,6 +745,10 @@ export function createSessionLogger({
     if (onProgramDeckState) {
       bus.off(EVENTS.PROGRAM_DECK_STATE, onProgramDeckState);
       onProgramDeckState = null;
+    }
+    if (onOrbitHeartRate) {
+      bus.off(EVENTS.ORBIT_HEART_RATE, onOrbitHeartRate);
+      onOrbitHeartRate = null;
     }
     liveColorGate?.stop();
     liveColorGate = null;

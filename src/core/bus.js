@@ -10,6 +10,7 @@ export const EVENTS = Object.freeze({
   LIVE_COLORS: 'liveColors',
   SETLIST: 'setlist',
   PROGRAM_DECK_STATE: 'programDeckState',
+  ORBIT_HEART_RATE: 'orbitHeartRate',
 });
 
 export function createBus() {

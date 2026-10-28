@@ -13,6 +13,7 @@ import { createOscOutput } from './outputs/osc.js';
 import { createSessionLogger } from './session-log/index.js';
 import { createSetlistStore } from './setlist/index.js';
 import { createProgramIngest } from './program/index.js';
+import { createOrbitIngest } from './orbit/index.js';
 import { createShutdown } from './ops/shutdown.js';
 
 const log = createLogger({ app: 'ableview' });
@@ -70,6 +71,12 @@ async function main() {
     getConfig,
     bus,
     log: log.child({ module: 'program' }),
+  });
+
+  const orbit = createOrbitIngest({
+    getConfig,
+    bus,
+    log: log.child({ module: 'orbit' }),
   });
 
   const oscOut = createOscOutput({
@@ -134,6 +141,7 @@ async function main() {
       getLiveColorsStatus: () => sacn.getStatus(),
       getOscOutStatus: () => oscOut.getStatus(),
       getProgramStatus: () => program.getStatus(),
+      getOrbitStatus: () => orbit.getStatus(),
     }),
     sessionLog,
   });
@@ -198,6 +206,13 @@ async function main() {
         log.error({ err: err.message }, 'program ingest failed to restart — cue lane unchanged');
       }
     }
+    if (sections.includes('orbit')) {
+      try {
+        await orbit.start();
+      } catch (err) {
+        log.error({ err: err.message }, 'orbit ingest failed to restart — cue lane unchanged');
+      }
+    }
     if (sections.includes('sim')) viewServer.rebroadcastSimState();
   });
 
@@ -239,6 +254,11 @@ async function main() {
   } catch (err) {
     log.error({ err: err.message }, 'program ingest failed to start — cue lane unchanged');
   }
+  try {
+    await orbit.start();
+  } catch (err) {
+    log.error({ err: err.message }, 'orbit ingest failed to start — cue lane unchanged');
+  }
   log.info({ source: ingest.source.name, simulated: ingest.simulated, httpPort: viewServer.port }, 'AbleView started');
 
   const shutdown = createShutdown(async (signal) => {
@@ -250,6 +270,7 @@ async function main() {
     sacnLoopback.stop();
     sacn.stop();
     program.stop();
+    orbit.stop();
     ingest.stop();
     sheets.stop();
     await viewServer.stop();

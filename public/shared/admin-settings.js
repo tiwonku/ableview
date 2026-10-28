@@ -25,6 +25,14 @@ const TIMECODE_DEFAULTS = Object.freeze({
   staleMs: 500,
 });
 
+const ORBIT_DEFAULTS = Object.freeze({
+  enabled: false,
+  websocketUrl: 'ws://127.0.0.1:8765',
+  bandId: '',
+  staleMs: 15000,
+  logHeartRates: false,
+});
+
 const SACN_DEFAULTS = Object.freeze({
   enabled: false,
   port: 5568,
@@ -103,6 +111,14 @@ function normalizeSettings(raw) {
         expectedDecks: src.expectedDecks ?? 2,
       }))
       : [],
+    orbit: {
+      ...ORBIT_DEFAULTS,
+      ...raw.orbit,
+      websocketUrl: raw.orbit?.websocketUrl || ORBIT_DEFAULTS.websocketUrl,
+      bandId: raw.orbit?.bandId ?? '',
+      logHeartRates: raw.orbit?.logHeartRates === true,
+      enabled: raw.orbit?.enabled === true,
+    },
   };
 }
 
@@ -825,6 +841,111 @@ function renderOscOutGroup(settings, oscOutStatus) {
   return group;
 }
 
+function orbitSeenLine(iso) {
+  if (!iso) return 'no readings yet';
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return 'no readings yet';
+  const sec = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (sec < 2) return 'just now';
+  if (sec < 60) return `${sec}s ago`;
+  return `${Math.round(sec / 60)}m ago`;
+}
+
+function formatBpm(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+function renderOrbitStatusBox(settings, orbitStatus) {
+  const box = el('div', 'program-source-status');
+  box.dataset.role = 'orbit-status';
+  if (settings?.orbit?.enabled !== true) {
+    box.appendChild(el('p', 'settings-field-hint', 'Orbit is off. Turn it on and save to connect.'));
+    return box;
+  }
+  if (!orbitStatus) {
+    box.appendChild(el('p', 'settings-field-hint', 'Checking Orbit…'));
+    return box;
+  }
+
+  let kind = 'offline';
+  let label = 'Connecting…';
+  if (orbitStatus.connected === true) {
+    kind = 'live';
+    label = `Connected · last batch ${orbitSeenLine(orbitStatus.lastSeenAt)}`;
+  } else if (orbitStatus.lastError) {
+    const err = String(orbitStatus.lastError);
+    const short = err.length > 120 ? `${err.slice(0, 117)}…` : err;
+    label = `Retrying · ${short}`;
+  }
+  const conn = el('p', `program-source-status-line program-source-status-line--${kind}`);
+  conn.textContent = label;
+  box.appendChild(conn);
+
+  const people = Array.isArray(orbitStatus.participants) ? orbitStatus.participants : [];
+  if (people.length === 0) {
+    box.appendChild(el('p', 'settings-field-hint', 'No readings yet.'));
+  }
+  for (const person of people) {
+    const lineKind = person.active ? 'live' : 'stale';
+    const line = el('p', `program-source-status-line program-source-status-line--${lineKind}`);
+    const name = person.memberName || person.memberId || 'watch';
+    line.textContent = person.active
+      ? `${name} · ${formatBpm(person.heartRate)} bpm · avg ${formatBpm(person.heartRateAvg)} · battery ${formatBpm(person.batteryLevel)}%`
+      : `${name} · quiet · ${orbitSeenLine(person.lastSeenAt)}`;
+    box.appendChild(line);
+  }
+
+  const logLine = el('p', 'settings-field-hint');
+  logLine.textContent = orbitStatus.logHeartRates === true
+    ? 'Writing heart rates to the session file while Log is on.'
+    : 'Not writing heart rates to the session file.';
+  box.appendChild(logLine);
+  return box;
+}
+
+function checkboxRow(id, name, label, checked) {
+  const input = el('input');
+  input.type = 'checkbox';
+  input.name = name;
+  input.id = id;
+  input.checked = checked === true;
+  input.className = 'settings-checkbox';
+  const row = el('div', 'settings-field settings-field-checkbox');
+  row.appendChild(input);
+  const lab = el('label', 'settings-checkbox-label', label);
+  lab.htmlFor = id;
+  row.appendChild(lab);
+  return row;
+}
+
+function renderOrbitGroup(settings, orbitStatus) {
+  const orbit = settings.orbit ?? ORBIT_DEFAULTS;
+  const group = el('fieldset', 'settings-group');
+  group.appendChild(el('legend', null, 'Orbit'));
+  group.appendChild(renderOrbitStatusBox(settings, orbitStatus));
+  group.appendChild(checkboxRow('orbitEnabled', 'orbitEnabled', 'Connect to Orbit', orbit.enabled === true));
+  group.appendChild(fieldRow(
+    'WebSocket address',
+    textInput('orbitWebsocketUrl', orbit.websocketUrl || ORBIT_DEFAULTS.websocketUrl),
+  ));
+  group.appendChild(fieldRow(
+    'Orbit session name',
+    textInput('orbitBandId', orbit.bandId ?? ''),
+  ));
+  group.appendChild(checkboxRow(
+    'orbitLogHeartRates',
+    'orbitLogHeartRates',
+    'Write heart rates to the session log',
+    orbit.logHeartRates === true,
+  ));
+  const hint = el('p', 'settings-sim-hint');
+  hint.textContent = 'AbleView connects out to Orbit. Readings stay on this page. Leave the session name blank to accept every event on that socket, or set the Orbit band id when more than one event is on the network. The log checkbox writes each reading into the show file while Log is on. Cue pages are unchanged either way.';
+  group.appendChild(hint);
+  return group;
+}
+
 function settingsFromForm(form, current) {
   const fd = new FormData(form);
   const watchedRaw = fd.get('watchedTracks')?.trim() ?? '';
@@ -879,6 +1000,13 @@ function settingsFromForm(form, current) {
     },
     oscOut: oscOutFromForm(fd),
     externalSources: externalSourcesFromForm(fd, current),
+    orbit: {
+      enabled: fd.get('orbitEnabled') === 'on',
+      websocketUrl: fd.get('orbitWebsocketUrl')?.trim() || current.orbit?.websocketUrl || ORBIT_DEFAULTS.websocketUrl,
+      bandId: fd.get('orbitBandId')?.trim() ?? '',
+      staleMs: current.orbit?.staleMs ?? ORBIT_DEFAULTS.staleMs,
+      logHeartRates: fd.get('orbitLogHeartRates') === 'on',
+    },
   };
 }
 
@@ -1265,7 +1393,7 @@ function renderSacnGroup(settings, sacnStatus, nics) {
   return group;
 }
 
-function renderForm(root, settings, { onSave, onSync, onSimTransport, onSimStep, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, oscOutStatus, programStatus, nics, share, shareViewId, onShareViewChange, setlistLibrary, simTransport }) {
+function renderForm(root, settings, { onSave, onSync, onSimTransport, onSimStep, status, sheetStatus, syncStatus, ingestStatus, timecodeStatus, sacnStatus, oscOutStatus, programStatus, orbitStatus, nics, share, shareViewId, onShareViewChange, setlistLibrary, simTransport }) {
   root.innerHTML = '';
 
   const heading = el('h2', 'section-title', 'Settings');
@@ -1490,11 +1618,15 @@ function renderForm(root, settings, { onSave, onSync, onSimTransport, onSimStep,
   const programRow = el('div', 'settings-row settings-row-single');
   programRow.appendChild(renderProgramSourcesGroup(settings, programStatus));
 
+  const orbitRow = el('div', 'settings-row settings-row-single');
+  orbitRow.appendChild(renderOrbitGroup(settings, orbitStatus));
+
   grid.appendChild(topRow);
   grid.appendChild(bottomRow);
   grid.appendChild(sacnRow);
   grid.appendChild(clockRow);
   grid.appendChild(programRow);
+  grid.appendChild(orbitRow);
   form.appendChild(grid);
 
   const actions = el('div', 'settings-actions');
@@ -1536,6 +1668,7 @@ export function mountSettingsPanel(rootSelector) {
   let sacnStatus = null;
   let oscOutStatus = null;
   let programStatus = null;
+  let orbitStatus = null;
   let nics = [{ name: 'All interfaces', address: '0.0.0.0' }];
   let share = { port: 8080, views: [], origins: [] };
   let shareViewId = 'band';
@@ -1559,6 +1692,7 @@ export function mountSettingsPanel(rootSelector) {
       sacnStatus,
       oscOutStatus,
       programStatus,
+      orbitStatus,
       nics,
       share,
       shareViewId,
@@ -1686,6 +1820,12 @@ export function mountSettingsPanel(rootSelector) {
     existing.replaceWith(renderProgramStatusBox(settings, programStatus));
   }
 
+  function refreshOrbitStatusBox() {
+    const existing = root.querySelector('[data-role="orbit-status"]');
+    if (!existing || !settings) return;
+    existing.replaceWith(renderOrbitStatusBox(settings, orbitStatus));
+  }
+
   async function loadSheetStatus() {
     const res = await fetch('/api/sheets/status');
     if (res.ok) sheetStatus = await res.json();
@@ -1700,6 +1840,9 @@ export function mountSettingsPanel(rootSelector) {
     if (data?.oscOut) oscOutStatus = data.oscOut;
     if (data && Object.prototype.hasOwnProperty.call(data, 'program')) {
       programStatus = data.program ?? { sources: [] };
+    }
+    if (data && Object.prototype.hasOwnProperty.call(data, 'orbit')) {
+      orbitStatus = data.orbit;
     }
   }
 
@@ -1776,6 +1919,15 @@ export function mountSettingsPanel(rootSelector) {
       render();
       return;
     }
+    if (patch.orbit && !data.reloaded?.includes('orbit')) {
+      status = {
+        ok: false,
+        message: 'Other settings saved, but Orbit was not applied. Restart AbleView, reload this page, and save again.',
+      };
+      await Promise.all([loadSheetStatus(), wait(400).then(() => loadHealthStatus())]);
+      render();
+      return;
+    }
     if (patch.externalSources && !data.reloaded?.includes('externalSources')) {
       status = {
         ok: false,
@@ -1835,6 +1987,7 @@ export function mountSettingsPanel(rootSelector) {
     const prevTimecode = JSON.stringify(timecodeStatus);
     const prevSacn = JSON.stringify(sacnStatus);
     const prevProgram = JSON.stringify(programStatus);
+    const prevOrbit = JSON.stringify(orbitStatus);
     const prevTransport = JSON.stringify(simTransport.status);
     Promise.all([loadHealthStatus(), loadSimTransport()])
       .then(() => {
@@ -1843,6 +1996,7 @@ export function mountSettingsPanel(rootSelector) {
         if (JSON.stringify(timecodeStatus) !== prevTimecode) refreshTimecodeSessionBox();
         if (JSON.stringify(sacnStatus) !== prevSacn) refreshSacnSessionBox();
         if (JSON.stringify(programStatus) !== prevProgram) refreshProgramStatusBox();
+        if (JSON.stringify(orbitStatus) !== prevOrbit) refreshOrbitStatusBox();
         if (!simTransport.busy && JSON.stringify(simTransport.status) !== prevTransport) {
           refreshAbletonSimTransport();
         }

@@ -135,6 +135,13 @@ export const DEFAULTS = Object.freeze({
     breath: { ...DEFAULT_BREATH },
   },
   externalSources: [],
+  orbit: {
+    enabled: false,
+    websocketUrl: 'ws://127.0.0.1:8765',
+    bandId: '',
+    staleMs: 15000,
+    logHeartRates: false,
+  },
   views: {},
 });
 
@@ -152,6 +159,16 @@ function deepMerge(base, override) {
     out[key] = deepMerge(base[key], override[key]);
   }
   return out;
+}
+
+function orbitWebSocketUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'ws:' || url.protocol === 'wss:';
+  } catch {
+    return false;
+  }
 }
 
 const VALID_SIM_MODES = ['internal', 'osc'];
@@ -503,6 +520,29 @@ export function validateConfig(config) {
           errors.push(`${path}.expectedDecks must be an integer >= 1`);
         }
       });
+    }
+  }
+
+  if (config.orbit != null) {
+    const orbit = config.orbit;
+    if (typeof orbit !== 'object' || Array.isArray(orbit)) {
+      errors.push('orbit must be an object');
+    } else {
+      if (orbit.enabled != null && typeof orbit.enabled !== 'boolean') {
+        errors.push('orbit.enabled must be a boolean');
+      }
+      if (orbit.logHeartRates != null && typeof orbit.logHeartRates !== 'boolean') {
+        errors.push('orbit.logHeartRates must be a boolean');
+      }
+      if (orbit.websocketUrl != null && !orbitWebSocketUrl(orbit.websocketUrl)) {
+        errors.push('orbit.websocketUrl must be a ws:// or wss:// address');
+      }
+      if (orbit.bandId != null && typeof orbit.bandId !== 'string') {
+        errors.push('orbit.bandId must be a string');
+      }
+      if (orbit.staleMs != null && !(Number.isFinite(orbit.staleMs) && orbit.staleMs >= 0)) {
+        errors.push('orbit.staleMs must be >= 0');
+      }
     }
   }
 

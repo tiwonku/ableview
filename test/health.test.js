@@ -187,6 +187,46 @@ test('buildHealthReport lists program sources without degrading the cue lane', (
   });
 });
 
+test('buildHealthReport lists orbit readings without degrading the cue lane', () => {
+  const report = buildHealthReport({
+    simulated: false,
+    getSheetSnapshot: () => sheetSnapshot(),
+    getConnectedViewCount: () => 1,
+    getIngestStatus: () => ({ live: true, lastSeenAt: Date.now() }),
+    getOrbitStatus: () => ({
+      enabled: true,
+      connected: false,
+      lastSeenAt: '2026-05-24T19:38:01.000Z',
+      lastError: 'connect ECONNREFUSED',
+      logHeartRates: true,
+      participants: [
+        {
+          memberId: '70bd',
+          memberName: 'nik',
+          heartRate: 91,
+          heartRateAvg: 91,
+          batteryLevel: 100,
+          calories: 23.5,
+          active: true,
+          lastSeenAt: '2026-05-24T19:38:01.000Z',
+        },
+      ],
+    }),
+    lastCuePayload: makeCuePayload({
+      clipName: 'Song A',
+      match: makeMatchResult({ matched: true, confidence: 0.9 }),
+    }),
+  });
+
+  assert.equal(report.status, 'ok');
+  assert.equal(report.checks.length, 0);
+  assert.equal(report.orbit.connected, false);
+  assert.equal(report.orbit.logHeartRates, true);
+  assert.equal(report.orbit.participants[0].memberName, 'nik');
+  assert.equal(report.orbit.participants[0].heartRate, 91);
+  assert.equal(report.orbit.participants[0].calories, undefined);
+});
+
 test('GET /health returns JSON and 503 when degraded', async () => {
   const bus = createBus();
   const server = await createViewServer({

@@ -33,7 +33,9 @@ function baseConfig(overrides = {}) {
 test('pickEditableSettings returns ingest, sim, sheets, match, timecode, sacn, moments, oscOut, and externalSources', () => {
   const config = baseConfig();
   const settings = pickEditableSettings(config);
-  assert.deepEqual(Object.keys(settings).sort(), ['externalSources', 'ingest', 'match', 'moments', 'oscOut', 'sacn', 'sheets', 'sim', 'timecode']);
+  assert.deepEqual(Object.keys(settings).sort(), ['externalSources', 'ingest', 'match', 'moments', 'orbit', 'oscOut', 'sacn', 'sheets', 'sim', 'timecode']);
+  assert.equal(settings.orbit.enabled, false);
+  assert.equal(settings.orbit.logHeartRates, false);
   assert.deepEqual(settings.externalSources, []);
   assert.equal(settings.ingest.abletonHost, '127.0.0.1');
   assert.equal(settings.sim.enabled, false);

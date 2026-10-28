@@ -231,6 +231,7 @@ export async function createViewServer({
       getLiveColorsStatus: ctx.getLiveColorsStatus,
       getOscOutStatus: ctx.getOscOutStatus,
       getProgramStatus: ctx.getProgramStatus,
+      getOrbitStatus: ctx.getOrbitStatus,
       lastCuePayload: lastPayload,
     });
     const code = report.status === 'ok' ? 200 : 503;

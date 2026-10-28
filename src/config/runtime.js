@@ -86,7 +86,7 @@ function serializeSacn(sacn) {
 }
 
 /** Sections editable from the admin settings panel (M7). */
-export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match', 'timecode', 'sacn', 'moments', 'oscOut', 'externalSources'];
+export const EDITABLE_SECTIONS = ['ingest', 'sim', 'sheets', 'match', 'timecode', 'sacn', 'moments', 'oscOut', 'externalSources', 'orbit'];
 
 function deepMerge(base, override) {
   if (override === undefined) return base;
@@ -119,7 +119,21 @@ export function serializeFileConfig(config) {
     moments: { ...config.moments },
     oscOut: serializeOscOut(config.oscOut),
     externalSources: serializeExternalSources(config.externalSources),
+    orbit: serializeOrbit(config.orbit),
     views: { ...config.views },
+  };
+}
+
+function serializeOrbit(orbit) {
+  const src = orbit ?? {};
+  return {
+    enabled: src.enabled === true,
+    websocketUrl: typeof src.websocketUrl === 'string' && src.websocketUrl.trim()
+      ? src.websocketUrl.trim()
+      : 'ws://127.0.0.1:8765',
+    bandId: typeof src.bandId === 'string' ? src.bandId.trim() : '',
+    staleMs: Number.isFinite(src.staleMs) ? src.staleMs : 15000,
+    logHeartRates: src.logHeartRates === true,
   };
 }
 
@@ -146,6 +160,7 @@ export function pickEditableSettings(config) {
     moments: { ...config.moments },
     oscOut: serializeOscOut(config.oscOut),
     externalSources: serializeExternalSources(config.externalSources),
+    orbit: serializeOrbit(config.orbit),
   };
 }
 

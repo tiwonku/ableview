@@ -152,6 +152,13 @@
       "fallStraight": 0
     }
   },
+  "orbit": {
+    "enabled": false,
+    "websocketUrl": "ws://127.0.0.1:8765",
+    "bandId": "",
+    "staleMs": 15000,
+    "logHeartRates": false
+  },
   "externalSources": [
     {
       "id": "djay-d",
