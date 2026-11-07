@@ -1,31 +1,136 @@
 {
   "name": "default",
-  "updatedAt": "2026-09-02T07:07:04.153Z",
+  "updatedAt": "2026-11-07T05:12:08.719Z",
   "items": [
     {
-      "rowId": "155",
-      "title": "The Sun Spreads In Our Mind",
+      "rowId": "229",
+      "title": "self care swirl",
       "status": "confirmed"
     },
     {
-      "rowId": "125",
-      "title": "Road To The Stars",
+      "rowId": "15",
+      "title": "Around The Block",
       "status": "confirmed"
     },
     {
-      "rowId": "159",
-      "title": "Time To Build A Home",
+      "rowId": "172",
+      "title": "Vigs Drop",
       "status": "confirmed"
     },
     {
-      "rowId": "73",
-      "title": "How Can You Lose",
+      "rowId": "8",
+      "title": "Aimin At Your Head",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "88",
+      "title": "Keep Em Bouncin",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "65",
+      "title": "Gold Coast Hustle",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "30",
+      "title": "Color Of My Soul",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "146",
+      "title": "Still Night",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "62",
+      "title": "Gazing At The Glare",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "82",
+      "title": "If I Gave You My Love",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "18",
+      "title": "B-Rock",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "17",
+      "title": "At Last I Am Free",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "173",
+      "title": "Where Are You Going",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "111",
+      "title": "Only Yesterday",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "166",
+      "title": "Vibe Vendetta",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "204",
+      "title": "Live Forever",
       "status": "confirmed"
     },
     {
       "rowId": "119",
       "title": "Private Ledge",
       "status": "confirmed"
+    },
+    {
+      "rowId": "16",
+      "title": "Ask Your Friends",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "169",
+      "title": "We Must Go On",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "224",
+      "title": "Always a Good Day",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "170",
+      "title": "Welcome to the Machine",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "155",
+      "title": "The Sun Spreads In Our Mind",
+      "status": "confirmed"
+    }
+  ],
+  "milestones": [
+    {
+      "id": "show-start",
+      "label": "Show start",
+      "at": "21:00:00:00",
+      "skip": false
+    },
+    {
+      "id": "milestone",
+      "label": "Show end",
+      "at": "00:00:00:00",
+      "skip": false
+    },
+    {
+      "id": "curfew",
+      "label": "Curfew",
+      "at": "02:00:00:00",
+      "skip": false
     }
   ]
 }
