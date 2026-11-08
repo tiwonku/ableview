@@ -249,6 +249,28 @@ test('hydrate marks missing rows when the sheet snapshot drops them', () => {
   assert.equal(state.items[0].title, 'Song A');
 });
 
+test('a blank setlist file still appears in the library and can be opened', () => {
+  const { store, dir } = tempStore();
+  writeFileSync(join(dir, 'default.json'), `${JSON.stringify({
+    name: 'default',
+    updatedAt: '2026-11-01T00:00:00.000Z',
+    items: [{ rowId: '5', title: 'Song A', status: 'confirmed' }],
+    milestones: [],
+  })}\n`);
+  writeFileSync(join(dir, 'Hula-26.json'), '');
+  writeFileSync(join(dir, 'fillmore_n1.json'), '   \n');
+  store.start();
+
+  const library = store.getState().library.map((entry) => entry.name).sort();
+  assert.deepEqual(library, ['Hula-26', 'default', 'fillmore_n1']);
+  assert.equal(store.getState().library.find((entry) => entry.name === 'Hula-26').itemCount, 0);
+
+  const opened = store.switchTo('Hula-26');
+  assert.equal(opened.name, 'Hula-26');
+  assert.deepEqual(opened.items, []);
+  assert.equal(opened.library.some((entry) => entry.name === 'fillmore_n1'), true);
+});
+
 test('switch, create, and duplicate named setlists', () => {
   const { store, dir } = tempStore();
   store.start();

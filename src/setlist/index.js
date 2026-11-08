@@ -47,7 +47,11 @@ export function setlistFilePath(directory, setlistName, cwd = process.cwd()) {
 }
 
 function readJson(filePath) {
-  return JSON.parse(readFileSync(filePath, 'utf8'));
+  const raw = readFileSync(filePath, 'utf8');
+  // A blank file is an empty set (created in the editor, not yet saved).
+  // Skipping it hides the name from the set dropdown.
+  if (!raw.trim()) return null;
+  return JSON.parse(raw);
 }
 
 function writeJson(filePath, data) {
