@@ -1,0 +1,36 @@
+{
+  "name": "fillmore_n2_show",
+  "updatedAt": "2026-11-08T00:06:23.507Z",
+  "items": [
+    {
+      "rowId": "178",
+      "title": "World Is A Cinema",
+      "status": "confirmed"
+    },
+    {
+      "rowId": "14",
+      "title": "Anytime (The Love You Left Behind)",
+      "status": "confirmed"
+    }
+  ],
+  "milestones": [
+    {
+      "id": "show-start",
+      "label": "Show start",
+      "at": "21:00:00:00",
+      "skip": false
+    },
+    {
+      "id": "milestone",
+      "label": "Show end",
+      "at": "00:00:00:00",
+      "skip": false
+    },
+    {
+      "id": "curfew",
+      "label": "Curfew",
+      "at": "01:00:00:00",
+      "skip": false
+    }
+  ]
+}
