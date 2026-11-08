@@ -6339,6 +6339,14 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
   grid-template-rows: minmax(0, 1fr) minmax(9.5rem, 34%);
 }
 
+.admin-dashboard-board:has(> .admin-heart-slot):has(> .admin-editor),
+.admin-dashboard-board:has(> .admin-heart-slot):has(> .alias-panel),
+.admin-dashboard-board:has(> .admin-heart-slot):has(> .pin-panel),
+.admin-dashboard-board:has(> .admin-heart-slot):has(> .no-match-panel),
+.admin-dashboard-board:has(> .admin-heart-slot):has(> .no-match) {
+  grid-template-rows: auto minmax(0, 1fr) minmax(9.5rem, 34%);
+}
+
 .admin-dashboard-board > .admin-editor,
 .admin-dashboard-board > .alias-panel,
 .admin-dashboard-board > .pin-panel,
@@ -6488,6 +6496,62 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
 
 .admin-dope-tally-person--latest .admin-dope-tally-who {
   color: var(--ok);
+}
+
+.admin-heart-slot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.75rem;
+  margin-bottom: var(--dash-gap);
+  padding: 0.1rem 0.7rem 0.14rem;
+  border: 1px solid rgba(240, 242, 248, 0.1);
+  border-radius: 0.45rem;
+  background: rgba(240, 242, 248, 0.035);
+  line-height: 1.1;
+}
+
+.admin-heart-label {
+  font-size: clamp(0.62rem, 1.35dvh, 0.78rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.admin-heart-person {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  font-size: clamp(0.78rem, 1.7dvh, 1.05rem);
+  font-weight: 550;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.admin-heart-bpm {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.admin-heart-unit {
+  font-size: 0.72em;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.admin-heart-person--quiet {
+  opacity: 0.45;
+}
+
+.admin-heart-person--quiet .admin-heart-bpm {
+  color: var(--muted);
+}
+
+.admin-heart-slot--board {
+  margin-bottom: 0;
 }
 
 .set-dope-tally {
@@ -6783,6 +6847,11 @@ body.layout-admin-dashboard .admin-board-toggle .cue-pane-btn:last-child {
 .admin-dashboard-main:not(:has(> .admin-dashboard-look)),
 .admin-dashboard-main:not(:has(> .admin-dashboard-notes)) {
   grid-template-rows: minmax(0, 1fr);
+}
+
+.admin-dashboard-main:has(> .admin-heart-slot):not(:has(> .admin-dashboard-look)),
+.admin-dashboard-main:has(> .admin-heart-slot):not(:has(> .admin-dashboard-notes)) {
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .admin-dashboard-board--set-open > .admin-dashboard-main {

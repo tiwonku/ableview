@@ -80,8 +80,10 @@ import {
 } from './flash-look-overlay.js';
 import { mountBreathPage, mountBreathPreview } from './breath-render.js';
 import { DOPE_FLASH_MS, createDopeFlashTracker, paintAdminDopeSlot, paintAdminDopeTally, paintSetDopeTally } from './admin-dope-flash.js';
+import { paintAdminHeartRate } from './admin-heart-rate.js';
 
 const RECONNECT_MS = 1500;
+const HEART_POLL_MS = 1000;
 const ALIAS_SEARCH_DEBOUNCE_MS = 180;
 
 function tracksKey(tracks) {
@@ -163,6 +165,10 @@ export function connectView({
   const dopeFlash = createDopeFlashTracker();
   let dopePulse = false;
   let dopeTimer = null;
+  let lastOrbit = null;
+  let lastOrbitJson = '';
+  let heartTimer = null;
+  let heartSeq = 0;
   let lastUpdate = null;
   let connected = false;
   let stopped = false;
@@ -243,6 +249,53 @@ export function connectView({
     if (wait != null) {
       dopeTimer = setTimeout(syncDopeFlash, Math.max(wait, 16));
     }
+  }
+
+  function dashboardShowsHeart() {
+    return Boolean(root)
+      && currentViewId === 'admin'
+      && boardMode === 'dashboard'
+      && !showingSettings
+      && !statusOnly;
+  }
+
+  function syncHeartRate() {
+    if (!dashboardShowsHeart()) {
+      stopHeartPoll();
+      return;
+    }
+    paintAdminHeartRate(root, lastOrbit);
+    ensureHeartPoll();
+  }
+
+  async function pollHeartRate() {
+    const seq = heartSeq;
+    try {
+      const res = await fetch('/health');
+      if (seq !== heartSeq) return;
+      if (!res.ok) return;
+      const body = await res.json();
+      const orbit = body?.orbit ?? null;
+      const json = JSON.stringify(orbit);
+      if (json === lastOrbitJson) return;
+      lastOrbitJson = json;
+      lastOrbit = orbit;
+      syncHeartRate();
+    } catch {
+      /* keep the last reading on screen */
+    }
+  }
+
+  function ensureHeartPoll() {
+    if (heartTimer) return;
+    pollHeartRate();
+    heartTimer = setInterval(pollHeartRate, HEART_POLL_MS);
+  }
+
+  function stopHeartPoll() {
+    heartSeq += 1;
+    if (heartTimer) clearInterval(heartTimer);
+    heartTimer = null;
   }
 
   function applySessionLogState(sessionLog) {
@@ -1544,6 +1597,7 @@ export function connectView({
     }
     } finally {
       syncDopeFlash();
+      syncHeartRate();
       repositionSessionLogMount();
       const restoreFocus = () => {
         if (focusGen !== sessionLogFocusGen) return;
@@ -1749,6 +1803,7 @@ export function connectView({
   async function enterSettings(href, historyMode) {
     if (showingSettings && settingsOverlay) return;
     showingSettings = true;
+    stopHeartPoll();
     breathCtl?.destroy();
     breathCtl = null;
     stopDashBreath();
@@ -1865,6 +1920,7 @@ export function connectView({
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (dopeTimer) clearTimeout(dopeTimer);
       dopeTimer = null;
+      stopHeartPoll();
       ws?.close();
     },
   };

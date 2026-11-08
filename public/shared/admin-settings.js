@@ -941,7 +941,7 @@ function renderOrbitGroup(settings, orbitStatus) {
     orbit.logHeartRates === true,
   ));
   const hint = el('p', 'settings-sim-hint');
-  hint.textContent = 'AbleView connects out to Orbit. Readings stay on this page. Leave the session name blank to accept every event on that socket, or set the Orbit band id when more than one event is on the network. The log checkbox writes each reading into the show file while Log is on. Cue pages are unchanged either way.';
+  hint.textContent = 'AbleView connects out to Orbit. Heart rates show on the admin dashboard and in the lines above. Leave the session name blank to accept every event on that socket, or set the Orbit band id when more than one event is on the network. The log checkbox writes each reading into the show file while Log is on.';
   group.appendChild(hint);
   return group;
 }

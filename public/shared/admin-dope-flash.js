@@ -107,18 +107,35 @@ function removeNode(node) {
   else node.parentNode?.removeChild?.(node);
 }
 
-function revealMast(mast) {
-  if (!mast.hidden) return;
+export function holdAdminDashboardMast(mast) {
+  if (!mast?.hidden) return;
   mast.hidden = false;
   if (mast.dataset) mast.dataset.dopeUnhid = '1';
 }
 
-/** Hide a mast we opened only when both the flash and the set tally are gone. */
+function revealMast(mast) {
+  holdAdminDashboardMast(mast);
+}
+
+function mastGlanceOpen(mast) {
+  return Boolean(
+    mast.querySelector('.admin-dope-slot')
+    || mast.querySelector('.admin-dope-tally')
+    || mast.querySelector('.admin-heart-slot'),
+  );
+}
+
+/** Hide a mast we opened for a glance strip once those strips are gone. */
 function maybeConcealMast(mast) {
   if (mast.dataset?.dopeUnhid !== '1') return;
-  if (mast.querySelector('.admin-dope-slot') || mast.querySelector('.admin-dope-tally')) return;
+  if (mastGlanceOpen(mast)) return;
   mast.hidden = true;
   delete mast.dataset.dopeUnhid;
+}
+
+export function releaseAdminDashboardMast(mast) {
+  if (!mast) return;
+  maybeConcealMast(mast);
 }
 
 function tallyRows(tally) {
