@@ -187,6 +187,7 @@ export function connectView({
   let cuePane = resolveStoredCuePane(readStoredCuePane());
   let pinSession = null;
   let lastSetlist = null;
+  let lastDeadlist = null;
   let lastClock = null;
   let lastClockClientAt = 0;
   setShowTimerContext(() => ({
@@ -396,6 +397,7 @@ export function connectView({
         lastSetlist = msg.setlist;
         if (!setlistNameDraft) setlistNameDraft = msg.setlist.name ?? '';
       }
+      if (msg.deadlist) lastDeadlist = msg.deadlist;
       if (msg.clock) {
         lastClock = msg.clock;
         lastClockClientAt = Date.now();
@@ -442,6 +444,19 @@ export function connectView({
     if (msg.type === 'clock' && msg.clock) {
       lastClock = msg.clock;
       lastClockClientAt = Date.now();
+      return;
+    }
+
+    if (msg.type === 'deadlist' && msg.deadlist) {
+      lastDeadlist = msg.deadlist;
+      if (
+        showingSettings
+        || statusOnly
+        || editSession
+        || aliasSession
+        || pinSession
+      ) return;
+      if (currentViewId === 'admin' || currentViewId === 'session') render();
       return;
     }
 
@@ -1175,6 +1190,60 @@ export function connectView({
     mutateSetlist('/api/setlist', { method: 'PATCH', body: { order: ids } });
   }
 
+  function applyDeadlist(clips) {
+    if (Array.isArray(clips)) lastDeadlist = { clips };
+  }
+
+  async function deadlistClip(clipName) {
+    const name = String(clipName ?? '').trim();
+    if (!name || saveState === 'saving') return;
+    saveState = 'saving';
+    saveError = null;
+    render();
+    try {
+      const res = await fetch('/api/match/deadlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clipName: name }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `Don't match failed (${res.status})`);
+      applyDeadlist(body.clips);
+      saveState = 'idle';
+      saveError = null;
+      render();
+    } catch (err) {
+      saveState = 'idle';
+      saveError = err.message ?? "Don't match failed";
+      render();
+    }
+  }
+
+  async function allowClip(id) {
+    const key = String(id ?? '').trim();
+    if (!key || saveState === 'saving') return;
+    saveState = 'saving';
+    saveError = null;
+    render();
+    try {
+      const res = await fetch('/api/match/deadlist', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ norm: key }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `Allow failed (${res.status})`);
+      applyDeadlist(body.clips);
+      saveState = 'idle';
+      saveError = null;
+      render();
+    } catch (err) {
+      saveState = 'idle';
+      saveError = err.message ?? 'Allow failed';
+      render();
+    }
+  }
+
   async function clearPin() {
     if (saveState === 'saving') return;
     saveState = 'saving';
@@ -1409,6 +1478,9 @@ export function connectView({
       pinPanel.autoFocusSearch = autoFocusSearch;
     }
     const getMomentWho = () => currentViewId;
+    const deadlistReady = lastDeadlist != null;
+    const onDeadlist = deadlistReady ? deadlistClip : undefined;
+    const onAllow = deadlistReady ? allowClip : undefined;
 
     if (currentViewId === 'session') {
       renderSession(root, {
@@ -1422,6 +1494,9 @@ export function connectView({
         onStartAlias: startAlias,
         onStartCreate: startCreate,
         onPinRow: postPin,
+        onDeadlistClip: onDeadlist,
+        onAllowClip: onAllow,
+        deadlist: lastDeadlist,
         onCancelEdit: cancelEdit,
         onSaveEdit: saveEdit,
         getMomentWho,
@@ -1505,6 +1580,7 @@ export function connectView({
         },
         onPin: postPin,
         onClearPin: clearPin,
+        onDeadlistClip: onDeadlist,
         onEditItem: editSetlistItem,
         onStartEdit: startEdit,
         onStartCreate: startCreate,
@@ -1541,6 +1617,9 @@ export function connectView({
         onPinLast: pinLastCue,
         onPinRow: postPin,
         onClearPin: clearPin,
+        onDeadlistClip: onDeadlist,
+        onAllowClip: onAllow,
+        deadlist: lastDeadlist,
         getMomentWho,
         boardMode: currentViewId === 'admin' ? boardMode : 'detail',
         onBoardModeChange: currentViewId === 'admin' ? setBoardMode : undefined,
@@ -1570,6 +1649,8 @@ export function connectView({
         onPinLast: pinLastCue,
         onPinRow: postPin,
         onClearPin: clearPin,
+        onDeadlistClip: onDeadlist,
+        onAllowClip: onAllow,
         onStartEdit: viewConfig.editable ? startEdit : undefined,
         onStartCreate: viewConfig.editable ? startCreate : undefined,
         onStartAlias: viewConfig.editable ? startAlias : undefined,

@@ -520,7 +520,8 @@ body.layout-operator .clip-name--pinned {
   color: var(--warn, #e8a048);
 }
 
-.playing-clip-chip-meta--arrangement {
+.playing-clip-chip-meta--arrangement,
+.playing-clip-chip-meta--deadlist {
   color: var(--muted);
   font-weight: 500;
 }
@@ -575,6 +576,92 @@ body.layout-operator .clip-name--pinned {
 
 .playing-clip-chip-pin-btn:hover {
   background: rgba(76, 139, 245, 0.42);
+}
+
+.playing-clip-chip-deadlist-btn,
+.session-track-deadlist-btn {
+  padding: 0.3rem 0.55rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffb4b4;
+  background: rgba(196, 92, 92, 0.16);
+  border: 1px solid rgba(196, 92, 92, 0.7);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.playing-clip-chip-deadlist-btn:hover,
+.session-track-deadlist-btn:hover {
+  background: rgba(196, 92, 92, 0.28);
+}
+
+.playing-clip-chip-allow-btn,
+.session-track-allow-btn,
+.deadlist-allow {
+  padding: 0.3rem 0.55rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(76, 139, 245, 0.16);
+  border: 1px solid rgba(76, 139, 245, 0.55);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.playing-clip-chip-allow-btn:hover,
+.session-track-allow-btn:hover,
+.deadlist-allow:hover {
+  background: rgba(76, 139, 245, 0.28);
+}
+
+.deadlist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border-radius: 0.5rem;
+}
+
+.deadlist-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.deadlist-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.deadlist-items {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.deadlist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.deadlist-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
 }
 
 .clip-head-sub {
@@ -1623,6 +1710,16 @@ body.layout-operator .clip-name--pinned {
 
 .view-edit-btn--unpin:hover:not(:disabled) {
   background: rgba(230, 162, 60, 0.28);
+}
+
+.view-edit-btn--deadlist {
+  border-color: rgba(196, 92, 92, 0.85);
+  background: rgba(196, 92, 92, 0.16);
+  color: #ffb4b4;
+}
+
+.view-edit-btn--deadlist:hover:not(:disabled) {
+  background: rgba(196, 92, 92, 0.28);
 }
 
 .view-title-row {
@@ -3187,7 +3284,9 @@ body.layout-operator .playing-clip-chip-actions {
 
 body.layout-operator .playing-clip-chip-alias-btn,
 body.layout-operator .playing-clip-chip-create-btn,
-body.layout-operator .playing-clip-chip-pin-btn {
+body.layout-operator .playing-clip-chip-pin-btn,
+body.layout-operator .playing-clip-chip-deadlist-btn,
+body.layout-operator .playing-clip-chip-allow-btn {
   padding: 0.45rem 0.85rem;
   font-size: clamp(0.8rem, 2.2dvh, 1rem);
 }
@@ -4969,7 +5068,8 @@ body.layout-session .session-main {
   color: var(--warn, #e8a048);
 }
 
-.session-track-match--arrangement {
+.session-track-match--arrangement,
+.session-track-match--deadlist {
   color: var(--muted);
   font-weight: 500;
 }

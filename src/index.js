@@ -5,6 +5,7 @@ import { createBus } from './core/bus.js';
 import { createIngest } from './ingest/index.js';
 import { createSheetsStore } from './sheets/index.js';
 import { createMatcher } from './match/index.js';
+import { createDeadlistStore } from './match/deadlist.js';
 import { createViewServer } from './server/index.js';
 import { createTimecodeListener } from './timecode/index.js';
 import { createSacnListener } from './sacn/index.js';
@@ -36,11 +37,17 @@ async function main() {
   const sheets = createSheetsStore({ getConfig, log: log.child({ module: 'sheets' }) });
   await sheets.start();
 
+  const deadlist = createDeadlistStore({
+    filePath: getConfig().match?.deadlistFile ?? './data/match-deadlist.json',
+    log: log.child({ module: 'match' }),
+  });
+
   const matcher = createMatcher({
     getConfig,
     bus,
     log: log.child({ module: 'match' }),
     getSnapshot: sheets.getSnapshot,
+    deadlist,
   });
 
   const ingest = createIngest({
@@ -122,7 +129,11 @@ async function main() {
     matchActions: {
       setOverride: (rowId) => matcher.setOverride(rowId),
       clearOverride: () => matcher.clearOverride(),
+      listDeadlist: () => matcher.listDeadlist(),
+      addDeadlist: (clipName) => matcher.deadlistClip(clipName),
+      removeDeadlist: (norm) => matcher.allowClip(norm),
     },
+    deadlistStore: deadlist,
     simActions: {
       isAvailable: () => ingest.isSimControlAvailable(),
       canControl: () => ingest.canSimControl(),

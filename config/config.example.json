@@ -53,6 +53,7 @@
     "fuseMinConfidence": 0.75,
     "requireTokenOverlap": true,
     "includeArrangement": false,
+    "deadlistFile": "./data/match-deadlist.json",
     "normalize": {
       "lowercase": true,
       "stripPunctuation": true,

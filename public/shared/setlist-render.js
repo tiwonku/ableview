@@ -462,10 +462,12 @@ function renderLiveActions(parent, {
   matched,
   pinned,
   busy,
+  clipName,
   getMomentWho,
   onStartEdit,
   onStartPin,
   onClearPin,
+  onDeadlistClip,
 }) {
   const actions = el('div', 'view-edit-actions setlist-live-actions');
   if (getMomentWho != null) prependDopeButton(actions, getMomentWho);
@@ -475,6 +477,14 @@ function renderLiveActions(parent, {
     changeBtn.title = 'Pin a different cue onto the live board';
     changeBtn.addEventListener('click', onStartPin);
     actions.appendChild(changeBtn);
+  }
+  const liveClip = String(clipName ?? '').trim();
+  if (!busy && matched && liveClip && onDeadlistClip) {
+    const deadBtn = el('button', 'view-edit-btn view-edit-btn--deadlist', "Don't match");
+    deadBtn.type = 'button';
+    deadBtn.title = 'Stop this clip from matching a cue. A pin on this clip is dropped.';
+    deadBtn.addEventListener('click', () => onDeadlistClip(liveClip));
+    actions.appendChild(deadBtn);
   }
   if (!busy && pinned && onClearPin) {
     const clearBtn = el('button', 'view-edit-btn view-edit-btn--unpin', 'Clear pin');
@@ -509,6 +519,7 @@ function renderLiveCard(root, ctx, model) {
     onStartPin,
     onPinLast,
     onClearPin,
+    onDeadlistClip,
     onSyncSheet,
   } = ctx;
 
@@ -531,10 +542,12 @@ function renderLiveCard(root, ctx, model) {
     matched,
     pinned,
     busy,
+    clipName: payload?.clipName,
     getMomentWho,
     onStartEdit,
     onStartPin,
     onClearPin,
+    onDeadlistClip,
   });
   card.appendChild(top);
 

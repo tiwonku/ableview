@@ -21,9 +21,16 @@ export function isExcludedArrangementMatch(trackMatch) {
   return trackMatch?.excluded === 'arrangement';
 }
 
+/** Operator asked this clip name not to auto-match. */
+export function isDeadlistedMatch(trackMatch) {
+  return trackMatch?.excluded === 'deadlist';
+}
+
 /** Playing clip the operator can alias or turn into a cue row. */
 export function canLinkUnmatchedClip(trackMatch) {
-  return trackMatch?.matched !== true && !isExcludedArrangementMatch(trackMatch);
+  return trackMatch?.matched !== true
+    && !isExcludedArrangementMatch(trackMatch)
+    && !isDeadlistedMatch(trackMatch);
 }
 
 export function hasArrangementPlayback(payload) {
@@ -221,6 +228,8 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
     onStartAlias,
     onStartCreate,
     onPinRow,
+    onDeadlistClip,
+    onAllowClip,
     aliasSession = null,
     createSession = null,
     showDeckNames = true,
@@ -238,6 +247,7 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
     const aliasTarget = isAliasTargetTrack(aliasSession, track);
     const createTarget = isCreateTargetTrack(createSession, track);
     const excludedArrangement = isExcludedArrangementMatch(tm);
+    const deadlisted = isDeadlistedMatch(tm);
     const unmatched = canLinkUnmatchedClip(tm);
 
     const chip = document.createElement('div');
@@ -246,6 +256,7 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
     if (aliasTarget) chip.classList.add('playing-clip-chip--alias-target');
     else if (createTarget) chip.classList.add('playing-clip-chip--create-target');
     else if (tm?.matched) chip.classList.add('playing-clip-chip--weak-match');
+    else if (deadlisted) chip.classList.add('playing-clip-chip--deadlist');
     else if (!excludedArrangement) chip.classList.add('playing-clip-chip--nomatch');
 
     if (showDeckNames && track.trackName) {
@@ -266,6 +277,9 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
     if (tm?.matched) {
       meta.textContent = `${formatConfidence(tm.confidence)} · ${tm.matchedValue || 'match'}`;
       meta.classList.add('playing-clip-chip-meta--match');
+    } else if (deadlisted) {
+      meta.textContent = 'Deadlisted';
+      meta.classList.add('playing-clip-chip-meta--deadlist');
     } else if (excludedArrangement) {
       meta.textContent = 'Arrangement';
       meta.classList.add('playing-clip-chip-meta--arrangement');
@@ -276,8 +290,10 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
     chip.appendChild(meta);
 
     const pinRowId = onPinRow ? tiePinRowId(payload, tm) : null;
+    const showDeadlist = !aliasSession && !createSession && tm?.matched && typeof onDeadlistClip === 'function';
+    const showAllow = !aliasSession && !createSession && deadlisted && typeof onAllowClip === 'function';
 
-    if (!aliasSession && !createSession && (unmatched || pinRowId)) {
+    if (!aliasSession && !createSession && (unmatched || pinRowId || showDeadlist || showAllow)) {
       const actions = document.createElement('div');
       actions.className = 'playing-clip-chip-actions';
 
@@ -292,6 +308,26 @@ export function renderPlayingClipsStrip(parent, payload, opts = {}) {
           : 'Pin this match until the next automatic match';
         pinBtn.addEventListener('click', () => onPinRow(pinRowId));
         actions.appendChild(pinBtn);
+      }
+
+      if (showDeadlist) {
+        const deadBtn = document.createElement('button');
+        deadBtn.type = 'button';
+        deadBtn.className = 'playing-clip-chip-deadlist-btn';
+        deadBtn.textContent = "Don't match";
+        deadBtn.title = 'Stop this clip from matching a cue';
+        deadBtn.addEventListener('click', () => onDeadlistClip(track.clipName));
+        actions.appendChild(deadBtn);
+      }
+
+      if (showAllow) {
+        const allowBtn = document.createElement('button');
+        allowBtn.type = 'button';
+        allowBtn.className = 'playing-clip-chip-allow-btn';
+        allowBtn.textContent = 'Allow';
+        allowBtn.title = 'Let this clip match the cue sheet again';
+        allowBtn.addEventListener('click', () => onAllowClip(track.clipName));
+        actions.appendChild(allowBtn);
       }
 
       if (unmatched && onStartAlias) {

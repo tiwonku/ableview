@@ -5,6 +5,7 @@ import { renderAliasPanel } from './alias-panel.js';
 import { renderRowEditorPanel } from './admin-row-editor.js';
 import { prependDopeButton } from './moment-controls.js';
 import { renderSceneBanner, renderSessionTracks } from './session-tracks.js';
+import { renderDeadlistList } from './deadlist-list.js';
 
 /**
  * @param {HTMLElement} root
@@ -41,6 +42,9 @@ export function renderSession(root, ctx) {
     onStartAlias,
     onStartCreate,
     onPinRow,
+    onDeadlistClip,
+    onAllowClip,
+    deadlist = null,
     onCancelEdit,
     onSaveEdit,
     getMomentWho = null,
@@ -91,5 +95,13 @@ export function renderSession(root, ctx) {
     onStartAlias,
     onStartCreate,
     onPinRow,
+    onDeadlistClip,
+    onAllowClip,
   });
+
+  const deadlistSection = renderDeadlistList({
+    clips: deadlist?.clips,
+    onAllowClip,
+  });
+  if (deadlistSection) root.appendChild(deadlistSection);
 }

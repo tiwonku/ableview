@@ -7,6 +7,7 @@ import {
   isCreateTargetTrack,
   isArrangementTrack,
   isExcludedArrangementMatch,
+  isDeadlistedMatch,
   canLinkUnmatchedClip,
 } from './playing-clips-strip.js';
 
@@ -75,6 +76,8 @@ export function renderSessionTracks(parent, {
   onStartAlias,
   onStartCreate,
   onPinRow,
+  onDeadlistClip,
+  onAllowClip,
   compact = false,
 } = {}) {
   const createSession = editSession?.mode === 'create' ? editSession : null;
@@ -107,6 +110,7 @@ export function renderSessionTracks(parent, {
       const aliasTarget = isAliasTargetTrack(aliasSession, track);
       const createTarget = isCreateTargetTrack(createSession, track);
       const excludedArrangement = isExcludedArrangementMatch(tm);
+      const deadlisted = isDeadlistedMatch(tm);
 
       if (playing) row.classList.add('session-track--playing');
       if (isArrangementTrack(track)) row.classList.add('session-track--arrangement');
@@ -114,6 +118,7 @@ export function renderSessionTracks(parent, {
       else if (createTarget) row.classList.add('session-track--create-target');
       else if (tm?.winner) row.classList.add('session-track--winner');
       else if (tm?.matched) row.classList.add('session-track--matched');
+      else if (playing && deadlisted) row.classList.add('session-track--deadlist');
       else if (playing && !excludedArrangement) row.classList.add('session-track--nomatch');
 
       const meta = document.createElement('div');
@@ -143,6 +148,9 @@ export function renderSessionTracks(parent, {
           : `Match · ${conf} · ${label}`;
         if (tm.winner) matchLine.classList.add('session-track-match--winner');
         else matchLine.classList.add('session-track-match--ok');
+      } else if (deadlisted) {
+        matchLine.textContent = 'Deadlisted';
+        matchLine.classList.add('session-track-match--deadlist');
       } else if (excludedArrangement) {
         matchLine.textContent = 'Arrangement';
         matchLine.classList.add('session-track-match--arrangement');
@@ -153,25 +161,43 @@ export function renderSessionTracks(parent, {
       meta.appendChild(matchLine);
 
       const pinRowId = !busy && onPinRow ? tiePinRowId(payload, tm) : null;
-      if (playing && pinRowId) {
+      const showDeadlist = playing && !busy && tm?.matched && typeof onDeadlistClip === 'function';
+      const showAllow = playing && !busy && deadlisted && typeof onAllowClip === 'function';
+      const showLink = playing && canLinkUnmatchedClip(tm) && !busy && (onStartAlias || onStartCreate);
+      if (pinRowId || showDeadlist || showAllow || showLink) {
         const actions = document.createElement('div');
         actions.className = 'session-track-actions';
-        const pinBtn = document.createElement('button');
-        pinBtn.type = 'button';
-        pinBtn.className = 'session-track-pin-btn';
-        pinBtn.textContent = 'Pin';
-        const song = tm.matchedValue?.trim();
-        pinBtn.title = song
-          ? `Pin ${song} until the next automatic match`
-          : 'Pin this match until the next automatic match';
-        pinBtn.addEventListener('click', () => onPinRow(pinRowId));
-        actions.appendChild(pinBtn);
-        meta.appendChild(actions);
-      } else if (playing && canLinkUnmatchedClip(tm) && !busy && (onStartAlias || onStartCreate)) {
-        const actions = document.createElement('div');
-        actions.className = 'session-track-actions';
-
-        if (onStartAlias) {
+        if (pinRowId) {
+          const pinBtn = document.createElement('button');
+          pinBtn.type = 'button';
+          pinBtn.className = 'session-track-pin-btn';
+          pinBtn.textContent = 'Pin';
+          const song = tm.matchedValue?.trim();
+          pinBtn.title = song
+            ? `Pin ${song} until the next automatic match`
+            : 'Pin this match until the next automatic match';
+          pinBtn.addEventListener('click', () => onPinRow(pinRowId));
+          actions.appendChild(pinBtn);
+        }
+        if (showDeadlist) {
+          const deadBtn = document.createElement('button');
+          deadBtn.type = 'button';
+          deadBtn.className = 'session-track-deadlist-btn';
+          deadBtn.textContent = "Don't match";
+          deadBtn.title = 'Stop this clip from matching a cue';
+          deadBtn.addEventListener('click', () => onDeadlistClip(track.clipName));
+          actions.appendChild(deadBtn);
+        }
+        if (showAllow) {
+          const allowBtn = document.createElement('button');
+          allowBtn.type = 'button';
+          allowBtn.className = 'session-track-allow-btn';
+          allowBtn.textContent = 'Allow';
+          allowBtn.title = 'Let this clip match the cue sheet again';
+          allowBtn.addEventListener('click', () => onAllowClip(track.clipName));
+          actions.appendChild(allowBtn);
+        }
+        if (showLink && onStartAlias) {
           const aliasBtn = document.createElement('button');
           aliasBtn.type = 'button';
           aliasBtn.className = 'session-track-alias-btn';
@@ -179,8 +205,7 @@ export function renderSessionTracks(parent, {
           aliasBtn.addEventListener('click', () => onStartAlias(track.clipName, track));
           actions.appendChild(aliasBtn);
         }
-
-        if (onStartCreate) {
+        if (showLink && onStartCreate) {
           const createBtn = document.createElement('button');
           createBtn.type = 'button';
           createBtn.className = 'session-track-create-btn';
@@ -188,7 +213,6 @@ export function renderSessionTracks(parent, {
           createBtn.addEventListener('click', () => onStartCreate(track.clipName, track));
           actions.appendChild(createBtn);
         }
-
         meta.appendChild(actions);
       }
 

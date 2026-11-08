@@ -1,6 +1,7 @@
 import Fuse from 'fuse.js';
 import { EVENTS } from '../core/bus.js';
 import { makeCuePayload, makeLastMatched, makeMatchResult, refreshLastMatchedRow, applyPinnedRow } from '../core/cue-payload.js';
+import { createDeadlistStore } from './deadlist.js';
 import {
   hasTokenOverlap,
   isExtraWordTitle,
@@ -108,6 +109,18 @@ function emptyMatch() {
   return makeMatchResult({ matched: false, confidence: 0 });
 }
 
+function deadlistedNorms(config) {
+  const raw = config.match?.deadlistedNorms;
+  if (raw instanceof Set) return raw.size ? raw : null;
+  if (Array.isArray(raw) && raw.length) return new Set(raw);
+  return null;
+}
+
+function isDeadlistedQuery(query, config) {
+  const norms = deadlistedNorms(config);
+  return Boolean(query && norms?.has(query));
+}
+
 /** Core single-clip match against an in-memory sheet snapshot. */
 export function resolveClipMatch(clipName, snapshot, config) {
   const matchCfg = config.match ?? {};
@@ -122,13 +135,21 @@ export function resolveClipMatch(clipName, snapshot, config) {
     return { match: emptyMatch(), row: null };
   }
 
-  const items = buildSearchItems(rows, config.sheets, normalizeOptions);
-  if (items.length === 0) {
+  const query = normalizeClipName(clipName, normalizeOptions);
+  if (!query) {
     return { match: emptyMatch(), row: null };
   }
 
-  const query = normalizeClipName(clipName, normalizeOptions);
-  if (!query) {
+  if (isDeadlistedQuery(query, config)) {
+    return {
+      match: { ...emptyMatch(), deadlisted: true },
+      row: null,
+      deadlisted: true,
+    };
+  }
+
+  const items = buildSearchItems(rows, config.sheets, normalizeOptions);
+  if (items.length === 0) {
     return { match: emptyMatch(), row: null };
   }
 
@@ -286,8 +307,8 @@ export function matchBestOfTracks(tracks, snapshot, config) {
       continue;
     }
 
-    const { match, row } = resolveClipMatch(query, snapshot, config);
-    trackMatches.push({
+    const { match, row, deadlisted } = resolveClipMatch(query, snapshot, config);
+    const entry = {
       trackIndex: track.trackIndex,
       trackName: track.trackName,
       clipName: track.clipName,
@@ -296,7 +317,9 @@ export function matchBestOfTracks(tracks, snapshot, config) {
       rowId: match.rowId ?? null,
       matchedValue: match.matchedValue ?? null,
       winner: false,
-    });
+    };
+    if (deadlisted) entry.excluded = 'deadlist';
+    trackMatches.push(entry);
 
     if (match.matched) {
       scored.push({
@@ -413,8 +436,9 @@ function matchIdentityKey(event) {
   });
 }
 
-export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
+export function createMatcher({ config, getConfig, bus, log, getSnapshot, deadlist = null }) {
   const resolveConfig = getConfig ?? (() => config);
+  const exclusions = deadlist ?? createDeadlistStore();
   let lastKey = null;
   let lastMatchKey = null;
   let lastEvent = null;
@@ -456,6 +480,19 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
     bus.emit(EVENTS.CUE_PAYLOAD, lastPayload);
   }
 
+  function configForMatch() {
+    const cfg = resolveConfig();
+    const norms = exclusions.norms();
+    if (!norms || norms.size === 0) return cfg;
+    return {
+      ...cfg,
+      match: {
+        ...cfg.match,
+        deadlistedNorms: norms,
+      },
+    };
+  }
+
   function handleNowPlaying(event, { force = false } = {}) {
     const key = nowPlayingKey(event);
     if (!force && key === lastKey) return;
@@ -486,7 +523,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
       };
     } else {
       const snapshot = getSnapshot();
-      payload = matchNowPlaying(event, snapshot, resolveConfig());
+      payload = matchNowPlaying(event, snapshot, configForMatch());
       payload.tempo = event.tempo;
       payload.beat = event.beat;
       payload.songTime = event.songTime ?? null;
@@ -557,7 +594,7 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
   });
 
   return {
-    matchClip: (clipName) => matchClip(clipName, getSnapshot(), resolveConfig()),
+    matchClip: (clipName) => matchClip(clipName, getSnapshot(), configForMatch()),
     rematch: () => {
       if (lastEvent) handleNowPlaying(lastEvent, { force: true });
     },
@@ -579,5 +616,29 @@ export function createMatcher({ config, getConfig, bus, log, getSnapshot }) {
       return overrideStatus();
     },
     getOverride: () => overrideStatus(),
+    deadlistClip(clipName) {
+      const opts = resolveConfig().match?.normalize;
+      const entry = exclusions.add(clipName, opts);
+      const currentNorm = normalizeClipName(lastPayload?.clipName ?? '', opts);
+      if (entry?.norm && currentNorm === entry.norm && overrideRowId) {
+        overrideRowId = null;
+        overrideSetAtMatchKey = null;
+      }
+      if (lastEvent) handleNowPlaying(lastEvent, { force: true });
+      return exclusions.list();
+    },
+    allowClip(id) {
+      const raw = String(id ?? '').trim();
+      if (!raw) throw new Error('norm is required');
+      const opts = resolveConfig().match?.normalize;
+      const norm = exclusions.has(raw) ? raw : normalizeClipName(raw, opts);
+      if (!norm || !exclusions.has(norm)) {
+        throw new Error(`deadlist entry not found: ${raw}`);
+      }
+      exclusions.remove(norm);
+      if (lastEvent) handleNowPlaying(lastEvent, { force: true });
+      return exclusions.list();
+    },
+    listDeadlist: () => exclusions.list(),
   };
 }

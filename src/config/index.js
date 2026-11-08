@@ -58,6 +58,7 @@ export const DEFAULTS = Object.freeze({
     fuseMinConfidence: 0.75,
     requireTokenOverlap: true,
     includeArrangement: false,
+    deadlistFile: './data/match-deadlist.json',
     normalize: { lowercase: true, stripPunctuation: true, stripVersionTags: true },
   },
   server: { wsHeartbeatSeconds: 5 },
@@ -219,6 +220,11 @@ export function validateConfig(config) {
   }
   if (config.match.includeArrangement != null && typeof config.match.includeArrangement !== 'boolean') {
     errors.push('match.includeArrangement must be a boolean');
+  }
+  if (config.match.deadlistFile != null) {
+    if (typeof config.match.deadlistFile !== 'string' || !config.match.deadlistFile.trim()) {
+      errors.push('match.deadlistFile must be a non-empty path');
+    }
   }
   if (config.match.fuseMinConfidence != null) {
     const floor = config.match.fuseMinConfidence;

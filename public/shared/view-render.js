@@ -51,6 +51,7 @@ import { copyTextToClipboard } from './clipboard.js';
 import { buildDashboardZones } from './admin-dashboard.js';
 import { mountProgramPanel } from './admin-program.js';
 import { renderSceneBanner, renderSessionTracks } from './session-tracks.js';
+import { renderDeadlistList } from './deadlist-list.js';
 
 const TRANSPORT_PLAY_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5.5v13l11-6.5L8 5.5z"/></svg>`;
 const TRANSPORT_PAUSE_ICON = `<svg class="transport-indicator-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M7 5h3.5v14H7V5zm6.5 0H17v14h-3.5V5z"/></svg>`;
@@ -417,6 +418,14 @@ function paintLiveBarTempo(payload) {
   tempo.setAttribute('aria-label', `Ableton tempo ${spoken}`);
 }
 
+function mountDeadlist(parent, deadlist, onAllowClip) {
+  const section = renderDeadlistList({
+    clips: deadlist?.clips,
+    onAllowClip,
+  });
+  if (section) parent.appendChild(section);
+}
+
 function renderNoMatchPanel(root, {
   payload,
   editable,
@@ -427,6 +436,8 @@ function renderNoMatchPanel(root, {
   onStartPin,
   onPinLast,
   onPinRow,
+  onDeadlistClip,
+  onAllowClip,
   fields = null,
   getMomentWho = null,
   liveColorColumns = DEFAULT_LIVE_COLOR_COLUMNS,
@@ -480,6 +491,8 @@ function renderNoMatchPanel(root, {
       onStartAlias: editable ? onStartAlias : undefined,
       onStartCreate: editable ? onStartCreate : undefined,
       onPinRow,
+      onDeadlistClip,
+      onAllowClip,
       aliasSession,
       createSession,
       showDeckNames: true,
@@ -531,6 +544,8 @@ export function renderView(root, {
   onPinLast,
   onPinRow,
   onClearPin,
+  onDeadlistClip,
+  onAllowClip,
   getMomentWho = null,
   onStartFlashLook,
   flashLookReady = false,
@@ -572,6 +587,8 @@ export function renderView(root, {
     cuePane: pane,
     onCuePaneChange,
     onClearPin: pinned && !busy ? onClearPin : undefined,
+    onDeadlistClip: matched && !busy ? onDeadlistClip : undefined,
+    clipName: payload?.clipName,
     onStartPin: matched && !busy ? onStartPin : undefined,
     onStartFlashLook: !busy ? onStartFlashLook : undefined,
     flashLookReady,
@@ -623,6 +640,8 @@ export function renderView(root, {
       onStartPin,
       onPinLast,
       onPinRow,
+      onDeadlistClip,
+      onAllowClip,
       fields,
       getMomentWho,
       liveColorColumns,
@@ -833,6 +852,8 @@ function renderViewEditActions({
   cuePane = null,
   onCuePaneChange,
   onClearPin,
+  onDeadlistClip,
+  clipName = '',
   onStartPin,
   onStartFlashLook,
   flashLookReady = false,
@@ -845,12 +866,14 @@ function renderViewEditActions({
   const showToggle = !editSession && Boolean(cuePane) && typeof onCuePaneChange === 'function';
   const showClear = !editSession && typeof onClearPin === 'function';
   const showChange = !editSession && typeof onStartPin === 'function';
+  const liveClip = String(clipName ?? '').trim();
+  const showDeadlist = !editSession && matched && liveClip && typeof onDeadlistClip === 'function';
   const showFlash = !editSession
     && matched
     && editable
     && typeof onStartFlashLook === 'function'
     && flashableColorColumns(fields, liveColorColumns).length > 0;
-  if (!showSave && !showEdit && !showToggle && !showClear && !showChange && !showFlash) return null;
+  if (!showSave && !showEdit && !showToggle && !showClear && !showChange && !showFlash && !showDeadlist) return null;
 
   const actions = document.createElement('div');
   actions.className = 'view-edit-actions';
@@ -894,6 +917,16 @@ function renderViewEditActions({
     changeBtn.textContent = 'Change cue';
     changeBtn.addEventListener('click', onStartPin);
     actions.appendChild(changeBtn);
+  }
+
+  if (showDeadlist) {
+    const deadBtn = document.createElement('button');
+    deadBtn.type = 'button';
+    deadBtn.className = 'view-edit-btn view-edit-btn--deadlist';
+    deadBtn.textContent = "Don't match";
+    deadBtn.title = 'Stop this clip from matching a cue. A pin on this clip is dropped.';
+    deadBtn.addEventListener('click', () => onDeadlistClip(liveClip));
+    actions.appendChild(deadBtn);
   }
 
   if (showClear) {
@@ -1481,6 +1514,8 @@ function appendAdminActionButtons(actions, {
   pinned,
   onStartPin,
   onClearPin,
+  onDeadlistClip,
+  clipName = '',
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
@@ -1527,6 +1562,16 @@ function appendAdminActionButtons(actions, {
     changeBtn.addEventListener('click', onStartPin);
     actions.appendChild(changeBtn);
   }
+  const liveClip = String(clipName ?? '').trim();
+  if (!busy && matched && liveClip && onDeadlistClip) {
+    const deadBtn = document.createElement('button');
+    deadBtn.type = 'button';
+    deadBtn.className = 'view-edit-btn view-edit-btn--deadlist';
+    deadBtn.textContent = "Don't match";
+    deadBtn.title = 'Stop this clip from matching a cue. A pin on this clip is dropped.';
+    deadBtn.addEventListener('click', () => onDeadlistClip(liveClip));
+    actions.appendChild(deadBtn);
+  }
   if (!busy && pinned && onClearPin) {
     const clearBtn = document.createElement('button');
     clearBtn.type = 'button';
@@ -1567,6 +1612,7 @@ function renderAdminClipRow(root, {
   onBoardModeChange,
   onStartPin,
   onClearPin,
+  onDeadlistClip,
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
@@ -1610,6 +1656,8 @@ function renderAdminClipRow(root, {
     pinned,
     onStartPin,
     onClearPin,
+    onDeadlistClip,
+    clipName: payload?.clipName,
     onStartEdit,
     onCancelEdit,
     onSaveEdit,
@@ -1763,6 +1811,9 @@ function renderAdminDashboard(root, ctx) {
     onPinLast,
     onPinRow,
     onClearPin,
+    onDeadlistClip,
+    onAllowClip,
+    deadlist = null,
     getMomentWho = null,
     operatorViews = [],
     boardMode = 'dashboard',
@@ -1799,6 +1850,7 @@ function renderAdminDashboard(root, ctx) {
     onBoardModeChange,
     onStartPin,
     onClearPin,
+    onDeadlistClip,
     onStartEdit,
     onCancelEdit,
     onSaveEdit,
@@ -1852,6 +1904,8 @@ function renderAdminDashboard(root, ctx) {
         onStartPin,
         onPinLast,
         onPinRow,
+        onDeadlistClip,
+        onAllowClip,
         liveColorColumns,
       });
     }
@@ -1878,8 +1932,11 @@ function renderAdminDashboard(root, ctx) {
     onStartAlias,
     onStartCreate,
     onPinRow,
+    onDeadlistClip,
+    onAllowClip,
     compact: true,
   });
+  mountDeadlist(sessionPane, deadlist, onAllowClip);
 
   const showSetDrawer = setDrawerOpen === true && !busy;
   if (showSetDrawer) {
@@ -1938,6 +1995,9 @@ export function renderAdmin(root, {
   onPinLast,
   onPinRow,
   onClearPin,
+  onDeadlistClip,
+  onAllowClip,
+  deadlist = null,
   getMomentWho = null,
   boardMode = 'detail',
   onBoardModeChange,
@@ -1978,6 +2038,9 @@ export function renderAdmin(root, {
       onPinLast,
       onPinRow,
       onClearPin,
+      onDeadlistClip,
+      onAllowClip,
+      deadlist,
       getMomentWho,
       operatorViews,
       boardMode,
@@ -2017,6 +2080,7 @@ export function renderAdmin(root, {
     onBoardModeChange,
     onStartPin,
     onClearPin,
+    onDeadlistClip,
     cuePane,
     onCuePaneChange,
   });
@@ -2042,9 +2106,13 @@ export function renderAdmin(root, {
       onStartPin,
       onPinLast,
       onPinRow,
+      onDeadlistClip,
+      onAllowClip,
       liveColorColumns,
     });
   }
+
+  mountDeadlist(root, deadlist, onAllowClip);
 
   if (pinSession && pinPanel) {
     renderPinPanel(root, pinPanel);

@@ -1608,7 +1608,7 @@ function renderForm(root, settings, { onSave, onSync, onSimTransport, onSimStep,
   includeArrRow.appendChild(includeArrLabel);
   matchGroup.appendChild(includeArrRow);
   const matchHint = el('p', 'settings-sim-hint');
-  matchHint.textContent = 'Leave Arrangement matching off for Session-view shows. Stopping a Session clip can fall back to a leftover Arrangement clip that is not in the mix. Generic clips (INTRO, LAYOUT, DROP) never match a song.';
+  matchHint.textContent = 'Leave Arrangement matching off for Session-view shows. Stopping a Session clip can fall back to a leftover Arrangement clip that is not in the mix. Generic clips (INTRO, LAYOUT, DROP) never match a song. Don\'t match on a live cue keeps that clip name from auto-matching until you allow it.';
   matchGroup.appendChild(matchHint);
   bottomRow.appendChild(matchGroup);
 

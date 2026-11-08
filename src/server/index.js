@@ -33,6 +33,7 @@ export async function createViewServer({
   sessionLog,
   matchActions,
   setlistStore,
+  deadlistStore,
 }) {
   let lastPayload = null;
   let lastProgram = null;
@@ -154,6 +155,14 @@ export async function createViewServer({
     broadcast({
       type: 'setlist',
       setlist: setlistStore.getState(),
+    });
+  }
+
+  function broadcastDeadlist() {
+    if (!deadlistStore) return;
+    broadcast({
+      type: 'deadlist',
+      deadlist: { clips: deadlistStore.list() },
     });
   }
 
@@ -289,6 +298,7 @@ export async function createViewServer({
 
   registerSetlistRoutes(app, { setlistStore, log });
   setlistStore?.setOnChange?.(broadcastSetlist);
+  deadlistStore?.setOnChange?.(broadcastDeadlist);
 
   app.get('/views/:name', async (req, reply) => {
     try {
@@ -354,6 +364,9 @@ export async function createViewServer({
     }
     if (setlistStore) {
       init.setlist = setlistStore.getState();
+    }
+    if (deadlistStore) {
+      init.deadlist = { clips: deadlistStore.list() };
     }
     if (viewWantsClock(viewId)) {
       init.clock = buildClock();
